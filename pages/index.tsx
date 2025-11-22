@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ProfileHeader } from './components/ProfileHeader';
-import { TimeTracker } from './components/TimeTracker';
-import { CalendarView } from './components/CalendarView';
-import { AIAnalyst } from './components/AIAnalyst';
+import { ProfileHeader } from '../components/ProfileHeader';
+import { TimeTracker } from '../components/TimeTracker';
+import { CalendarView } from '../components/CalendarView';
+import { AIAnalyst } from '../components/AIAnalyst';
 import { UserProfile, WorkLog } from './types';
 import { LogOut } from 'lucide-react';
 
@@ -70,28 +70,29 @@ const generateMockData = (): WorkLog[] => {
 
 const App: React.FC = () => {
   const [user] = useState<UserProfile>(MOCK_USER);
-  const [workLogs, setWorkLogs] = useState<WorkLog[]>(() => {
-    try {
-      const saved = localStorage.getItem('cerventch_worklogs');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        // If the array is empty or from a previous empty state, fill it with mock data
-        return parsed.length > 0 ? parsed : generateMockData();
-      }
-      return generateMockData();
-    } catch {
-      return generateMockData();
-    }
-  });
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
 
-  const [activeLog, setActiveLog] = useState<WorkLog | null>(() => {
-     try {
-       const saved = localStorage.getItem('cerventch_activelog');
-       return saved ? JSON.parse(saved) : null;
-     } catch {
-       return null;
-     }
-  });
+  const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
+
+  useEffect(() => {
+    try {
+      const savedLogs = localStorage.getItem('cerventch_worklogs');
+      if (savedLogs) {
+        const parsed = JSON.parse(savedLogs);
+        setWorkLogs(parsed.length > 0 ? parsed : generateMockData());
+      } else {
+        setWorkLogs(generateMockData());
+      }
+
+      const savedActiveLog = localStorage.getItem('cerventch_activelog');
+      if (savedActiveLog) {
+        setActiveLog(JSON.parse(savedActiveLog));
+      }
+    } catch {
+      setWorkLogs(generateMockData());
+      setActiveLog(null);
+    }
+  }, []);
 
   // Persist logs
   useEffect(() => {
