@@ -5,6 +5,9 @@ import { CalendarView } from '@/components/CalendarView';
 import { AIAnalyst } from '@/components/AIAnalyst';
 import { UserProfile, WorkLog } from '@/types';
 import { LogOut } from 'lucide-react';
+import { withAuth } from '@/hoc/withAuth';
+import { supabase } from '@/services/supabase';
+import { useRouter } from 'next/router';
 
 // Mock User Data
 const MOCK_USER: UserProfile = {
@@ -69,6 +72,7 @@ const generateMockData = (): WorkLog[] => {
 };
 
 const App: React.FC = () => {
+  const router = useRouter();
   const [user] = useState<UserProfile>(MOCK_USER);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
 
@@ -139,10 +143,9 @@ const App: React.FC = () => {
     setActiveLog(null);
   };
 
-  const handleLogout = () => {
-    // In a real app, this would handle auth logic
-    console.log("User logged out");
-    alert("Logged out successfully");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
   };
 
   return (
@@ -222,4 +225,4 @@ const App: React.FC = () => {
   );
 };
 
-export default App;
+export default withAuth(App);

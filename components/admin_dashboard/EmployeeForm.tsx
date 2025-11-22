@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { Save, X, Upload } from 'lucide-react';
-import { Employee } from '@/types';
+import { Save, X, Upload, ChevronDown } from 'lucide-react';
+import { Employee, Position } from '@/types';
 
 interface EmployeeFormProps {
   onSubmit: (employee: Employee) => void;
   onCancel: () => void;
+  positions: Position[];
 }
 
-const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel }) => {
+const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positions }) => {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -59,7 +60,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel }) => {
                 <InputGroup label="First Name" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} placeholder="Jane" required />
                 <InputGroup label="Last Name" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" required />
                 <InputGroup label="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" placeholder="jane@company.com" required />
-                <InputGroup label="Phone Number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+1 (555) 000-0000" />
+                <InputGroup label="Phone Number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+63 (XXX) YYY-YYYY" />
                 <div className="md:col-span-2">
                     <InputGroup label="Home Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="123 Main St, City, State" />
                 </div>
@@ -70,7 +71,23 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel }) => {
         <div className="space-y-4 pt-4 border-t border-slate-800">
             <h3 className="text-lg font-semibold text-blue-400">Role & Position</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup label="Position/Title" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} placeholder="Software Engineer" required />
+                <div className="flex flex-col gap-2">
+                    <label className="text-sm font-medium text-slate-400">Position/Title <span className="text-red-400">*</span></label>
+                    <div className="relative">
+                        <select
+                            value={formData.position}
+                            onChange={e => setFormData({...formData, position: e.target.value})}
+                            required
+                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
+                        >
+                            <option value="" disabled>Select a position</option>
+                            {positions.map(p => (
+                                <option key={p.id} value={p.name}>{p.name}</option>
+                            ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                    </div>
+                </div>
                 {/* <InputGroup label="Department" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} placeholder="Engineering" /> */}
             </div>
         </div>
