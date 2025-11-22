@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect} from 'react';
 import { WorkLog } from '../types';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History } from 'lucide-react';
 
@@ -8,6 +8,11 @@ interface CalendarViewProps {
 
 export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
   
   const today = new Date();
   const currentMonth = today.getMonth();
@@ -101,7 +106,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                     Work Calendar
                 </h3>
                 <div className="flex items-center gap-4 text-slate-400 text-sm">
-                   <span>{monthName} {currentYear}</span>
+                   <span>{hasMounted ? `${monthName} ${currentYear}` : ''}</span>
                    <div className="flex gap-1">
                        <button className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 disabled"><ChevronLeft className="w-4 h-4" /></button>
                        <button className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 disabled"><ChevronRight className="w-4 h-4" /></button>
@@ -119,7 +124,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                 <div>Sat</div>
             </div>
             <div className="grid grid-cols-7 gap-2">
-                {renderDays()}
+                {hasMounted ? renderDays() : null}
             </div>
         </div>
 
@@ -136,7 +141,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                     <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                         <div>
                             <h3 className="text-lg font-bold text-white">
-                                {new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' })}
+                                {hasMounted ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' }) : ''}
                             </h3>
                             <p className="text-slate-400 text-xs">Daily Log Details</p>
                         </div>

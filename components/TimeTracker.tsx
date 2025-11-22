@@ -11,6 +11,7 @@ interface TimeTrackerProps {
 export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut, activeLog }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [now, setNow] = useState(new Date());
+  const [hasMounted, setHasMounted] = useState(false);
   const intervalRef = useRef<number | null>(null);
 
   // Effect for Live Clock
@@ -18,6 +19,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
     const clockInterval = window.setInterval(() => {
       setNow(new Date());
     }, 1000);
+    setHasMounted(true);
     return () => window.clearInterval(clockInterval);
   }, []);
 
@@ -80,10 +82,10 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
             <div className="flex flex-col items-center mb-6 border-b border-slate-700/50 pb-6">
                 <div className="text-slate-400 text-[10px] font-bold uppercase tracking-widest mb-1">Current Time</div>
                 <div className="text-4xl font-bold text-white font-mono tracking-tight">
-                    {now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    {hasMounted ? now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '00:00:00'}
                 </div>
                 <div className="text-blue-400 font-medium mt-1 text-sm">
-                    {now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}
+                    {hasMounted ? now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }): ''}
                 </div>
             </div>
 
