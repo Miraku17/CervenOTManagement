@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Filter, MapPin, Phone, Mail, Briefcase } from 'lucide-react';
-import { Employee } from '@/types';
+import { Employee, Position } from '@/types';
 import EmployeeForm from '@/components/admin_dashboard/EmployeeForm';
 
 interface EmployeeManagerProps {
   employees: Employee[];
   onSelectEmployee: (id: string) => void;
   onAddEmployee: (employee: Employee) => void;
+  positions: Position[];
 }
 
-const EmployeeManager: React.FC<EmployeeManagerProps> = ({ employees, onSelectEmployee, onAddEmployee }) => {
+const EmployeeManager: React.FC<EmployeeManagerProps> = ({ employees, onSelectEmployee, onAddEmployee, positions }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -30,7 +31,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ employees, onSelectEm
         >
           ← Back to List
         </button>
-        <EmployeeForm onSubmit={onAddEmployee} onCancel={() => setIsCreating(false)} />
+        <EmployeeForm onSubmit={onAddEmployee} onCancel={() => setIsCreating(false)} positions={positions} />
       </div>
     );
   }

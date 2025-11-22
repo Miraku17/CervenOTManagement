@@ -50,3 +50,8 @@ export interface AttendanceRecord {
 }
 
 export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME';
+
+export interface Position {
+  id: number;
+  name: string;
+}

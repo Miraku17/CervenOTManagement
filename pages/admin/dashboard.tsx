@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -10,7 +10,7 @@ import {
   X
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
-import { Employee, ViewState, WorkLog } from '@/types';
+import { Employee, ViewState, WorkLog, Position } from '@/types';
 import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
@@ -118,6 +118,19 @@ const AdminDashboard: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const [positions, setPositions] = useState<Position[]>([]);
+
+  useEffect(() => {
+    const fetchPositions = async () => {
+      const { data, error } = await supabase.from('positions').select('*');
+      if (data) {
+        setPositions(data);
+      }
+    };
+
+    fetchPositions();
+  }, []);
 
   const handleNavigate = (view: ViewState) => {
     setCurrentView(view);
@@ -287,6 +300,7 @@ const AdminDashboard: React.FC = () => {
                 employees={employees} 
                 onSelectEmployee={handleSelectEmployee}
                 onAddEmployee={handleAddEmployee}
+                positions={positions}
               />
             )}
 
