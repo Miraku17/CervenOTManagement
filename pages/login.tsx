@@ -1,16 +1,51 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/router';
 import Silk from '@/components/react_bits/Silk';
+import { supabase } from '@/services/supabase';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Logging in with:', { email, password });
-    router.push('/');
+    setLoading(true);
+    setError(null);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      setError(error.message);
+      setLoading(false);
+      return;
+    }
+
+    if (data.user) {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+
+      if (profileError) {
+        setError(profileError.message);
+        setLoading(false);
+        return;
+      }
+
+      if (profile && profile.role === 'admin') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push('/');
+      }
+      // router.push('/admin/dashboard');
+    }
   };
 
   return (
@@ -35,6 +70,8 @@ const LoginPage: React.FC = () => {
           </h1>
           <p className="mt-2 text-sm text-slate-400">Employee Portal Login</p>
         </div>
+
+        {error && <p className="text-red-500 text-center">{error}</p>}
 
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
@@ -71,9 +108,10 @@ const LoginPage: React.FC = () => {
 
           <button
             type="submit"
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-bold transition-colors"
+            disabled={loading}
+            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-bold transition-colors disabled:bg-slate-700 disabled:cursor-not-allowed"
           >
-            Sign In
+            {loading ? 'Signing In...' : 'Sign In'}
           </button>
         </form>
       </div>

@@ -15,6 +15,9 @@ import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditWorkLogView from '@/components/admin_dashboard/EditWorkLogView';
+import { withAuth } from '@/hoc/withAuth';
+import { supabase } from '@/services/supabase';
+import { useRouter } from 'next/router';
 
 // Helper to generate mock data for testing
 const generateMockData = (): WorkLog[] => {
@@ -110,6 +113,7 @@ const MOCK_EMPLOYEES: Employee[] = [
 ];
 
 const AdminDashboard: React.FC = () => {
+  const router = useRouter();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
@@ -205,7 +209,13 @@ const AdminDashboard: React.FC = () => {
         </nav>
 
         <div className="p-4 border-t border-slate-800">
-          <button className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors">
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              router.push('/login');
+            }}
+            className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors"
+          >
             <LogOut size={20} />
             <span>Logout</span>
           </button>
@@ -321,4 +331,4 @@ const SidebarItem: React.FC<{
   </button>
 );
 
-export default AdminDashboard;
+export default withAuth(AdminDashboard, 'admin');
