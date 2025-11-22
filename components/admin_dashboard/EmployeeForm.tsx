@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Save, X, Upload } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee } from '@/types';
 
 interface EmployeeFormProps {
   onSubmit: (employee: Employee) => void;

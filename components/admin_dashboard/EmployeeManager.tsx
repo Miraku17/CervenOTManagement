@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Search, Plus, Filter, MapPin, Phone, Mail, Briefcase } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee } from '@/types';
 import EmployeeForm from './EmployeeForm';
 
 interface EmployeeManagerProps {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Users, Clock, UserCheck, TrendingUp } from 'lucide-react';
-import { Employee } from '../../types';
+import { Employee } from '@/types';
 import { 
   BarChart, 
   Bar, 
