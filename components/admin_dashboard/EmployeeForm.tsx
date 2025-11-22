@@ -71,7 +71,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel }) => {
             <h3 className="text-lg font-semibold text-blue-400">Role & Position</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <InputGroup label="Position/Title" value={formData.position} onChange={e => setFormData({...formData, position: e.target.value})} placeholder="Software Engineer" required />
-                <InputGroup label="Department" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} placeholder="Engineering" />
+                {/* <InputGroup label="Department" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} placeholder="Engineering" /> */}
             </div>
         </div>
 
