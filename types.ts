@@ -23,3 +23,29 @@ export interface DayStats {
   totalSeconds: number;
   logs: WorkLog[];
 }
+
+
+export interface Employee {
+  id: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  address: string;
+  position: string;
+  department: string;
+  joinDate: string;
+  avatarUrl: string;
+  status: 'Active' | 'On Leave' | 'Terminated';
+}
+
+export interface AttendanceRecord {
+  id: string;
+  employeeId: string;
+  date: string; // YYYY-MM-DD
+  timeIn: string; // HH:mm
+  timeOut: string | null; // HH:mm
+  status: 'Present' | 'Late' | 'Absent' | 'Half Day';
+  totalHours?: number;
+}
+
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL';
