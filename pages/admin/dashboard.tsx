@@ -10,9 +10,62 @@ import {
   X
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
-import { Employee, ViewState } from '@/types';
+import { Employee, ViewState, WorkLog } from '@/types';
 import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
+import ExportDataView from '@/components/admin_dashboard/ExportDataView';
+import EditWorkLogView from '@/components/admin_dashboard/EditWorkLogView';
+
+// Helper to generate mock data for testing
+const generateMockData = (): WorkLog[] => {
+  const logs: WorkLog[] = [];
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    // Skip some days to simulate weekends or leaves, but keep it populated
+    // 20% chance to skip a day
+    if (Math.random() < 0.2) continue;
+
+    const dateObj = new Date(year, month, day);
+    const isWeekend = dateObj.getDay() === 0 || dateObj.getDay() === 6;
+
+    // On weekends, only work 30% of the time
+    if (isWeekend && Math.random() > 0.3) continue;
+
+    // Sometimes multiple sessions per day (10% chance)
+    const sessions = Math.random() > 0.9 ? 2 : 1;
+
+    for (let s = 0; s < sessions; s++) {
+        // Random start time between 8 AM (8) and 6 PM (18)
+        const startHour = 8 + Math.floor(Math.random() * 10); 
+        const startMinute = Math.floor(Math.random() * 60);
+        
+        // Random duration between 2 hours and 6 hours
+        const durationHours = 2 + Math.random() * 4;
+        const durationSeconds = Math.floor(durationHours * 3600);
+        
+        const startTime = new Date(year, month, day, startHour, startMinute).getTime();
+        const endTime = startTime + (durationSeconds * 1000);
+
+        // Don't generate future logs
+        if (startTime > Date.now()) continue;
+
+        logs.push({
+            id: `mock-${day}-${s}-${Math.random().toString(36).substr(2, 9)}`,
+            date: dateObj.toISOString().split('T')[0],
+            startTime: startTime,
+            endTime: endTime,
+            durationSeconds: durationSeconds,
+            status: 'COMPLETED'
+        });
+    }
+  }
+  return logs.sort((a, b) => a.startTime - b.startTime);
+};
+
 // Mock Data Initialization
 const MOCK_EMPLOYEES: Employee[] = [
   {
@@ -25,7 +78,8 @@ const MOCK_EMPLOYEES: Employee[] = [
     department: 'Engineering',
     joinDate: '2022-03-15',
     avatarUrl: 'https://picsum.photos/200/200?random=1',
-    status: 'Active'
+    status: 'Active',
+    workLogs: generateMockData(),
   },
   {
     id: '2',
@@ -37,7 +91,8 @@ const MOCK_EMPLOYEES: Employee[] = [
     department: 'Product',
     joinDate: '2021-11-01',
     avatarUrl: 'https://picsum.photos/200/200?random=2',
-    status: 'Active'
+    status: 'Active',
+    workLogs: generateMockData(),
   },
   {
     id: '3',
@@ -49,7 +104,8 @@ const MOCK_EMPLOYEES: Employee[] = [
     department: 'Design',
     joinDate: '2023-01-10',
     avatarUrl: 'https://picsum.photos/200/200?random=3',
-    status: 'On Leave'
+    status: 'On Leave',
+    workLogs: generateMockData(),
   }
 ];
 
@@ -76,6 +132,21 @@ const AdminDashboard: React.FC = () => {
     setEmployees(prev => [newEmployee, ...prev]);
     // Navigate to list or detail after adding
     setCurrentView('EMPLOYEES'); 
+  };
+
+  const handleUpdateLog = (employeeId: string, logId: string, newLog: Partial<WorkLog>) => {
+    setEmployees(prev => prev.map(emp => {
+      if (emp.id === employeeId) {
+        const newWorkLogs = emp.workLogs?.map(log => {
+          if (log.id === logId) {
+            return { ...log, ...newLog };
+          }
+          return log;
+        });
+        return { ...emp, workLogs: newWorkLogs };
+      }
+      return emp;
+    }));
   };
 
   const selectedEmployee = useMemo(() => 
@@ -121,9 +192,15 @@ const AdminDashboard: React.FC = () => {
           />
           <SidebarItem 
             icon={<Settings size={20} />} 
-            label="Settings" 
-            isActive={false} 
-            onClick={() => {}}
+            label="Export" 
+            isActive={currentView === 'EXPORT'} 
+            onClick={() => handleNavigate('EXPORT')}
+          />
+          <SidebarItem 
+            icon={<Users size={20} />} 
+            label="Edit Time" 
+            isActive={currentView === 'EDIT_TIME'}
+            onClick={() => handleNavigate('EDIT_TIME')}
           />
         </nav>
 
@@ -208,6 +285,14 @@ const AdminDashboard: React.FC = () => {
                 employee={selectedEmployee} 
                 onBack={() => handleNavigate('EMPLOYEES')}
               />
+            )}
+
+            {currentView === 'EXPORT' && (
+              <ExportDataView employees={employees} />
+            )}
+
+            {currentView === 'EDIT_TIME' && (
+              <EditWorkLogView employees={employees} onUpdateLog={handleUpdateLog} />
             )}
           </div>
         </div>

@@ -36,6 +36,7 @@ export interface Employee {
   joinDate: string;
   avatarUrl: string;
   status: 'Active' | 'On Leave' | 'Terminated';
+  workLogs?: WorkLog[];
 }
 
 export interface AttendanceRecord {
@@ -48,4 +49,4 @@ export interface AttendanceRecord {
   totalHours?: number;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME';
