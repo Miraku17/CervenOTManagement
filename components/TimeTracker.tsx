@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Play, Square, Clock } from 'lucide-react';
-import { WorkLog } from '../types';
+import { WorkLog } from '@/types';
 
 interface TimeTrackerProps {
   onClockIn: () => void;

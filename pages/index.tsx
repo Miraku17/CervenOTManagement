@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ProfileHeader } from '../components/ProfileHeader';
-import { TimeTracker } from '../components/TimeTracker';
-import { CalendarView } from '../components/CalendarView';
-import { AIAnalyst } from '../components/AIAnalyst';
-import { UserProfile, WorkLog } from '../types';
+import { ProfileHeader } from '@/components/ProfileHeader';
+import { TimeTracker } from '@/components/TimeTracker';
+import { CalendarView } from '@/components/CalendarView';
+import { AIAnalyst } from '@/components/AIAnalyst';
+import { UserProfile, WorkLog } from '@/types';
 import { LogOut } from 'lucide-react';
 
 // Mock User Data

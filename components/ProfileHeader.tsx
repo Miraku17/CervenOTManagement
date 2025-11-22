@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserProfile } from '../types';
+import { UserProfile } from '@/types';
 import { Mail, MapPin, Phone, BadgeCheck } from 'lucide-react';
 
 interface ProfileHeaderProps {

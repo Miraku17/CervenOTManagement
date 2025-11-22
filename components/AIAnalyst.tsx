@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { WorkLog } from '../types';
-import { generateTimesheetAnalysis } from '../services/geminiService';
+import { WorkLog } from '@/types';
+import { generateTimesheetAnalysis } from '@/services/geminiService';
 import { Sparkles, BrainCircuit, Loader2 } from 'lucide-react';
 
 interface AIAnalystProps {

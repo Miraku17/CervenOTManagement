@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useEffect} from 'react';
-import { WorkLog } from '../types';
+import { WorkLog } from '@/types';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History } from 'lucide-react';
 
 interface CalendarViewProps {

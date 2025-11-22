@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserProfile } from '../../types';
+import { UserProfile } from '@/types';
 
 interface SearchEmployeeProps {
   employees: UserProfile[];

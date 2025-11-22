@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserProfile, WorkLog } from '../../types';
+import { UserProfile, WorkLog } from '@/types';
 import { X } from 'lucide-react';
 
 interface EmployeeDetailsProps {

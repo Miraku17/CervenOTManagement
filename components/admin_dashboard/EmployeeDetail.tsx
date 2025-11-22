@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase } from 'lucide-react';
-import { Employee } from '@/types';
+import { Employee, AttendanceRecord } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
 
 interface EmployeeDetailProps {
