@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Save, X, Upload, ChevronDown } from 'lucide-react';
 import { Employee, Position } from '@/types';
+import { supabase } from '@/services/supabase';
 
 interface EmployeeFormProps {
   onSubmit: (employee: Employee) => void;
@@ -18,26 +19,85 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     position: '',
     department: '',
   });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Function to generate a random password
+  const generateRandomPassword = () => {
+    return Math.random().toString(36).slice(-12);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Basic Validation
-    if (!formData.firstName || !formData.email) return;
+    setError(null);
+    setSuccess(false);
+    setLoading(true);
 
-    const newEmployee: Employee = {
-      id: Date.now().toString(),
-      fullName: `${formData.firstName} ${formData.lastName}`,
-      email: formData.email,
-      phone: formData.phone,
-      address: formData.address,
-      position: formData.position,
-      department: formData.department,
-      joinDate: new Date().toISOString().split('T')[0],
-      avatarUrl: `https://picsum.photos/200/200?random=${Date.now()}`,
-      status: 'Active'
-    };
+    if (!formData.firstName || !formData.email) {
+      setError('Please fill all required fields.');
+      setLoading(false);
+      return;
+    }
 
-    onSubmit(newEmployee);
+    try {
+      const tempPassword = generateRandomPassword();
+
+      // 1. Create user with a temporary password
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: tempPassword,
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) throw new Error('Could not create user.');
+
+      // 2. Insert profile data
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        position: formData.position,
+        role: 'user',
+        // avatar_url: `https://picsum.photos/200/200?random=${Date.now()}`,
+        join_date: new Date().toISOString().split('T')[0],
+        status: 'Invited'
+      });
+
+      if (profileError) throw profileError;
+      
+      // 3. Send password recovery email (invitation)
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      if (resetError) throw resetError;
+
+      // 4. Update UI
+      const newEmployee: Employee = {
+        id: authData.user.id,
+        fullName: `${formData.firstName} ${formData.lastName}`,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        position: formData.position,
+        department: formData.department,
+        joinDate: new Date().toISOString().split('T')[0],
+        avatarUrl: `https://picsum.photos/200/200?random=${Date.now()}`,
+        status: 'Invited'
+      };
+
+      onSubmit(newEmployee);
+      setSuccess(true);
+
+    } catch (err: any) {
+      setError(err.message || 'An unexpected error occurred.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,15 +105,17 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
       <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-6">
         <div>
             <h2 className="text-2xl font-bold text-white">Add New Employee</h2>
-            <p className="text-slate-400 mt-1">Fill in the information to create a new staff profile.</p>
+            <p className="text-slate-400 mt-1">An invitation email will be sent for the employee to set up their password.</p>
         </div>
         <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
             <X className="text-slate-400" />
         </button>
       </div>
 
+      {error && <p className="text-red-500 text-center mb-4 p-3 bg-red-500/10 rounded-lg">{error}</p>}
+      {success && <p className="text-emerald-500 text-center mb-4 p-3 bg-emerald-500/10 rounded-lg">Invitation sent successfully!</p>}
+
       <form onSubmit={handleSubmit} className="space-y-8">
-        {/* Personal Info */}
         <div className="space-y-4">
             <h3 className="text-lg font-semibold text-blue-400">Personal Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -67,7 +129,6 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
             </div>
         </div>
 
-        {/* Role Info */}
         <div className="space-y-4 pt-4 border-t border-slate-800">
             <h3 className="text-lg font-semibold text-blue-400">Role & Position</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -88,24 +149,16 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                     </div>
                 </div>
-                {/* <InputGroup label="Department" value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})} placeholder="Engineering" /> */}
             </div>
         </div>
 
         <div className="pt-6 flex items-center justify-end gap-4">
-            <button 
-                type="button" 
-                onClick={onCancel}
-                className="px-6 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-medium"
-            >
+            <button type="button" onClick={onCancel} disabled={loading} className="px-6 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-medium disabled:opacity-50">
                 Cancel
             </button>
-            <button 
-                type="submit"
-                className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-900/50"
-            >
-                <Save size={18} />
-                Save Employee
+            <button type="submit" disabled={loading} className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-900/50 disabled:bg-slate-700 disabled:cursor-not-allowed">
+                {loading ? <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span> : <Save size={18} />}
+                {loading ? 'Sending Invitation...' : 'Save & Send Invite'}
             </button>
         </div>
       </form>
@@ -116,7 +169,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
 const InputGroup: React.FC<{
   label: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
   type?: string;
   placeholder?: string;
   required?: boolean;
