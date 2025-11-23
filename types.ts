@@ -16,6 +16,7 @@ export interface WorkLog {
   endTime: number | null; // Timestamp
   durationSeconds: number;
   status: 'COMPLETED' | 'IN_PROGRESS';
+  comment?: string;
 }
 
 export interface DayStats {
