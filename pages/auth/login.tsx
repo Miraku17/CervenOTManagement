@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
 
@@ -8,12 +9,22 @@ const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [displayedMessage, setDisplayedMessage] = useState<string | null>(null); // State for displaying messages
   const router = useRouter();
+
+  useEffect(() => {
+    if (router.query.message === 'reset_link_expired') {
+      setDisplayedMessage('Reset password link is invalid or has expired. Please try again.');
+      // Clear the query parameter from the URL
+      router.replace(router.pathname, undefined, { shallow: true });
+    }
+  }, [router.query.message, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setDisplayedMessage(null); // Clear any previous messages on login attempt
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -71,6 +82,8 @@ const LoginPage: React.FC = () => {
         </div>
 
         {error && <p className="text-red-500 text-center">{error}</p>}
+        {displayedMessage && <p className="text-yellow-500 text-center">{displayedMessage}</p>}
+
 
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
@@ -103,6 +116,12 @@ const LoginPage: React.FC = () => {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div className="flex items-center justify-end">
+            <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300">
+              Forgot Password?
+            </Link>
           </div>
 
           <button
