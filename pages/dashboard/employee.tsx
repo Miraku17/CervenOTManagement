@@ -5,6 +5,8 @@ import Silk from '@/components/react_bits/Silk';
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/router';
 import { UserProfile, WorkLog } from '../../types';
+import FeatureCard from '@/components/FeatureCard';
+import { withAuth } from '../../hoc/withAuth';
 
 // Mock User Data
 const MOCK_USER: UserProfile = {
@@ -69,6 +71,7 @@ const generateMockData = (): WorkLog[] => {
 };
 
 const EmployeeDashboard: React.FC = () => {
+  const { user, loading } = useUser();
   const router = useRouter();
 
   useEffect(() => {
