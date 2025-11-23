@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
-import Link from 'next/link';
-import { Eye, EyeOff } from 'lucide-react';
-import Silk from '@/components/react_bits/Silk';
-import { supabase } from '@/services/supabase';
-import { useUser } from '@/hooks/useUser'; // Import useUser hook
-
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/router";
+import Link from "next/link";
+import { Eye, EyeOff } from "lucide-react";
+import { supabase } from "@/services/supabase";
+import { useUser } from "@/hooks/useUser"; // Import useUser hook
+import Aurora from "@/components/react_bits/Aurora";
 const LoginPage: React.FC = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,18 +18,20 @@ const LoginPage: React.FC = () => {
   // Handle redirect if user is already logged in
   useEffect(() => {
     if (!userLoading && user) {
-      if (user.role === 'admin') {
-        router.replace('/admin/dashboard');
+      if (user.role === "admin") {
+        router.replace("/admin/dashboard");
       } else {
-        router.replace('/dashboard/employee');
+        router.replace("/dashboard/employee");
       }
     }
   }, [user, userLoading, router]);
 
   // Handle messages from query parameters (e.g., reset_link_expired)
   useEffect(() => {
-    if (router.query.message === 'reset_link_expired') {
-      setDisplayedMessage('Reset password link is invalid or has expired. Please try again.');
+    if (router.query.message === "reset_link_expired") {
+      setDisplayedMessage(
+        "Reset password link is invalid or has expired. Please try again."
+      );
       // Clear the query parameter from the URL
       router.replace(router.pathname, undefined, { shallow: true });
     }
@@ -56,9 +57,9 @@ const LoginPage: React.FC = () => {
     if (data.user) {
       // Fetch profile role after successful login
       const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
         .single();
 
       if (profileError) {
@@ -67,10 +68,10 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      if (profile && profile.role === 'admin') {
-        router.push('/admin/dashboard');
+      if (profile && profile.role === "admin") {
+        router.push("/admin/dashboard");
       } else {
-        router.push('/dashboard/employee');
+        router.push("/dashboard/employee");
       }
     }
   };
@@ -86,15 +87,13 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
-
       {/* 🌈 Silk Full-Screen Background */}
       <div className="fixed inset-0 -z-10 w-full h-full">
-        <Silk
-          speed={4}
-          scale={1}
-          color="#155efd"
-          noiseIntensity={1.5}
-          rotation={0}
+        <Aurora
+          colorStops={["#3B82F6", "#1D4ED8", "#1E3A8A"]}
+          blend={1}
+          amplitude={1.0}
+          speed={1}
         />
       </div>
 
@@ -108,12 +107,16 @@ const LoginPage: React.FC = () => {
         </div>
 
         {error && <p className="text-red-500 text-center">{error}</p>}
-        {displayedMessage && <p className="text-yellow-500 text-center">{displayedMessage}</p>}
-
+        {displayedMessage && (
+          <p className="text-yellow-500 text-center">{displayedMessage}</p>
+        )}
 
         <form className="space-y-6" onSubmit={handleLogin}>
           <div>
-            <label htmlFor="email" className="text-sm font-bold text-slate-400 block mb-2">
+            <label
+              htmlFor="email"
+              className="text-sm font-bold text-slate-400 block mb-2"
+            >
               Email Address
             </label>
             <input
@@ -129,13 +132,16 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="relative">
-            <label htmlFor="password" className="text-sm font-bold text-slate-400 block mb-2">
+            <label
+              htmlFor="password"
+              className="text-sm font-bold text-slate-400 block mb-2"
+            >
               Password
             </label>
             <input
               id="password"
               name="password"
-              type={showPassword ? 'text' : 'password'}
+              type={showPassword ? "text" : "password"}
               autoComplete="current-password"
               required
               value={password}
@@ -152,7 +158,10 @@ const LoginPage: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-end">
-            <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300">
+            <Link
+              href="/auth/forgot-password"
+              className="text-sm text-blue-400 hover:text-blue-300"
+            >
               Forgot Password?
             </Link>
           </div>
@@ -162,7 +171,7 @@ const LoginPage: React.FC = () => {
             disabled={loading}
             className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-bold transition-colors disabled:bg-slate-700 disabled:cursor-not-allowed"
           >
-            {loading ? 'Signing In...' : 'Sign In'}
+            {loading ? "Signing In..." : "Sign In"}
           </button>
         </form>
       </div>
