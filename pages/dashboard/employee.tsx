@@ -71,7 +71,7 @@ const generateMockData = (): WorkLog[] => {
   return logs.sort((a, b) => a.startTime - b.startTime);
 };
 
-const App: React.FC = () => {
+const EmployeeDashboard: React.FC = () => {
   const router = useRouter();
   const [user] = useState<UserProfile>(MOCK_USER);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
@@ -128,7 +128,7 @@ const App: React.FC = () => {
     setActiveLog(newLog);
   };
 
-  const handleClockOut = (finalDurationSeconds: number) => {
+  const handleClockOut = (finalDurationSeconds: number, comment?: string) => {
     if (!activeLog) return;
     
     const now = Date.now();
@@ -136,7 +136,8 @@ const App: React.FC = () => {
       ...activeLog,
       endTime: now,
       durationSeconds: finalDurationSeconds,
-      status: 'COMPLETED'
+      status: 'COMPLETED',
+      comment: comment,
     };
 
     setWorkLogs(prev => [...prev, completedLog]);
@@ -225,4 +226,4 @@ const App: React.FC = () => {
   );
 };
 
-export default withAuth(App);
+export default withAuth(EmployeeDashboard);
