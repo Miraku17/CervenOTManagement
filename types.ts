@@ -36,7 +36,7 @@ export interface Employee {
   department: string;
   joinDate: string;
   avatarUrl: string;
-  status: 'Active' | 'On Leave' | 'Terminated';
+  status: 'Active' | 'On Leave' | 'Terminated' | 'Invited';
   workLogs?: WorkLog[];
 }
 
