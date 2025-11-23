@@ -42,9 +42,8 @@ const LoginPage: React.FC = () => {
       if (profile && profile.role === 'admin') {
         router.push('/admin/dashboard');
       } else {
-        router.push('/');
+        router.push('/dashboard/employee');
       }
-      // router.push('/admin/dashboard');
     }
   };
 

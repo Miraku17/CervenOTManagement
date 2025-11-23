@@ -71,7 +71,7 @@ const generateMockData = (): WorkLog[] => {
   return logs.sort((a, b) => a.startTime - b.startTime);
 };
 
-const App: React.FC = () => {
+const EmployeeDashboard: React.FC = () => {
   const router = useRouter();
   const [user] = useState<UserProfile>(MOCK_USER);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
@@ -225,4 +225,4 @@ const App: React.FC = () => {
   );
 };
 
-export default withAuth(App);
+export default withAuth(EmployeeDashboard);

@@ -28,7 +28,7 @@ export const withAuth = <P extends object>(
     }
 
     if (requiredRole && user.role !== requiredRole) {
-      router.replace('/'); // or a dedicated 'unauthorized' page
+      router.replace('/dashboard/employee'); // Redirect to employee dashboard
       return null;
     }
 
