@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null); // State for displaying messages
@@ -102,20 +104,27 @@ const LoginPage: React.FC = () => {
             />
           </div>
 
-          <div>
+          <div className="relative">
             <label htmlFor="password" className="text-sm font-bold text-slate-400 block mb-2">
               Password
             </label>
             <input
               id="password"
               name="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute inset-y-0 right-0 top-6 flex items-center px-3 text-white"
+            >
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
           </div>
 
           <div className="flex items-center justify-end">

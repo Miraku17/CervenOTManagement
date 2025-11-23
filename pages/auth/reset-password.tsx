@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import { Eye, EyeOff } from 'lucide-react';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
 import Link from 'next/link';
@@ -7,6 +8,8 @@ import Link from 'next/link';
 const ResetPasswordPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,36 +100,50 @@ const ResetPasswordPage: React.FC = () => {
 
         {!message && ( // Only show form if no success message is displayed
             <form className="space-y-6" onSubmit={handleResetPassword}>
-            <div>
+            <div className="relative">
                 <label htmlFor="newPassword" className="text-sm font-bold text-slate-400 block mb-2">
                 New Password
                 </label>
                 <input
                 id="newPassword"
                 name="newPassword"
-                type="password"
+                type={showNewPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 required
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute inset-y-0 right-0 top-6 flex items-center px-3 text-white"
+                >
+                    {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
             </div>
 
-            <div>
+            <div className="relative">
                 <label htmlFor="confirmPassword" className="text-sm font-bold text-slate-400 block mb-2">
                 Confirm New Password
                 </label>
                 <input
                 id="confirmPassword"
                 name="confirmPassword"
-                type="password"
+                type={showConfirmPassword ? 'text' : 'password'}
                 autoComplete="new-password"
                 required
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
+                <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute inset-y-0 right-0 top-6 flex items-center px-3 text-white"
+                >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
             </div>
 
             <button
