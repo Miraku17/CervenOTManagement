@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 import { Save, X, ChevronDown } from "lucide-react";
-import { Position } from "@/types";
-import { supabase } from "@/services/supabase";
+import { Employee, Position } from "@/types";
 
 interface EmployeeFormProps {
   onCancel: () => void;
+  onSubmit: (employee: Employee) => void;
   positions: Position[];
 }
 
-const EmployeeForm: React.FC<EmployeeFormProps> = ({ onCancel, positions }) => {
+const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positions }) => {
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -42,51 +42,42 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onCancel, positions }) => {
     setSuccess(false);
     setLoading(true);
 
-    if (
-      !formData.firstName ||
-      !formData.lastName ||
-      !formData.email ||
-      !formData.position
-    ) {
+    const selectedPosition = positions.find(p => p.name === formData.position);
+
+    if (!formData.firstName || !formData.lastName || !formData.email || !selectedPosition) {
       setError("First Name, Last Name, Email, and Position are required.");
       setLoading(false);
       return;
     }
 
     try {
-      // 1. Create user with Admin API
-      const { data: authData, error: authError } =
-        await supabase.auth.admin.createUser({
-          email: formData.email,
-          email_confirm: false, // user must verify
-          password: Math.random().toString(36).slice(-12), // optional temporary password
-        });
-
-      if (authError) throw authError;
-      if (!authData.user) throw new Error("Could not create user.");
-
-      const userId = authData.user.id;
-
-      // 2. Insert profile row
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: userId,
-        role: "employee",
-        email: formData.email,
-        first_name: formData.firstName || null,
-        last_name: formData.lastName || null,
-        position_id: null,
-        contact_number: formData.phone || null,
-        address: formData.address || null,
+      const response = await fetch('/api/create-employee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          positionId: selectedPosition.id,
+          password: Math.random().toString(36).slice(-12), // Generate a random temporary password
+        }),
       });
 
-      if (profileError) throw profileError;
+      const result = await response.json();
 
-      // 3. Stop loading, show success, and reset form
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create employee');
+      }
+
+      onSubmit(result.employee);
       setSuccess(true);
-      setLoading(false);
-      resetForm();
+      setTimeout(() => {
+        resetForm();
+      }, 3000);
+
     } catch (err: any) {
       setError(err.message || "An unexpected error occurred.");
+    } finally {
       setLoading(false);
     }
   };
@@ -97,8 +88,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onCancel, positions }) => {
         <div>
           <h2 className="text-2xl font-bold text-white">Add New Employee</h2>
           <p className="text-slate-400 mt-1">
-            An email confirmation will be sent for the employee to verify their
-            account.
+            An invitation email will be sent for the employee to set up their password.
           </p>
         </div>
         <button
@@ -116,7 +106,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onCancel, positions }) => {
       )}
       {success && (
         <p className="text-emerald-500 text-center mb-4 p-3 bg-emerald-500/10 rounded-lg">
-          Employee created successfully! Email confirmation sent.
+          Employee created successfully! Please tell the employee to reset their password.
         </p>
       )}
 
@@ -227,7 +217,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onCancel, positions }) => {
             ) : (
               <Save size={18} />
             )}
-            {loading ? "Sending..." : "Send Invite"}
+            {loading ? "Sending Invitation..." : "Save & Send Invite"}
           </button>
         </div>
       </form>
