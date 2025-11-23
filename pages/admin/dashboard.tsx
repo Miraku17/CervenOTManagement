@@ -225,7 +225,7 @@ const AdminDashboard: React.FC = () => {
           <button
             onClick={async () => {
               await supabase.auth.signOut();
-              router.push('/login');
+              router.push('/auth/login');
             }}
             className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors"
           >

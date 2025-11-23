@@ -23,7 +23,7 @@ export const withAuth = <P extends object>(
     }
 
     if (!user) {
-      router.replace('/login');
+      router.replace('/auth/login');
       return null;
     }
 

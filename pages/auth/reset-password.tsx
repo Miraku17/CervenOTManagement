@@ -33,7 +33,7 @@ const ResetPasswordPage: React.FC = () => {
     setMessage('If your email is registered, a password reset link has been sent.');
     setLoading(false);
     // Optionally, redirect after a short delay
-    // setTimeout(() => router.push('/login'), 3000);
+    // setTimeout(() => router.push('/auth/login'), 3000);
   };
 
   return (

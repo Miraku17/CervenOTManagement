@@ -1,31 +1,39 @@
-import React, { useState } from 'react';
-import { Save, X, Upload, ChevronDown } from 'lucide-react';
-import { Employee, Position } from '@/types';
-import { supabase } from '@/services/supabase';
+import React, { useState } from "react";
+import { Save, X, ChevronDown } from "lucide-react";
+import { Employee, Position } from "@/types";
 
 interface EmployeeFormProps {
-  onSubmit: (employee: Employee) => void;
   onCancel: () => void;
+  onSubmit: (employee: Employee) => void;
   positions: Position[];
 }
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positions }) => {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    address: '',
-    position: '',
-    department: '',
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    address: "",
+    position: "",
+    department: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  // Function to generate a random password
-  const generateRandomPassword = () => {
-    return Math.random().toString(36).slice(-12);
+  const resetForm = () => {
+    setFormData({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      address: "",
+      position: "",
+      department: "",
+    });
+    setSuccess(false);
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,67 +42,41 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     setSuccess(false);
     setLoading(true);
 
-    if (!formData.firstName || !formData.email) {
-      setError('Please fill all required fields.');
+    const selectedPosition = positions.find(p => p.name === formData.position);
+
+    if (!formData.firstName || !formData.lastName || !formData.email || !selectedPosition) {
+      setError("First Name, Last Name, Email, and Position are required.");
       setLoading(false);
       return;
     }
 
     try {
-      const tempPassword = generateRandomPassword();
-
-      // 1. Create user with a temporary password
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: tempPassword,
+      const response = await fetch('/api/create-employee', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          positionId: selectedPosition.id,
+          password: Math.random().toString(36).slice(-12), // Generate a random temporary password
+        }),
       });
 
-      if (authError) throw authError;
-      if (!authData.user) throw new Error('Could not create user.');
+      const result = await response.json();
 
-      // 2. Insert profile data
-      const { error: profileError } = await supabase.from('profiles').insert({
-        id: authData.user.id,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        position: formData.position,
-        role: 'user',
-        // avatar_url: `https://picsum.photos/200/200?random=${Date.now()}`,
-        join_date: new Date().toISOString().split('T')[0],
-        status: 'Invited'
-      });
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create employee');
+      }
 
-      if (profileError) throw profileError;
-      
-      // 3. Send password recovery email (invitation)
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(formData.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (resetError) throw resetError;
-
-      // 4. Update UI
-      const newEmployee: Employee = {
-        id: authData.user.id,
-        fullName: `${formData.firstName} ${formData.lastName}`,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        position: formData.position,
-        department: formData.department,
-        joinDate: new Date().toISOString().split('T')[0],
-        avatarUrl: `https://picsum.photos/200/200?random=${Date.now()}`,
-        status: 'Invited'
-      };
-
-      onSubmit(newEmployee);
+      onSubmit(result.employee);
       setSuccess(true);
+      setTimeout(() => {
+        resetForm();
+      }, 3000);
 
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.message || "An unexpected error occurred.");
     } finally {
       setLoading(false);
     }
@@ -104,62 +86,139 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-2xl max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-8 border-b border-slate-800 pb-6">
         <div>
-            <h2 className="text-2xl font-bold text-white">Add New Employee</h2>
-            <p className="text-slate-400 mt-1">An invitation email will be sent for the employee to set up their password.</p>
+          <h2 className="text-2xl font-bold text-white">Add New Employee</h2>
+          <p className="text-slate-400 mt-1">
+            An invitation email will be sent for the employee to set up their password.
+          </p>
         </div>
-        <button onClick={onCancel} className="p-2 hover:bg-slate-800 rounded-full transition-colors">
-            <X className="text-slate-400" />
+        <button
+          onClick={onCancel}
+          className="p-2 hover:bg-slate-800 rounded-full transition-colors"
+        >
+          <X className="text-slate-400" />
         </button>
       </div>
 
-      {error && <p className="text-red-500 text-center mb-4 p-3 bg-red-500/10 rounded-lg">{error}</p>}
-      {success && <p className="text-emerald-500 text-center mb-4 p-3 bg-emerald-500/10 rounded-lg">Invitation sent successfully!</p>}
+      {error && (
+        <p className="text-red-500 text-center mb-4 p-3 bg-red-500/10 rounded-lg">
+          {error}
+        </p>
+      )}
+      {success && (
+        <p className="text-emerald-500 text-center mb-4 p-3 bg-emerald-500/10 rounded-lg">
+          Employee created successfully! Please tell the employee to reset their password.
+        </p>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-blue-400">Personal Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <InputGroup label="First Name" value={formData.firstName} onChange={e => setFormData({...formData, firstName: e.target.value})} placeholder="Jane" required />
-                <InputGroup label="Last Name" value={formData.lastName} onChange={e => setFormData({...formData, lastName: e.target.value})} placeholder="Doe" required />
-                <InputGroup label="Email Address" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} type="email" placeholder="jane@company.com" required />
-                <InputGroup label="Phone Number" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="+63 (XXX) YYY-YYYY" />
-                <div className="md:col-span-2">
-                    <InputGroup label="Home Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="123 Main St, City, State" />
-                </div>
+          <h3 className="text-lg font-semibold text-blue-400">
+            Personal Information
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <InputGroup
+              label="First Name"
+              value={formData.firstName}
+              onChange={(e) =>
+                setFormData({ ...formData, firstName: e.target.value })
+              }
+              placeholder="Jane"
+              required
+            />
+            <InputGroup
+              label="Last Name"
+              value={formData.lastName}
+              onChange={(e) =>
+                setFormData({ ...formData, lastName: e.target.value })
+              }
+              placeholder="Doe"
+              required
+            />
+            <InputGroup
+              label="Email Address"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({ ...formData, email: e.target.value })
+              }
+              type="email"
+              placeholder="jane@company.com"
+              required
+            />
+            <InputGroup
+              label="Phone Number"
+              value={formData.phone}
+              onChange={(e) =>
+                setFormData({ ...formData, phone: e.target.value })
+              }
+              placeholder="+63 (XXX) YYY-YYYY"
+            />
+            <div className="md:col-span-2">
+              <InputGroup
+                label="Home Address"
+                value={formData.address}
+                onChange={(e) =>
+                  setFormData({ ...formData, address: e.target.value })
+                }
+                placeholder="123 Main St, City, State"
+              />
             </div>
+          </div>
         </div>
 
         <div className="space-y-4 pt-4 border-t border-slate-800">
-            <h3 className="text-lg font-semibold text-blue-400">Role & Position</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-slate-400">Position/Title <span className="text-red-400">*</span></label>
-                    <div className="relative">
-                        <select
-                            value={formData.position}
-                            onChange={e => setFormData({...formData, position: e.target.value})}
-                            required
-                            className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
-                        >
-                            <option value="" disabled>Select a position</option>
-                            {positions.map(p => (
-                                <option key={p.id} value={p.name}>{p.name}</option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-                    </div>
-                </div>
+          <h3 className="text-lg font-semibold text-blue-400">
+            Role & Position
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-400">
+                Position/Title <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.position}
+                  onChange={(e) =>
+                    setFormData({ ...formData, position: e.target.value })
+                  }
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
+                >
+                  <option value="" disabled>
+                    Select a position
+                  </option>
+                  {positions.map((p) => (
+                    <option key={p.id} value={p.name}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+              </div>
             </div>
+          </div>
         </div>
 
         <div className="pt-6 flex items-center justify-end gap-4">
-            <button type="button" onClick={onCancel} disabled={loading} className="px-6 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-medium disabled:opacity-50">
-                Cancel
-            </button>
-            <button type="submit" disabled={loading} className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-900/50 disabled:bg-slate-700 disabled:cursor-not-allowed">
-                {loading ? <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span> : <Save size={18} />}
-                {loading ? 'Sending Invitation...' : 'Save & Send Invite'}
-            </button>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={loading}
+            className="px-6 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors font-medium disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors font-medium flex items-center gap-2 shadow-lg shadow-blue-900/50 disabled:bg-slate-700 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+            ) : (
+              <Save size={18} />
+            )}
+            {loading ? "Sending Invitation..." : "Save & Send Invite"}
+          </button>
         </div>
       </form>
     </div>
@@ -169,14 +228,18 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
 const InputGroup: React.FC<{
   label: string;
   value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => void;
+  onChange: (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => void;
   type?: string;
   placeholder?: string;
   required?: boolean;
 }> = ({ label, value, onChange, type = "text", placeholder, required }) => (
   <div className="flex flex-col gap-2">
-    <label className="text-sm font-medium text-slate-400">{label} {required && <span className="text-red-400">*</span>}</label>
-    <input 
+    <label className="text-sm font-medium text-slate-400">
+      {label} {required && <span className="text-red-400">*</span>}
+    </label>
+    <input
       type={type}
       value={value}
       onChange={onChange}
