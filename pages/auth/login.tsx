@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
+import { useUser } from '@/hooks/useUser'; // Import useUser hook
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -13,7 +14,20 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null); // State for displaying messages
   const router = useRouter();
+  const { user, loading: userLoading } = useUser(); // Use the useUser hook
 
+  // Handle redirect if user is already logged in
+  useEffect(() => {
+    if (!userLoading && user) {
+      if (user.role === 'admin') {
+        router.replace('/admin/dashboard');
+      } else {
+        router.replace('/dashboard/employee');
+      }
+    }
+  }, [user, userLoading, router]);
+
+  // Handle messages from query parameters (e.g., reset_link_expired)
   useEffect(() => {
     if (router.query.message === 'reset_link_expired') {
       setDisplayedMessage('Reset password link is invalid or has expired. Please try again.');
@@ -40,6 +54,7 @@ const LoginPage: React.FC = () => {
     }
 
     if (data.user) {
+      // Fetch profile role after successful login
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role')
@@ -59,6 +74,15 @@ const LoginPage: React.FC = () => {
       }
     }
   };
+
+  // Show a loading indicator while checking user session
+  if (userLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-slate-950">
+        <p className="text-white">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
