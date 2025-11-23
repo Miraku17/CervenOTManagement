@@ -23,7 +23,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <BadgeCheck className="w-6 h-6 text-blue-400" />
             </h2>
             <div className="flex flex-col md:flex-row md:items-center gap-2 mt-1">
-              <span className="text-lg text-blue-400 font-medium">{positions.name}</span>
+              <span className="text-lg text-blue-400 font-medium">{positions?.name}</span>
               <span className="hidden md:inline text-slate-600">•</span>
               {/* <span className="text-slate-400 font-medium">{user.department}</span> */}
               <span className="hidden md:inline text-slate-600">•</span>

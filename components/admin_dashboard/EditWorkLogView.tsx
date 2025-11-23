@@ -58,16 +58,11 @@ const EditWorkLogView: React.FC<EditWorkLogViewProps> = ({ employees, onUpdateLo
                 </tr>
               </thead>
               <tbody className="bg-slate-900 divide-y divide-slate-800">
-                {selectedEmployee.workLogs?.map(log => (
-                  <tr key={log.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{log.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{new Date(log.startTime).toLocaleTimeString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-white">{log.endTime ? new Date(log.endTime).toLocaleTimeString() : 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-right">
-                      <button onClick={() => setEditingLog(log)} className="text-blue-500 hover:text-blue-700">Edit</button>
-                    </td>
-                  </tr>
-                ))}
+                <tr>
+                  <td colSpan={4} className="px-6 py-4 whitespace-nowrap text-sm text-center text-slate-400">
+                    No work logs found for this employee.
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

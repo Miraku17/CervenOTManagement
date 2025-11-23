@@ -8,32 +8,9 @@ interface EmployeeDetailProps {
   onBack: () => void;
 }
 
-// Mock generator for attendance
-const generateMockAttendance = (employeeId: string, date: Date): AttendanceRecord => {
-  const isWeekend = getDay(date) === 0 || getDay(date) === 6;
-  if (isWeekend) return { id: 'x', employeeId, date: format(date, 'yyyy-MM-dd'), timeIn: '-', timeOut: '-', status: 'Absent' };
-  
-  return {
-    id: Math.random().toString(),
-    employeeId,
-    date: format(date, 'yyyy-MM-dd'),
-    timeIn: '09:00',
-    timeOut: '17:30',
-    status: 'Present',
-    totalHours: 8.5
-  };
-};
-
 const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendance, setAttendance] = useState<AttendanceRecord | null>(null);
-
-  useEffect(() => {
-    // Simulate fetching data for the specific date
-    const dateObj = parseISO(selectedDate);
-    const record = generateMockAttendance(employee.id, dateObj);
-    setAttendance(record);
-  }, [selectedDate, employee.id]);
 
   return (
     <div className="animate-fade-in space-y-6">

@@ -18,14 +18,7 @@ interface DashboardHomeProps {
 }
 
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
-  // Mock Chart Data
-  const attendanceData = [
-    { name: 'Mon', present: 40, late: 2 },
-    { name: 'Tue', present: 38, late: 4 },
-    { name: 'Wed', present: 42, late: 0 },
-    { name: 'Thu', present: 35, late: 5 },
-    { name: 'Fri', present: 41, late: 1 },
-  ];
+  const attendanceData: { name: string; present: number; late: number; }[] = [];
 
   return (
     <div className="space-y-6">

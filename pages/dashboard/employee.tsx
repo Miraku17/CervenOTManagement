@@ -1,18 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
-import { CalendarView } from '@/components/CalendarView';
-import { AIAnalyst } from '@/components/AIAnalyst';
-import { WorkLog } from '@/types';
 import { LogOut } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
+import { useRouter } from 'next/router';
+import { supabase } from '@/services/supabase';
 
 
 
 const EmployeeDashboard: React.FC = () => {
   const { user, loading } = useUser();
-  const [workLogs, setWorkLogs] = useState<WorkLog[]>(user?.workLogs || []);
-  const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
+  const router = useRouter();
 
   // If user is not logged in or still loading, show a loading state or redirect
   if (loading || !user) {
@@ -23,41 +21,9 @@ const EmployeeDashboard: React.FC = () => {
     );
   }
 
-  const handleClockIn = () => {
-    const now = Date.now();
-    const todayStr = new Date(now).toISOString().split('T')[0];
-    
-    const newLog: WorkLog = {
-      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
-      date: todayStr,
-      startTime: now,
-      endTime: null,
-      durationSeconds: 0,
-      status: 'IN_PROGRESS'
-    };
-    
-    setActiveLog(newLog);
-  };
-
-  const handleClockOut = (finalDurationSeconds: number) => {
-    if (!activeLog) return;
-    
-    const now = Date.now();
-    const completedLog: WorkLog = {
-      ...activeLog,
-      endTime: now,
-      durationSeconds: finalDurationSeconds,
-      status: 'COMPLETED'
-    };
-
-    setWorkLogs(prev => [...prev, completedLog]);
-    setActiveLog(null);
-  };
-
-  const handleLogout = () => {
-    // In a real app, this would handle auth logic
-    console.log("User logged out");
-    alert("Logged out successfully");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/auth/login');
   };
 
   return (
@@ -115,23 +81,13 @@ const EmployeeDashboard: React.FC = () => {
           </div>
           <div className="lg:col-span-1">
             <TimeTracker 
-              onClockIn={handleClockIn} 
-              onClockOut={handleClockOut} 
-              activeLog={activeLog} 
+              onClockIn={() => {}} 
+              onClockOut={() => {}} 
+              activeLog={null} 
             />
           </div>
         </div>
 
-        {/* Middle Row: AI & Quick Stats */}
-        {/* <div className="grid grid-cols-1">
-             <AIAnalyst logs={workLogs} />
-        </div> */}
-
-        {/* Bottom Row: Calendar History */}
-        <div>
-          <CalendarView logs={workLogs} />
-        </div>
-        
       </main>
     </div>
   );

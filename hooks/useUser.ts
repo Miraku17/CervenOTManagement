@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 import { User } from '@supabase/supabase-js';
+import { WorkLog } from '@/types';
 
 interface UserProfile extends User {
   first_name?: string;

@@ -1,12 +1,12 @@
 export interface UserProfile {
-  id: string;
+  id?: string;
   // name: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  positions: { name: string };
-  contact_number: string;
-  address: string;
+  first_name?: string;
+  last_name?: string;
+  email?: string;
+  positions?: { name: string };
+  contact_number?: string;
+  address?: string;
 }
 
 export interface WorkLog {
@@ -37,7 +37,6 @@ export interface Employee {
   joinDate: string;
   avatarUrl: string;
   status: 'Active' | 'On Leave' | 'Terminated' | 'Invited';
-  workLogs?: WorkLog[];
 }
 
 export interface AttendanceRecord {
