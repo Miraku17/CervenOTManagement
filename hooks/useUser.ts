@@ -3,6 +3,11 @@ import { supabase } from '@/services/supabase';
 import { User } from '@supabase/supabase-js';
 
 interface UserProfile extends User {
+  first_name?: string;
+  last_name?: string;
+  positions?: { name: string };
+  contact_number?: string;
+  address?: string;
   role?: string;
 }
 
@@ -18,11 +23,11 @@ export const useUser = () => {
         const user = session.user;
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('*, positions(name)')
           .eq('id', user.id)
           .single();
         
-        setUser({ ...user, role: profile?.role });
+        setUser({ ...user, ...profile });
       }
       setLoading(false);
     };
@@ -34,11 +39,11 @@ export const useUser = () => {
         const user = session.user;
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('*, positions(name)')
           .eq('id', user.id)
           .single();
 
-        setUser({ ...user, role: profile?.role });
+        setUser({ ...user, ...profile });
       } else {
         setUser(null);
       }

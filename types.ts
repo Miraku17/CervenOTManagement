@@ -1,12 +1,12 @@
 export interface UserProfile {
   id: string;
-  name: string;
+  // name: string;
+  first_name: string;
+  last_name: string;
   email: string;
-  position: string;
-  avatarUrl: string;
-  contactNumber: string;
+  positions: { name: string };
+  contact_number: string;
   address: string;
-  department: string;
 }
 
 export interface WorkLog {
