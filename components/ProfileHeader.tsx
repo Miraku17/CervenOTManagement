@@ -26,7 +26,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
               <span className="text-lg text-blue-400 font-medium">{positions?.name}</span>
               <span className="hidden md:inline text-slate-600">•</span>
               {/* <span className="text-slate-400 font-medium">{user.department}</span> */}
-              <span className="hidden md:inline text-slate-600">•</span>
+              {/* <span className="hidden md:inline text-slate-600">•</span> */}
               <span className="text-emerald-400 text-sm font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">Active Employee</span>
             </div>
           </div>

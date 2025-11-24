@@ -98,11 +98,11 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({ employees, onSelectEm
               </div>
               <div className="flex items-center gap-3 text-slate-400 text-sm">
                 <Phone size={16} className="text-slate-500" />
-                <span>{employee.phone}</span>
+                <span>{employee.contact_number}</span>
               </div>
               <div className="flex items-center gap-3 text-slate-400 text-sm">
-                <Briefcase size={16} className="text-slate-500" />
-                <span>{employee.department}</span>
+                <MapPin size={16} className="text-slate-500" />
+                <span>{employee.address}</span>
               </div>
             </div>
           </div>

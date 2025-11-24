@@ -1,25 +1,96 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
+import { CalendarView } from '@/components/CalendarView';
 import { LogOut } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/router';
 import { supabase } from '@/services/supabase';
+import { WorkLog } from '@/types';
 
 
 
 const EmployeeDashboard: React.FC = () => {
   const { user, loading } = useUser();
   const router = useRouter();
+  const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
+  const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
+
+  useEffect(() => {
+    const savedActiveLog = localStorage.getItem('cerventch_activelog');
+    if (savedActiveLog) {
+      setActiveLog(JSON.parse(savedActiveLog));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeLog) {
+      localStorage.setItem('cerventch_activelog', JSON.stringify(activeLog));
+    } else {
+      localStorage.removeItem('cerventch_activelog');
+    }
+  }, [activeLog]);
 
   // If user is not logged in or still loading, show a loading state or redirect
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#0B1121] text-slate-200 flex items-center justify-center">
-        <div className="text-xl font-medium">Loading user data...</div>
+      <div className="min-h-screen bg-[#0B1121] text-slate-200 flex flex-col items-center justify-center">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="w-8 h-8 text-white animate-pulse"
+            >
+               <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
+               <path d="M12 2.5V18" />
+               <path d="M7 18L12 10" />
+               <path d="M17 18L12 10" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Cerventech<span className="text-blue-500">.HR</span>
+          </h1>
+        </div>
+        <div className="mt-4 text-xl font-medium animate-text-glow">Loading...</div>
       </div>
     );
   }
+
+  const handleClockIn = () => {
+    const now = Date.now();
+    const todayStr = new Date(now).toISOString().split('T')[0];
+    
+    const newLog: WorkLog = {
+      id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substr(2, 9),
+      date: todayStr,
+      startTime: now,
+      endTime: null,
+      durationSeconds: 0,
+      status: 'IN_PROGRESS'
+    };
+    
+    setActiveLog(newLog);
+  };
+
+  const handleClockOut = (finalDurationSeconds: number) => {
+    if (!activeLog) return;
+    
+    const now = Date.now();
+    const completedLog: WorkLog = {
+      ...activeLog,
+      endTime: now,
+      durationSeconds: finalDurationSeconds,
+      status: 'COMPLETED'
+    };
+
+    setWorkLogs(prev => [...prev, completedLog]);
+    setActiveLog(null);
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -81,13 +152,16 @@ const EmployeeDashboard: React.FC = () => {
           </div>
           <div className="lg:col-span-1">
             <TimeTracker 
-              onClockIn={() => {}} 
-              onClockOut={() => {}} 
-              activeLog={null} 
+              onClockIn={handleClockIn} 
+              onClockOut={handleClockOut} 
+              activeLog={activeLog} 
             />
           </div>
         </div>
 
+        <div>
+          <CalendarView logs={workLogs} />
+        </div>
       </main>
     </div>
   );
