@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { email, firstName, lastName, phone, address, positionId } = req.body;
+  const { email, firstName, lastName, contact_number, address, positionId } = req.body;
 
   if (!email || !firstName || !lastName || !positionId) {
     return res.status(400).json({ error: 'Email, first name, last name, and position are required.' });
@@ -44,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       first_name: firstName,
       last_name: lastName,
       email,
-      contact_number: phone || null,
+      contact_number: contact_number || null,
       address: address || null,
       position_id: positionId,
       role: 'employee',
@@ -61,7 +61,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       id: userId,
       fullName: `${firstName} ${lastName}`,
       email,
-      phone,
+      contact_number: contact_number || null,
       address,
       position: positionId,
       joinDate: new Date().toISOString().split('T')[0],

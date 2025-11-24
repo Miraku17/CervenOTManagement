@@ -20,64 +20,59 @@ import { useRouter } from 'next/router';
 
 
 
-// Mock Data Initialization
-const MOCK_EMPLOYEES: Employee[] = [
-  {
-    id: '1',
-    fullName: 'Sarah Connor',
-    email: 'sarah.connor@staffsync.com',
-    phone: '+1 (555) 012-3456',
-    address: '123 Tech Blvd, Cyberdyne City, CA',
-    position: 'Senior Software Engineer',
-    department: 'Engineering',
-    joinDate: '2022-03-15',
-    avatarUrl: 'https://picsum.photos/200/200?random=1',
-    status: 'Active',
-  },
-  {
-    id: '2',
-    fullName: 'John Smith',
-    email: 'john.smith@staffsync.com',
-    phone: '+1 (555) 987-6543',
-    address: '456 Innovation Way, Austin, TX',
-    position: 'Product Manager',
-    department: 'Product',
-    joinDate: '2021-11-01',
-    avatarUrl: 'https://picsum.photos/200/200?random=2',
-    status: 'Active',
-  },
-  {
-    id: '3',
-    fullName: 'Emily Chen',
-    email: 'emily.chen@staffsync.com',
-    phone: '+1 (555) 456-7890',
-    address: '789 Design Ln, New York, NY',
-    position: 'UX Designer',
-    department: 'Design',
-    joinDate: '2023-01-10',
-    avatarUrl: 'https://picsum.photos/200/200?random=3',
-    status: 'On Leave',
-  }
-];
+
 
 const AdminDashboard: React.FC = () => {
   const router = useRouter();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [positions, setPositions] = useState<Position[]>([]);
 
+  // Fetch positions
   useEffect(() => {
     const fetchPositions = async () => {
       const { data, error } = await supabase.from('positions').select('*');
       if (data) {
         setPositions(data);
       }
+      if (error) {
+        console.error('Error fetching positions:', error);
+      }
     };
-
     fetchPositions();
+  }, []);
+
+  // Fetch employees
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*, positions(name)')
+        .eq('role', 'employee');
+
+      if (data) {
+        const fetchedEmployees: Employee[] = data.map((profile: any) => ({
+          id: profile.id,
+          fullName: `${profile.first_name} ${profile.last_name}`,
+          email: profile.email,
+          contact_number: profile.contact_number || '',
+          address: profile.address || '',
+          position: profile.positions?.name || 'N/A',
+          department: profile.department || 'N/A', // Assuming department exists or set a default
+          joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
+          avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${profile.first_name}+${profile.last_name}`, // Static avatar
+          status: 'Active', // Default status for now
+        }));
+        setEmployees(fetchedEmployees);
+      }
+      if (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+    fetchEmployees();
   }, []);
 
   const handleNavigate = (view: ViewState) => {
@@ -94,8 +89,8 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleAddEmployee = (newEmployee: Employee) => {
+    // In a real app, this would add to Supabase and then refetch or update state
     setEmployees(prev => [newEmployee, ...prev]);
-    // Navigate to list or detail after adding
     setCurrentView('EMPLOYEES'); 
   };
 

@@ -30,7 +30,7 @@ export interface Employee {
   id: string;
   fullName: string;
   email: string;
-  phone: string;
+  contact_number: string;
   address: string;
   position: string;
   department: string;
