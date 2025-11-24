@@ -15,8 +15,29 @@ const EmployeeDashboard: React.FC = () => {
   // If user is not logged in or still loading, show a loading state or redirect
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#0B1121] text-slate-200 flex items-center justify-center">
-        <div className="text-xl font-medium">Loading user data...</div>
+      <div className="min-h-screen bg-[#0B1121] text-slate-200 flex flex-col items-center justify-center">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
+            <svg 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              className="w-8 h-8 text-white animate-pulse"
+            >
+               <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
+               <path d="M12 2.5V18" />
+               <path d="M7 18L12 10" />
+               <path d="M17 18L12 10" />
+            </svg>
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Cerventech<span className="text-blue-500">.HR</span>
+          </h1>
+        </div>
+        <div className="mt-4 text-xl font-medium animate-text-glow">Loading...</div>
       </div>
     );
   }
