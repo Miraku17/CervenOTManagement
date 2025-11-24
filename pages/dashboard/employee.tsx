@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
+import { CalendarView } from '@/components/CalendarView';
 import { LogOut } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/router';
@@ -158,6 +159,9 @@ const EmployeeDashboard: React.FC = () => {
           </div>
         </div>
 
+        <div>
+          <CalendarView logs={workLogs} />
+        </div>
       </main>
     </div>
   );
