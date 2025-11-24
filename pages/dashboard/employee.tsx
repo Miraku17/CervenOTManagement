@@ -34,7 +34,7 @@ const EmployeeDashboard: React.FC = () => {
   // If user is not logged in or still loading, show a loading state or redirect
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#0B1121] text-slate-200 flex flex-col items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 flex flex-col items-center justify-center">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
             <svg 
@@ -104,9 +104,9 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0B1121] text-slate-200 pb-20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 pb-20">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-[#0B1121]/80 backdrop-blur-md border-b border-slate-800">
+      <nav className="sticky top-0 z-50 bg-gradient-to-r from-slate-950/80 via-blue-950/80 to-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
