@@ -61,6 +61,12 @@ const EmployeeDashboard: React.FC = () => {
     );
   }
 
+  // Redirect to login if no authenticated user
+  if (!user) {
+    router.push('/auth/login');
+    return null;
+  }
+
   const handleClockIn = () => {
     const now = Date.now();
     const todayStr = new Date(now).toISOString().split('T')[0];
