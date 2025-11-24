@@ -153,14 +153,14 @@ const EmployeeDashboard: React.FC = () => {
         
         {/* Top Row: Profile & Tracker */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             <ProfileHeader user={user} />
           </div>
-          <div className="lg:col-span-1">
-            <TimeTracker 
-              onClockIn={handleClockIn} 
-              onClockOut={handleClockOut} 
-              activeLog={activeLog} 
+          <div className="lg:col-span-2">
+            <TimeTracker
+              onClockIn={handleClockIn}
+              onClockOut={handleClockOut}
+              activeLog={activeLog}
             />
           </div>
         </div>
