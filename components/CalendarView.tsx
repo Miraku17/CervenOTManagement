@@ -222,6 +222,20 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                                                 </div>
                                             </div>
                                         </div>
+                                        {log.comment && (
+                                            <div className="pt-2 mt-2 border-t border-slate-700/50">
+                                                <div className="flex items-start gap-2">
+                                                    <div className="flex-shrink-0 mt-0.5">
+                                                        <div className="px-2 py-1 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] font-bold text-amber-400 uppercase tracking-wider">
+                                                            Overtime
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="text-sm text-slate-300 leading-relaxed">{log.comment}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>

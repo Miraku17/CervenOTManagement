@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '@/types';
-import { Mail, MapPin, Phone, BadgeCheck } from 'lucide-react';
+import { Mail, MapPin, Phone, BadgeCheck, Briefcase } from 'lucide-react';
 
 interface ProfileHeaderProps {
   user: UserProfile;
@@ -26,44 +26,83 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
     return colors[index];
   };
 
-  return (
-    <div className="bg-slate-800/50 backdrop-blur-md border border-slate-700 rounded-2xl p-6 shadow-xl relative overflow-hidden group h-full flex flex-col justify-center">
-      {/* Decorative background accent */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+  // Check if contact info exists
+  const hasContactNumber = contact_number && contact_number.trim() !== '';
+  const hasAddress = address && address.trim() !== '';
+  const hasEmail = email && email.trim() !== '';
 
-      <div className="relative z-10 flex flex-col items-center text-center space-y-6">
-        {/* Circular Avatar */}
-        <div className={`w-32 h-32 rounded-full bg-gradient-to-br ${getAvatarColor(first_name || '')} flex items-center justify-center shadow-2xl ring-4 ring-slate-700/50`}>
-          <span className="text-5xl font-bold text-white">{initials}</span>
+  return (
+    <div className="bg-gradient-to-br from-slate-800/80 to-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl shadow-2xl relative overflow-hidden group h-full">
+      {/* Animated background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-600/5 via-transparent to-purple-600/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+      {/* Decorative glow */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" />
+      <div className="absolute -bottom-24 -left-24 w-48 h-48 bg-purple-500/20 rounded-full blur-3xl" />
+
+      <div className="relative z-10 p-6 flex flex-col items-center text-center space-y-6">
+        {/* Avatar with pulse animation */}
+        <div className="relative">
+          <div className={`w-28 h-28 rounded-full bg-gradient-to-br ${getAvatarColor(first_name || '')} flex items-center justify-center shadow-2xl ring-4 ring-slate-700/50 group-hover:ring-blue-500/30 transition-all duration-300`}>
+            <span className="text-4xl font-bold text-white">{initials}</span>
+          </div>
+          <div className="absolute -bottom-2 -right-2 bg-emerald-500 rounded-full p-2 shadow-lg ring-4 ring-slate-800">
+            <div className="w-3 h-3 bg-white rounded-full animate-pulse" />
+          </div>
         </div>
 
-        {/* Info Section */}
-        <div className="space-y-3">
-          <div>
-            <h2 className="text-3xl font-bold text-white flex items-center justify-center gap-2">
+        {/* Name and Position */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <h2 className="text-2xl font-bold text-white">
               {first_name} {last_name}
-              <BadgeCheck className="w-6 h-6 text-blue-400" />
             </h2>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <span className="text-lg text-blue-400 font-medium">{positions?.name}</span>
-              <span className="text-slate-600">•</span>
-              <span className="text-emerald-400 text-sm font-bold bg-emerald-400/10 px-2 py-0.5 rounded-full border border-emerald-400/20">Active Employee</span>
-            </div>
+            <BadgeCheck className="w-5 h-5 text-blue-400" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-slate-300 pt-2">
-            <div className="flex items-center gap-3 justify-center bg-slate-900/50 px-4 py-3 rounded-lg border border-slate-700/50 hover:border-blue-500/30 transition-colors">
-              <Mail className="w-4 h-4 text-blue-400" />
-              {email}
+          {positions?.name && (
+            <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-full border border-blue-500/20">
+              <Briefcase className="w-3.5 h-3.5 text-blue-400" />
+              <span className="text-sm text-blue-300 font-medium">{positions.name}</span>
             </div>
-            <div className="flex items-center gap-3 justify-center bg-slate-900/50 px-4 py-3 rounded-lg border border-slate-700/50 hover:border-blue-500/30 transition-colors">
-              <Phone className="w-4 h-4 text-blue-400" />
-              {contact_number}
+          )}
+        </div>
+
+        {/* Contact Information Grid */}
+        <div className="w-full space-y-2 pt-2">
+          {hasEmail && (
+            <div className="group/item flex items-center gap-3 bg-slate-900/50 px-4 py-3 rounded-xl border border-slate-700/50 hover:border-blue-500/40 hover:bg-slate-900/70 transition-all duration-200 cursor-default">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-blue-500/10 group-hover/item:bg-blue-500/20 transition-colors">
+                <Mail className="w-4 h-4 text-blue-400" />
+              </div>
+              <span className="text-sm text-slate-300 truncate flex-1 text-left">{email}</span>
             </div>
-            <div className="flex items-center gap-3 justify-center bg-slate-900/50 px-4 py-3 rounded-lg border border-slate-700/50 hover:border-blue-500/30 transition-colors md:col-span-2">
-              <MapPin className="w-4 h-4 text-blue-400" />
-              {address}
+          )}
+
+          {hasContactNumber && (
+            <div className="group/item flex items-center gap-3 bg-slate-900/50 px-4 py-3 rounded-xl border border-slate-700/50 hover:border-emerald-500/40 hover:bg-slate-900/70 transition-all duration-200 cursor-default">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-emerald-500/10 group-hover/item:bg-emerald-500/20 transition-colors">
+                <Phone className="w-4 h-4 text-emerald-400" />
+              </div>
+              <span className="text-sm text-slate-300 flex-1 text-left">{contact_number}</span>
             </div>
+          )}
+
+          {hasAddress && (
+            <div className="group/item flex items-center gap-3 bg-slate-900/50 px-4 py-3 rounded-xl border border-slate-700/50 hover:border-purple-500/40 hover:bg-slate-900/70 transition-all duration-200 cursor-default">
+              <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-purple-500/10 group-hover/item:bg-purple-500/20 transition-colors">
+                <MapPin className="w-4 h-4 text-purple-400" />
+              </div>
+              <span className="text-sm text-slate-300 flex-1 text-left line-clamp-2">{address}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Status Badge */}
+        <div className="pt-2">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20 rounded-full">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-lg shadow-emerald-400/50 animate-pulse" />
+            <span className="text-xs font-semibold text-emerald-300 uppercase tracking-wider">Active Employee</span>
           </div>
         </div>
       </div>
