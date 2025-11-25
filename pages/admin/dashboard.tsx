@@ -29,6 +29,7 @@ const AdminDashboard: React.FC = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [positions, setPositions] = useState<Position[]>([]);
 
@@ -92,7 +93,35 @@ const AdminDashboard: React.FC = () => {
   const handleAddEmployee = (newEmployee: Employee) => {
     // In a real app, this would add to Supabase and then refetch or update state
     setEmployees(prev => [newEmployee, ...prev]);
-    setCurrentView('EMPLOYEES'); 
+    setCurrentView('EMPLOYEES');
+  };
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return; // Prevent multiple clicks
+
+    try {
+      setIsLoggingOut(true);
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Logout error:', error);
+        alert('Failed to logout. Please try again.');
+        setIsLoggingOut(false);
+        return;
+      }
+
+      // Clear any local storage if needed
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+      }
+
+      // Navigate to login page
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      alert('An error occurred during logout.');
+      setIsLoggingOut(false);
+    }
   };
 
 
@@ -154,14 +183,21 @@ const AdminDashboard: React.FC = () => {
 
         <div className="p-4 border-t border-slate-800">
           <button
-            onClick={async () => {
-              await supabase.auth.signOut();
-              router.push('/auth/login');
-            }}
-            className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <LogOut size={20} />
-            <span>Logout</span>
+            {isLoggingOut ? (
+              <>
+                <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>Logging out...</span>
+              </>
+            ) : (
+              <>
+                <LogOut size={20} />
+                <span>Logout</span>
+              </>
+            )}
           </button>
         </div>
       </aside>

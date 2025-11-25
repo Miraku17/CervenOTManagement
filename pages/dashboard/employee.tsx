@@ -23,6 +23,7 @@ const EmployeeDashboard: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'clockIn' | 'clockOut' | null>(null);
   const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number; comment?: string } | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -427,8 +428,31 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    router.push('/auth/login');
+    if (isLoggingOut) return; // Prevent multiple clicks
+
+    try {
+      setIsLoggingOut(true);
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error('Logout error:', error);
+        showToast('error', 'Failed to logout. Please try again.');
+        setIsLoggingOut(false);
+        return;
+      }
+
+      // Clear any local storage
+      if (typeof window !== 'undefined') {
+        localStorage.clear();
+      }
+
+      // Navigate to login page
+      router.push('/auth/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      showToast('error', 'An error occurred during logout.');
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -483,12 +507,22 @@ const EmployeeDashboard: React.FC = () => {
                 <div className="hidden md:block text-sm text-slate-500 border-r border-slate-700 pr-4">
                 Employee Portal v1.0
                 </div>
-                <button 
+                <button
                     onClick={handleLogout}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors"
+                    disabled={isLoggingOut}
+                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    <LogOut className="w-4 h-4" />
-                    Log Out
+                    {isLoggingOut ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                        <span>Logging out...</span>
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="w-4 h-4" />
+                        <span>Log Out</span>
+                      </>
+                    )}
                 </button>
             </div>
           </div>

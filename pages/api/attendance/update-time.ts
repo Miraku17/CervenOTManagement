@@ -28,15 +28,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Convert datetime-local format to ISO string
-    const timeInISO = new Date(timeIn).toISOString();
-    const timeOutISO = timeOut ? new Date(timeOut).toISOString() : null;
+    // Supabase automatically applies +0800 timezone, so just use the values directly
+    const timeInISO = timeIn;
+    const timeOutISO = timeOut || null;
 
-    // Calculate total minutes if both times are present
-    let totalMinutes = null;
+    // Calculate updated total minutes if both times are present
+    let updatedTotalMinutes = null;
     if (timeOutISO) {
       const diffMs = new Date(timeOutISO).getTime() - new Date(timeInISO).getTime();
-      totalMinutes = Math.floor(diffMs / 60000); // Convert to minutes
+      updatedTotalMinutes = Math.floor(diffMs / 60000); // Convert to minutes
     }
 
     // Update the attendance record
@@ -45,7 +45,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         time_in: timeInISO,
         time_out: timeOutISO,
-        total_minutes: totalMinutes,
+        updated_total_minutes: updatedTotalMinutes,
         is_overtime_requested: !!overtimeComment,
         overtime_comment: overtimeComment || null,
         updated_at: new Date().toISOString(),

@@ -57,14 +57,11 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
       }
 
       if (data.attendance) {
-        // Get raw ISO strings from database
+        // Get raw data with Philippines Time conversion from database
         const rawResponse = await fetch(`/api/attendance/get-raw?userId=${selectedEmployee.id}&date=${selectedDate}`);
         const rawData = await rawResponse.json();
 
         if (rawData.attendance) {
-          const timeIn = rawData.attendance.time_in ? new Date(rawData.attendance.time_in).toISOString().slice(0, 16) : '';
-          const timeOut = rawData.attendance.time_out ? new Date(rawData.attendance.time_out).toISOString().slice(0, 16) : '';
-
           setAttendance({
             id: rawData.attendance.id,
             time_in: rawData.attendance.time_in,
@@ -73,8 +70,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             is_overtime_requested: rawData.attendance.is_overtime_requested
           });
 
-          setEditedTimeIn(timeIn);
-          setEditedTimeOut(timeOut);
+          // Use formatted times from API (Supabase already applies +0800 timezone)
+          setEditedTimeIn(rawData.attendance.time_in_formatted || '');
+          setEditedTimeOut(rawData.attendance.time_out_formatted || '');
           setEditedOvertimeComment(rawData.attendance.overtime_comment || '');
         }
       } else {

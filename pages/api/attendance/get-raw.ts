@@ -45,8 +45,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Format times for datetime-local input (Supabase already applies +0800 timezone)
+    const formatForInput = (isoTime: string | null) => {
+      if (!isoTime) return null;
+      // Just convert to format YYYY-MM-DDTHH:mm (Supabase already has correct timezone)
+      return isoTime.slice(0, 16);
+    };
+
+    const formattedData = {
+      ...data,
+      time_in_formatted: formatForInput(data.time_in),
+      time_out_formatted: formatForInput(data.time_out),
+    };
+
     return res.status(200).json({
-      attendance: data
+      attendance: formattedData
     });
 
   } catch (error: any) {
