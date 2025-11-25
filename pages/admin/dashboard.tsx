@@ -14,6 +14,7 @@ import { Employee, ViewState, WorkLog, Position } from '@/types';
 import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
+import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import { withAuth } from '@/hoc/withAuth';
 import { supabase } from '@/services/supabase';
 import { useRouter } from 'next/router';
@@ -245,6 +246,9 @@ const AdminDashboard: React.FC = () => {
               <ExportDataView employees={employees} />
             )}
 
+            {currentView === 'EDIT_TIME' && (
+              <EditTimeView employees={employees} />
+            )}
 
           </div>
         </div>

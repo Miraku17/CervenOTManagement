@@ -45,7 +45,7 @@ export interface AttendanceRecord {
   date: string; // YYYY-MM-DD
   timeIn: string; // HH:mm
   timeOut: string | null; // HH:mm
-  status: 'Present' | 'Late' | 'Absent' | 'Half Day';
+  status: 'Present' | 'Late' | 'Absent' | 'Half Day' | 'In Progress';
   totalHours?: number;
 }
 

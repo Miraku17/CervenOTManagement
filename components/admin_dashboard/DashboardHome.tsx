@@ -1,96 +1,166 @@
-import React from 'react';
-import { Users, Clock, UserCheck, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Clock, UserCheck, TrendingUp, Loader2 } from 'lucide-react';
 import { Employee } from '@/types';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  LineChart,
-  Line
-} from 'recharts';
 
 interface DashboardHomeProps {
   employees: Employee[];
 }
 
+interface DashboardStats {
+  totalEmployees: number;
+  clockedInToday: number;
+  activeNow: number;
+  overtimeRequests: number;
+  weeklyHours: number;
+}
+
+interface RecentActivity {
+  id: string;
+  employeeName: string;
+  email: string;
+  date: string;
+  timeIn: string;
+  timeOut: string | null;
+  duration: string | null;
+  status: string;
+  isOvertime: boolean;
+  avatarSeed: string;
+}
+
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
-  const attendanceData: { name: string; present: number; late: number; }[] = [];
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch all data in parallel
+      const [statsRes, activityRes] = await Promise.all([
+        fetch('/api/dashboard/stats'),
+        fetch('/api/dashboard/recent-activity?limit=10')
+      ]);
+
+      const statsData = await statsRes.json();
+      const activityData = await activityRes.json();
+
+      if (statsData.stats) setStats(statsData.stats);
+      if (activityData.activity) setRecentActivity(activityData.activity);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Employees" 
-          value={employees.length.toString()} 
-          change="+2 this month" 
-          icon={<Users className="text-blue-400" />} 
+        <StatCard
+          title="Total Employees"
+          value={stats?.totalEmployees.toString() || '0'}
+          change={`${stats?.clockedInToday || 0} clocked in today`}
+          icon={<Users className="text-blue-400" />}
           color="blue"
         />
-        <StatCard 
-          title="On Time Today" 
-          value="94%" 
-          change="+5% from yesterday" 
-          icon={<Clock className="text-emerald-400" />} 
-          color="emerald"
+        <StatCard
+          title="Overtime Requests"
+          value={stats?.overtimeRequests.toString() || '0'}
+          change="This week"
+          icon={<Clock className="text-amber-400" />}
+          color="amber"
         />
-        <StatCard 
-          title="Active Now" 
-          value={employees.filter(e => e.status === 'Active').length.toString()} 
-          change="Currently working" 
-          icon={<UserCheck className="text-violet-400" />} 
+        <StatCard
+          title="Active Now"
+          value={stats?.activeNow.toString() || '0'}
+          change="Currently working"
+          icon={<UserCheck className="text-violet-400" />}
           color="violet"
         />
-        <StatCard 
-          title="Total Hours" 
-          value="1,240" 
-          change="Weekly aggregated" 
-          icon={<TrendingUp className="text-amber-400" />} 
-          color="amber"
+        <StatCard
+          title="Weekly Hours"
+          value={stats?.weeklyHours.toString() || '0'}
+          change="This week aggregated"
+          icon={<TrendingUp className="text-emerald-400" />}
+          color="emerald"
         />
       </div>
 
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-white mb-6">Weekly Attendance Overview</h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={attendanceData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                <XAxis dataKey="name" stroke="#94a3b8" axisLine={false} tickLine={false} />
-                <YAxis stroke="#94a3b8" axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }}
-                  cursor={{fill: 'rgba(255,255,255,0.05)'}}
-                />
-                <Bar dataKey="present" fill="#3b82f6" radius={[4, 4, 0, 0]} barSize={40} />
-                <Bar dataKey="late" fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={40} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+      {/* Recent Activity Section */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-lg font-semibold text-white">Recent Activity</h3>
+          <span className="text-xs text-slate-400">Last 7 days</span>
         </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {recentActivity.length > 0 ? (
+            <>
+              {recentActivity.map((activity) => (
+                <div key={activity.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all">
+                  <div className="flex items-start gap-3 mb-3">
+                    <img
+                      src={`https://api.dicebear.com/7.x/initials/svg?seed=${activity.avatarSeed}`}
+                      alt={activity.employeeName}
+                      className="w-12 h-12 rounded-full object-cover border-2 border-slate-700"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-semibold text-white truncate">{activity.employeeName}</p>
+                        {activity.isOvertime && (
+                          <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] font-bold text-amber-400 uppercase">
+                            OT
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400">{activity.email}</p>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
+                      activity.status === 'Active'
+                        ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20'
+                        : 'text-blue-400 bg-blue-400/10 border border-blue-400/20'
+                    }`}>
+                      {activity.status}
+                    </span>
+                  </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-          <h3 className="text-lg font-semibold text-white mb-6">Recent Activity</h3>
-          <div className="space-y-4">
-            {employees.slice(0, 3).map((emp, idx) => (
-              <div key={idx} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors">
-                <img src={emp.avatarUrl} alt={emp.fullName} className="w-10 h-10 rounded-full object-cover" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-white">{emp.fullName}</p>
-                  <p className="text-xs text-slate-400">Clocked in at 08:58 AM</p>
+                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800">
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Date</p>
+                      <p className="text-xs text-slate-300">{activity.date}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time In</p>
+                      <p className="text-xs text-slate-300">{activity.timeIn}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time Out</p>
+                      <p className="text-xs text-slate-300">{activity.timeOut || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Duration</p>
+                      <p className="text-xs text-emerald-400 font-medium">{activity.duration || '-'}</p>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-xs text-emerald-400 font-medium bg-emerald-400/10 px-2 py-1 rounded-full">On Time</span>
-              </div>
-            ))}
-             <div className="mt-4 pt-4 border-t border-slate-800 text-center">
-                <button className="text-sm text-blue-400 hover:text-blue-300">View All Logs</button>
-             </div>
-          </div>
+              ))}
+            </>
+          ) : (
+            <div className="col-span-2 text-center py-12 text-slate-500">
+              No recent activity
+            </div>
+          )}
         </div>
       </div>
     </div>
