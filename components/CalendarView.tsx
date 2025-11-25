@@ -10,16 +10,16 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
 
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [viewYear, setViewYear] = useState(today.getFullYear());
+
   useEffect(() => {
     setHasMounted(true);
   }, []);
-  
-  const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
 
-  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay(); // 0 is Sunday
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sunday
 
   // Group logs by date
   const logsByDate = useMemo(() => {
@@ -37,7 +37,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
       return (logsByDate[date] || []).reduce((acc, log) => acc + log.durationSeconds, 0);
   };
 
-  const monthName = today.toLocaleString('default', { month: 'long' });
+  const monthName = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long' });
+
+  // Navigation functions
+  const goToPreviousMonth = () => {
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(viewYear - 1);
+    } else {
+      setViewMonth(viewMonth - 1);
+    }
+  };
+
+  const goToNextMonth = () => {
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(viewYear + 1);
+    } else {
+      setViewMonth(viewMonth + 1);
+    }
+  };
+
+  const goToToday = () => {
+    setViewMonth(today.getMonth());
+    setViewYear(today.getFullYear());
+  };
 
   const renderDays = () => {
     const days = [];
@@ -46,11 +70,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
-        const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const totalSeconds = getDailyTotalSeconds(dateStr);
         const hours = (totalSeconds / 3600).toFixed(1);
         const hasWork = totalSeconds > 0;
-        const isToday = d === today.getDate();
+        const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
         const isSelected = selectedDate === dateStr;
 
         days.push(
@@ -106,10 +130,26 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                     Work Calendar
                 </h3>
                 <div className="flex items-center gap-4 text-slate-400 text-sm">
-                   <span>{hasMounted ? `${monthName} ${currentYear}` : ''}</span>
+                   <span className="font-medium">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
                    <div className="flex gap-1">
-                       <button className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 disabled"><ChevronLeft className="w-4 h-4" /></button>
-                       <button className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 disabled"><ChevronRight className="w-4 h-4" /></button>
+                       <button
+                         onClick={goToPreviousMonth}
+                         className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                       >
+                         <ChevronLeft className="w-4 h-4" />
+                       </button>
+                       <button
+                         onClick={goToToday}
+                         className="px-2 py-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+                       >
+                         Today
+                       </button>
+                       <button
+                         onClick={goToNextMonth}
+                         className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                       >
+                         <ChevronRight className="w-4 h-4" />
+                       </button>
                    </div>
                 </div>
             </div>
