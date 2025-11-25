@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Calendar, Clock, Save, User, AlertCircle } from 'lucide-react';
-import { Employee } from '@/types';
-import { format } from 'date-fns';
+import React, { useState, useEffect } from "react";
+import { Search, Calendar, Clock, Save, User, AlertCircle } from "lucide-react";
+import { Employee } from "@/types";
+import { format } from "date-fns";
 
 interface EditTimeViewProps {
   employees: Employee[];
@@ -16,24 +16,45 @@ interface AttendanceData {
 }
 
 const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<string>(
+    format(new Date(), "yyyy-MM-dd")
+  );
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(
+    null
+  );
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Edited values
-  const [editedTimeIn, setEditedTimeIn] = useState('');
-  const [editedTimeOut, setEditedTimeOut] = useState('');
-  const [editedOvertimeComment, setEditedOvertimeComment] = useState('');
+  const [editedTimeIn, setEditedTimeIn] = useState("");
+  const [editedTimeOut, setEditedTimeOut] = useState("");
+  const [editedOvertimeComment, setEditedOvertimeComment] = useState("");
 
   // Filter employees based on search
-  const filteredEmployees = employees.filter(emp =>
-    emp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    emp.email.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredEmployees = employees.filter(
+    (emp) =>
+      emp.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      emp.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const formatDatetimeLocal = (dateString: string | null) => {
+    if (!dateString) return "";
+
+    const date = new Date(dateString); // handles UTC automatically
+
+    // Convert → YYYY-MM-DDTHH:mm
+    const offsetDate = new Date(
+      date.getTime() - date.getTimezoneOffset() * 60000
+    );
+
+    return offsetDate.toISOString().slice(0, 16);
+  };
 
   // Fetch attendance when employee or date changes
   useEffect(() => {
@@ -49,17 +70,23 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     setMessage(null);
 
     try {
-      const response = await fetch(`/api/attendance/user-details?userId=${selectedEmployee.id}&date=${selectedDate}`);
+      const response = await fetch(
+        `/api/attendance/user-details?userId=${selectedEmployee.id}&date=${selectedDate}`
+      );
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch attendance');
+        throw new Error(data.error || "Failed to fetch attendance");
       }
 
       if (data.attendance) {
         // Get raw data with Philippines Time conversion from database
-        const rawResponse = await fetch(`/api/attendance/get-raw?userId=${selectedEmployee.id}&date=${selectedDate}`);
+        const rawResponse = await fetch(
+          `/api/attendance/get-raw?userId=${selectedEmployee.id}&date=${selectedDate}`
+        );
         const rawData = await rawResponse.json();
+
+        console.log("Raw Data:", rawData);
 
         if (rawData.attendance) {
           setAttendance({
@@ -67,23 +94,24 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             time_in: rawData.attendance.time_in,
             time_out: rawData.attendance.time_out,
             overtime_comment: rawData.attendance.overtime_comment,
-            is_overtime_requested: rawData.attendance.is_overtime_requested
+            is_overtime_requested: rawData.attendance.is_overtime_requested,
           });
 
           // Use formatted times from API (Supabase already applies +0800 timezone)
-          setEditedTimeIn(rawData.attendance.time_in_formatted || '');
-          setEditedTimeOut(rawData.attendance.time_out_formatted || '');
-          setEditedOvertimeComment(rawData.attendance.overtime_comment || '');
+          setEditedTimeIn(formatDatetimeLocal(rawData.attendance.time_in));
+          setEditedTimeOut(formatDatetimeLocal(rawData.attendance.time_out));
+
+          setEditedOvertimeComment(rawData.attendance.overtime_comment || "");
         }
       } else {
         setAttendance(null);
-        setEditedTimeIn('');
-        setEditedTimeOut('');
-        setEditedOvertimeComment('');
+        setEditedTimeIn("");
+        setEditedTimeOut("");
+        setEditedOvertimeComment("");
       }
     } catch (error: any) {
-      console.error('Error fetching attendance:', error);
-      setMessage({ type: 'error', text: error.message });
+      console.error("Error fetching attendance:", error);
+      setMessage({ type: "error", text: error.message });
       setAttendance(null);
     } finally {
       setIsLoading(false);
@@ -97,9 +125,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     setMessage(null);
 
     try {
-      const response = await fetch('/api/attendance/update-time', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/attendance/update-time", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           attendanceId: attendance.id,
           timeIn: editedTimeIn,
@@ -111,14 +139,14 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to update attendance');
+        throw new Error(data.error || "Failed to update attendance");
       }
 
-      setMessage({ type: 'success', text: 'Attendance updated successfully!' });
+      setMessage({ type: "success", text: "Attendance updated successfully!" });
       fetchAttendance(); // Refresh data
     } catch (error: any) {
-      console.error('Error updating attendance:', error);
-      setMessage({ type: 'error', text: error.message });
+      console.error("Error updating attendance:", error);
+      setMessage({ type: "error", text: error.message });
     } finally {
       setIsSaving(false);
     }
@@ -129,7 +157,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">Edit Time Records</h1>
-          <p className="text-slate-400 mt-1">Search for an employee and modify their attendance records</p>
+          <p className="text-slate-400 mt-1">
+            Search for an employee and modify their attendance records
+          </p>
         </div>
       </div>
 
@@ -166,7 +196,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
 
           {/* Employee List */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl max-h-[500px] overflow-y-auto">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">Employees ({filteredEmployees.length})</h3>
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+              Employees ({filteredEmployees.length})
+            </h3>
             <div className="space-y-2">
               {filteredEmployees.map((emp) => (
                 <button
@@ -174,8 +206,8 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                   onClick={() => setSelectedEmployee(emp)}
                   className={`w-full text-left p-3 rounded-lg transition-all ${
                     selectedEmployee?.id === emp.id
-                      ? 'bg-blue-600 text-white shadow-lg'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      ? "bg-blue-600 text-white shadow-lg"
+                      : "bg-slate-800 hover:bg-slate-700 text-slate-300"
                   }`}
                 >
                   <div className="flex items-center gap-3">
@@ -190,7 +222,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                 </button>
               ))}
               {filteredEmployees.length === 0 && (
-                <p className="text-center text-slate-500 py-8">No employees found</p>
+                <p className="text-center text-slate-500 py-8">
+                  No employees found
+                </p>
               )}
             </div>
           </div>
@@ -202,7 +236,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             {!selectedEmployee ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                 <User className="w-16 h-16 mb-4 opacity-30" />
-                <p className="text-lg">Select an employee to edit their attendance</p>
+                <p className="text-lg">
+                  Select an employee to edit their attendance
+                </p>
               </div>
             ) : isLoading ? (
               <div className="flex flex-col items-center justify-center py-20">
@@ -212,8 +248,13 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             ) : !attendance ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                 <AlertCircle className="w-16 h-16 mb-4 opacity-30" />
-                <p className="text-lg">No attendance record found for this date</p>
-                <p className="text-sm mt-2">Employee may not have clocked in on {format(new Date(selectedDate), 'MMM dd, yyyy')}</p>
+                <p className="text-lg">
+                  No attendance record found for this date
+                </p>
+                <p className="text-sm mt-2">
+                  Employee may not have clocked in on{" "}
+                  {format(new Date(selectedDate), "MMM dd, yyyy")}
+                </p>
               </div>
             ) : (
               <div className="space-y-6">
@@ -223,7 +264,8 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                     Edit Attendance
                   </h2>
                   <p className="text-slate-400 mt-1">
-                    {selectedEmployee.fullName} • {format(new Date(selectedDate), 'MMMM dd, yyyy')}
+                    {selectedEmployee.fullName} •{" "}
+                    {format(new Date(selectedDate), "MMMM dd, yyyy")}
                   </p>
                 </div>
 
@@ -231,19 +273,24 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                 {!attendance.time_out ? (
                   <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
                     <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-                    <p className="text-lg font-semibold text-amber-300 mb-2">Time in and out not done</p>
+                    <p className="text-lg font-semibold text-amber-300 mb-2">
+                      Time in and out not done
+                    </p>
                     <p className="text-sm text-amber-400/80">
-                      This employee has not clocked out yet. You can only edit completed attendance records.
+                      This employee has not clocked out yet. You can only edit
+                      completed attendance records.
                     </p>
                   </div>
                 ) : (
                   <>
                     {message && (
-                      <div className={`p-4 rounded-xl border ${
-                        message.type === 'success'
-                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                          : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                      }`}>
+                      <div
+                        className={`p-4 rounded-xl border ${
+                          message.type === "success"
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                            : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                        }`}
+                      >
                         {message.text}
                       </div>
                     )}
@@ -282,7 +329,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                         </label>
                         <textarea
                           value={editedOvertimeComment}
-                          onChange={(e) => setEditedOvertimeComment(e.target.value)}
+                          onChange={(e) =>
+                            setEditedOvertimeComment(e.target.value)
+                          }
                           placeholder="Add overtime comment..."
                           rows={3}
                           className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
