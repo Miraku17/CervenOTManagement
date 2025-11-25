@@ -149,9 +149,9 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
                 <button
                     onClick={isRunning ? handleClockOutWithComment : onClockIn}
                     className={`
-                        group relative flex items-center justify-center gap-3 px-8 py-4 rounded-xl w-full font-bold text-lg transition-all duration-300 transform active:scale-[0.98] shadow-lg
-                        ${isRunning 
-                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/20 ring-4 ring-rose-500/10' 
+                        group relative flex items-center justify-center gap-3 px-8 py-4 rounded-xl w-full font-bold text-lg transition-all duration-300 transform active:scale-[0.98] shadow-lg cursor-pointer
+                        ${isRunning
+                            ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/20 ring-4 ring-rose-500/10'
                             : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20 ring-4 ring-blue-500/10'}
                     `}
                 >
