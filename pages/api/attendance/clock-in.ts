@@ -65,6 +65,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (insertError) throw insertError;
 
+    // Update user's last_activity in profiles table
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ last_activity: now.toISOString() })
+      .eq('id', userId);
+
+    if (profileError) {
+      console.error('Failed to update last_activity:', profileError);
+      // Don't throw - this is not critical for clock-in
+    }
+
     return res.status(201).json({
       message: 'Clocked in successfully',
       attendance

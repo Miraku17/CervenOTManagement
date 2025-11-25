@@ -3,6 +3,7 @@ import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
 import { ToastContainer, ToastProps } from '@/components/Toast';
+import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/router';
@@ -19,6 +20,9 @@ const EmployeeDashboard: React.FC = () => {
   const [isClocking, setIsClocking] = useState(false);
   const [toasts, setToasts] = useState<ToastProps[]>([]);
   const [isFetchingLogs, setIsFetchingLogs] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<'clockIn' | 'clockOut' | null>(null);
+  const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number; comment?: string } | null>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -111,6 +115,39 @@ const EmployeeDashboard: React.FC = () => {
       showToast('error', 'Failed to load attendance history');
     } finally {
       setIsFetchingLogs(false);
+    }
+  };
+
+  // Fetch current session data
+  const fetchCurrentSession = async () => {
+    if (!user?.id) return;
+
+    try {
+      const response = await fetch(`/api/attendance/current-session?userId=${user.id}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch current session');
+      }
+
+      if (data.session) {
+        console.log('Current session data:', data.session);
+        console.log('Duration (minutes):', data.session.duration_minutes);
+        console.log('Clock in:', data.session.clock_in);
+        console.log('Session end:', data.session.session_end);
+        console.log('Has clocked out:', data.session.has_clocked_out);
+        console.log('Clock in location:', data.session.clock_in_location);
+        if (data.session.clock_out_location) {
+          console.log('Clock out location:', data.session.clock_out_location);
+        }
+        return data.session;
+      } else {
+        console.log('No active session found');
+        return null;
+      }
+    } catch (error: any) {
+      console.error('Error fetching current session:', error);
+      return null;
     }
   };
 
@@ -217,6 +254,35 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
+  // Wrapper functions that show confirmation modals
+  const requestClockIn = () => {
+    setConfirmAction('clockIn');
+    setShowConfirmModal(true);
+  };
+
+  const requestClockOut = (duration: number, comment?: string) => {
+    setPendingClockOutData({ duration, comment });
+    setConfirmAction('clockOut');
+    setShowConfirmModal(true);
+  };
+
+  const handleConfirm = () => {
+    if (confirmAction === 'clockIn') {
+      handleClockIn();
+    } else if (confirmAction === 'clockOut' && pendingClockOutData) {
+      handleClockOut(pendingClockOutData.duration, pendingClockOutData.comment);
+      setPendingClockOutData(null);
+    }
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+  };
+
+  const handleCancel = () => {
+    setShowConfirmModal(false);
+    setConfirmAction(null);
+    setPendingClockOutData(null);
+  };
+
   const handleClockIn = async () => {
     if (!user?.id || isClocking) return;
 
@@ -275,6 +341,11 @@ const EmployeeDashboard: React.FC = () => {
 
       setActiveLog(newLog);
       showToast('success', 'Successfully clocked in!');
+
+      // Fetch current session data to show in console
+      setTimeout(() => {
+        fetchCurrentSession();
+      }, 500);
     } catch (error: any) {
       console.error('Clock-in error:', error);
       showToast('error', error.message || 'Failed to clock in. Please try again.');
@@ -365,6 +436,22 @@ const EmployeeDashboard: React.FC = () => {
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        title={confirmAction === 'clockIn' ? 'Clock In' : 'Clock Out'}
+        message={
+          confirmAction === 'clockIn'
+            ? 'Are you ready to start your work session?'
+            : 'Are you sure you want to end your work session?'
+        }
+        confirmText={confirmAction === 'clockIn' ? 'Start Work' : 'End Work'}
+        cancelText="Cancel"
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+        type={confirmAction === 'clockIn' ? 'info' : 'warning'}
+      />
+
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-gradient-to-r from-slate-950/80 via-blue-950/80 to-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -418,9 +505,10 @@ const EmployeeDashboard: React.FC = () => {
           </div>
           <div className="lg:col-span-2">
             <TimeTracker
-              onClockIn={handleClockIn}
-              onClockOut={handleClockOut}
+              onClockIn={requestClockIn}
+              onClockOut={requestClockOut}
               activeLog={activeLog}
+              isLoading={isClocking}
             />
           </div>
         </div>

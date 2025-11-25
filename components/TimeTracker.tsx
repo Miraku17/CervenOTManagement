@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Clock } from 'lucide-react';
+import { Play, Square, Clock, Loader2 } from 'lucide-react';
 import { WorkLog } from '@/types';
 
 interface TimeTrackerProps {
   onClockIn: () => void;
   onClockOut: (duration: number, comment?: string) => void;
   activeLog: WorkLog | null;
+  isLoading?: boolean;
 }
 
-export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut, activeLog }) => {
+export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut, activeLog, isLoading = false }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [now, setNow] = useState(new Date());
   const [hasMounted, setHasMounted] = useState(false);
@@ -73,8 +74,25 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
 
   const isRunning = !!activeLog;
 
+  // Calculate hours worked and check if overtime is eligible
+  const hoursWorked = elapsedSeconds / 3600;
+  const isOvertimeEligible = hoursWorked >= 8;
+  const hoursUntilOvertime = Math.max(0, 8 - hoursWorked);
+
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center relative overflow-hidden h-full">
+        {/* Loading Overlay */}
+        {isLoading && (
+          <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center">
+            <div className="bg-slate-800 border border-slate-600 rounded-xl px-6 py-4 flex items-center gap-3 shadow-2xl">
+              <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+              <span className="text-white font-medium">
+                {isRunning ? 'Processing clock out...' : 'Processing clock in...'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Ambient glow */}
         <div className={`absolute inset-0 opacity-20 transition-opacity duration-700 ${isRunning ? 'bg-blue-600 blur-3xl' : 'bg-transparent'}`}></div>
 
@@ -112,23 +130,40 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
                 </div>
 
                 <div className="text-slate-400 text-sm text-center">
-                   {isRunning ? 'Currently logging overtime work...' : 'Ready to start a new session'}
+                   {isRunning
+                     ? (isOvertimeEligible
+                         ? (isOvertime ? 'Currently logging overtime work' : 'Regular hours completed')
+                         : 'Currently logging work hours')
+                     : 'Ready to start a new session'}
                 </div>
 
                 {isRunning && (
                   <div className="w-full space-y-3 px-4 py-3 bg-slate-700/30 rounded-lg border border-slate-600">
-                    <label className="flex items-center space-x-2 text-slate-300">
-                      <input 
-                        type="checkbox" 
-                        className="form-checkbox h-4 w-4 text-blue-600 bg-slate-900 border-slate-500 rounded focus:ring-blue-500"
-                        checked={isOvertime}
-                        onChange={(e) => {
-                          setIsOvertime(e.target.checked);
-                          if (!e.target.checked) setOvertimeError(null);
-                        }}
-                      />
-                      <span>Mark as Overtime</span>
-                    </label>
+                    <div className="space-y-2">
+                      <label className={`flex items-center space-x-2 ${isOvertimeEligible ? 'text-slate-300' : 'text-slate-500'}`}>
+                        <input
+                          type="checkbox"
+                          className="form-checkbox h-4 w-4 text-blue-600 bg-slate-900 border-slate-500 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                          checked={isOvertime}
+                          disabled={!isOvertimeEligible}
+                          onChange={(e) => {
+                            setIsOvertime(e.target.checked);
+                            if (!e.target.checked) setOvertimeError(null);
+                          }}
+                        />
+                        <span>Mark as Overtime</span>
+                      </label>
+                      {!isOvertimeEligible && (
+                        <p className="text-xs text-amber-400/80 ml-6">
+                          Overtime available after 8 hours. ({hoursUntilOvertime.toFixed(1)}h remaining)
+                        </p>
+                      )}
+                      {isOvertimeEligible && !isOvertime && (
+                        <p className="text-xs text-emerald-400/80 ml-6">
+                          You've worked {hoursWorked.toFixed(1)} hours. Overtime is now available!
+                        </p>
+                      )}
+                    </div>
                     {isOvertime && (
                       <>
                         <textarea
@@ -148,14 +183,23 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
 
                 <button
                     onClick={isRunning ? handleClockOutWithComment : onClockIn}
+                    disabled={isLoading}
                     className={`
-                        group relative flex items-center justify-center gap-3 px-8 py-4 rounded-xl w-full font-bold text-lg transition-all duration-300 transform active:scale-[0.98] shadow-lg cursor-pointer
+                        group relative flex items-center justify-center gap-3 px-8 py-4 rounded-xl w-full font-bold text-lg transition-all duration-300 transform shadow-lg
+                        ${!isLoading && 'cursor-pointer active:scale-[0.98]'}
+                        ${isLoading && 'opacity-70 cursor-not-allowed'}
                         ${isRunning
                             ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-900/20 ring-4 ring-rose-500/10'
                             : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-900/20 ring-4 ring-blue-500/10'}
+                        ${isLoading && 'hover:bg-opacity-100'}
                     `}
                 >
-                    {isRunning ? (
+                    {isLoading ? (
+                        <>
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                            {isRunning ? 'Clocking Out...' : 'Clocking In...'}
+                        </>
+                    ) : isRunning ? (
                         <>
                             <Square className="w-5 h-5 fill-current" />
                             {isOvertime && overtimeComment ? 'Clock Out & Submit Overtime' : 'Clock Out'}
