@@ -18,13 +18,49 @@ const EmployeeDashboard: React.FC = () => {
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isClocking, setIsClocking] = useState(false);
   const [toasts, setToasts] = useState<ToastProps[]>([]);
+  const [isFetchingLogs, setIsFetchingLogs] = useState(false);
 
   useEffect(() => {
-    const savedActiveLog = localStorage.getItem('cerventch_activelog');
-    if (savedActiveLog) {
-      setActiveLog(JSON.parse(savedActiveLog));
+    if (user?.id) {
+      checkActiveSession();
     }
-  }, []);
+  }, [user?.id]);
+
+  // Check for active clock-in session from database
+  const checkActiveSession = async () => {
+    if (!user?.id) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('date', today)
+        .is('time_out', null)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        // Restore active session from database
+        const activeSession: WorkLog = {
+          id: data.id,
+          date: data.date,
+          startTime: new Date(data.time_in).getTime(),
+          endTime: null,
+          durationSeconds: 0,
+          status: 'IN_PROGRESS'
+        };
+        setActiveLog(activeSession);
+        console.log('Restored active session:', activeSession);
+      }
+    } catch (error) {
+      console.error('Error checking active session:', error);
+    }
+  };
 
   useEffect(() => {
     if (activeLog) {
@@ -33,6 +69,50 @@ const EmployeeDashboard: React.FC = () => {
       localStorage.removeItem('cerventch_activelog');
     }
   }, [activeLog]);
+
+  // Fetch attendance records from database
+  useEffect(() => {
+    if (user?.id) {
+      fetchAttendanceRecords();
+    }
+  }, [user?.id]);
+
+  const fetchAttendanceRecords = async () => {
+    if (!user?.id || isFetchingLogs) return;
+
+    setIsFetchingLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('user_id', user.id)
+        .not('time_out', 'is', null) // Only get records with clock out
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+
+      if (data) {
+        // Convert attendance records to WorkLog format
+        const logs: WorkLog[] = data.map((record) => ({
+          id: record.id,
+          date: record.date,
+          startTime: new Date(record.time_in).getTime(),
+          endTime: new Date(record.time_out).getTime(),
+          durationSeconds: record.total_minutes ? record.total_minutes * 60 : 0,
+          status: 'COMPLETED' as const,
+          comment: record.overtime_comment || undefined,
+        }));
+
+        setWorkLogs(logs);
+        console.log('Fetched attendance records:', logs);
+      }
+    } catch (error: any) {
+      console.error('Error fetching attendance records:', error);
+      showToast('error', 'Failed to load attendance history');
+    } finally {
+      setIsFetchingLogs(false);
+    }
+  };
 
   // Toast notification helpers
   const showToast = (type: 'success' | 'error' | 'warning', message: string) => {
@@ -264,6 +344,9 @@ const EmployeeDashboard: React.FC = () => {
         ? 'Successfully clocked out with overtime request!'
         : 'Successfully clocked out!';
       showToast('success', message);
+
+      // Refresh attendance records from database
+      fetchAttendanceRecords();
     } catch (error: any) {
       console.error('Clock-out error:', error);
       showToast('error', error.message || 'Failed to clock out. Please try again.');
