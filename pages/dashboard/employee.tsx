@@ -168,7 +168,14 @@ const EmployeeDashboard: React.FC = () => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
-  // If user is not logged in or still loading, show a loading state or redirect
+  // Redirect to login if no authenticated user
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, loading, router]);
+
+  // If user is not logged in or still loading, show a loading state
   if (loading || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 flex flex-col items-center justify-center">
@@ -196,12 +203,6 @@ const EmployeeDashboard: React.FC = () => {
         <div className="mt-4 text-xl font-medium animate-text-glow">Loading...</div>
       </div>
     );
-  }
-
-  // Redirect to login if no authenticated user
-  if (!user) {
-    router.push('/auth/login');
-    return null;
   }
 
   // Helper function to get user location
@@ -292,19 +293,27 @@ const EmployeeDashboard: React.FC = () => {
       // Get user location
       let location = null;
       let address = null;
+      
       try {
         location = await getUserLocation();
         console.log('Clock-in location:', location);
-
-        // Get readable address from coordinates
-        if (location) {
-          address = await getAddressFromCoords(location.latitude, location.longitude);
-          console.log('Clock-in address:', address);
-        }
       } catch (locationError) {
         console.warn('Could not get location:', locationError);
-        showToast('warning', 'Location access denied. Clocking in without location data.');
-        // Continue without location if user denies permission
+        showToast('error', 'Location access is required to clock in. Please allow location access.');
+        setIsClocking(false);
+        return;
+      }
+
+      // Get readable address from coordinates
+      if (location) {
+        address = await getAddressFromCoords(location.latitude, location.longitude);
+        console.log('Clock-in address:', address);
+      }
+
+      if (!address) {
+        showToast('error', 'Could not determine your address. Please try again.');
+        setIsClocking(false);
+        return;
       }
 
       // Call clock-in API
@@ -313,8 +322,8 @@ const EmployeeDashboard: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          latitude: location?.latitude,
-          longitude: location?.longitude,
+          latitude: location.latitude,
+          longitude: location.longitude,
           address: address,
         }),
       });
@@ -363,19 +372,27 @@ const EmployeeDashboard: React.FC = () => {
       // Get user location
       let location = null;
       let address = null;
+      
       try {
         location = await getUserLocation();
         console.log('Clock-out location:', location);
-
-        // Get readable address from coordinates
-        if (location) {
-          address = await getAddressFromCoords(location.latitude, location.longitude);
-          console.log('Clock-out address:', address);
-        }
       } catch (locationError) {
         console.warn('Could not get location:', locationError);
-        showToast('warning', 'Location access denied. Clocking out without location data.');
-        // Continue without location if user denies permission
+        showToast('error', 'Location access is required to clock out. Please allow location access.');
+        setIsClocking(false);
+        return;
+      }
+
+      // Get readable address from coordinates
+      if (location) {
+        address = await getAddressFromCoords(location.latitude, location.longitude);
+        console.log('Clock-out address:', address);
+      }
+
+      if (!address) {
+        showToast('error', 'Could not determine your address. Please try again.');
+        setIsClocking(false);
+        return;
       }
 
       // Call clock-out API
@@ -384,8 +401,8 @@ const EmployeeDashboard: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          latitude: location?.latitude,
-          longitude: location?.longitude,
+          latitude: location.latitude,
+          longitude: location.longitude,
           address: address,
           overtimeComment: comment,
         }),

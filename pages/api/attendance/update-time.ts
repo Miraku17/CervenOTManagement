@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { fromZonedTime } from 'date-fns-tz';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -28,25 +29,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Supabase automatically applies +0800 timezone, so just use the values directly
-    const timeInISO = timeIn;
-    const timeOutISO = timeOut || null;
+    // Convert PHT to UTC (correct for timestamptz)
+    const timeInUTC = fromZonedTime(timeIn, "Asia/Manila").toISOString();
+    const timeOutUTC = timeOut ? fromZonedTime(timeOut, "Asia/Manila").toISOString() : null;
 
-    // Calculate updated total minutes if both times are present
+    // Calculate updated total minutes if both times exist
     let updatedTotalMinutes = null;
-    if (timeOutISO) {
-      const diffMs = new Date(timeOutISO).getTime() - new Date(timeInISO).getTime();
-      updatedTotalMinutes = Math.floor(diffMs / 60000); // Convert to minutes
+    if (timeOutUTC) {
+      const diffMs = new Date(timeOutUTC).getTime() - new Date(timeInUTC).getTime();
+      updatedTotalMinutes = Math.floor(diffMs / 60000); 
     }
 
     // Update the attendance record
     const { data, error } = await supabase
       .from('attendance')
       .update({
-        time_in: timeInISO,
-        time_out: timeOutISO,
+        time_in: timeInUTC,
+        time_out: timeOutUTC,
         updated_total_minutes: updatedTotalMinutes,
-        is_overtime_requested: !!overtimeComment,
+        is_overtime_requested: overtimeComment ? true : false,
         overtime_comment: overtimeComment || null,
         updated_at: new Date().toISOString(),
       })
