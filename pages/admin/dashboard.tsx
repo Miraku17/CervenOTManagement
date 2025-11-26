@@ -161,22 +161,11 @@ const AdminDashboard: React.FC = () => {
       {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800">
         <div className="p-6 flex items-center gap-3">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              className="w-5 h-5 text-white mb-0.5"
-            >
-               <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-               <path d="M12 2.5V18" />
-               <path d="M7 18L12 10" />
-               <path d="M17 18L12 10" />
-            </svg>
-          </div>
+          <img
+            src="/cerventech.png"
+            alt="Cerventech Logo"
+            className="w-10 h-10 rounded-lg object-cover shadow-lg"
+          />
           <h1 className="text-xl font-bold tracking-tight text-white">Cerventech<span className="text-blue-500">.Admin</span></h1>
         </div>
 
@@ -232,7 +221,14 @@ const AdminDashboard: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/95 md:hidden flex flex-col p-4">
            <div className="flex justify-between items-center mb-8">
-             <h1 className="text-xl font-bold text-white">Cerventech<span className="text-blue-500">.Admin</span></h1>
+             <div className="flex items-center gap-3">
+               <img
+                 src="/cerventech.png"
+                 alt="Cerventech Logo"
+                 className="w-10 h-10 rounded-lg object-cover shadow-lg"
+               />
+               <h1 className="text-xl font-bold text-white">Cerventech<span className="text-blue-500">.Admin</span></h1>
+             </div>
              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400">
                <X size={24} />
              </button>

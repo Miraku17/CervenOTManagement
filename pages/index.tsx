@@ -24,22 +24,11 @@ export default function LandingPage() {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="w-8 h-8 text-white animate-pulse"
-            >
-              <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-              <path d="M12 2.5V18" />
-              <path d="M7 18L12 10" />
-              <path d="M17 18L12 10" />
-            </svg>
-          </div>
+          <img
+            src="/cerventech.png"
+            alt="Cerventech Logo"
+            className="w-12 h-12 rounded-lg object-cover shadow-lg shadow-blue-900/50 animate-pulse"
+          />
           <p className="text-white text-xl font-medium">Loading...</p>
         </div>
       </div>
@@ -58,22 +47,11 @@ export default function LandingPage() {
       <nav className="fixed top-0 w-full z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
         <div className="container mx-auto px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/20">
-              <svg 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2.5" 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                className="w-6 h-6 text-white"
-              >
-                <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-                <path d="M12 2.5V18" />
-                <path d="M7 18L12 10" />
-                <path d="M17 18L12 10" />
-              </svg>
-            </div>
+            <img
+              src="/cerventech.png"
+              alt="Cerventech Logo"
+              className="w-10 h-10 rounded-lg object-cover shadow-lg shadow-blue-900/20"
+            />
             <span className="text-2xl font-bold tracking-tight">Cerventech</span>
           </div>
           
