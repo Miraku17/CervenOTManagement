@@ -118,18 +118,24 @@ const AdminDashboard: React.FC = () => {
       // Sign out from Supabase with timeout - the auth listener will handle the redirect
       console.log('[Admin Dashboard] Calling supabase.auth.signOut() with timeout...');
 
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SignOut timeout')), 5000)
+      // Create a timeout promise that resolves (not rejects) with a timeout indicator
+      const timeoutPromise = new Promise<{ timedOut: boolean }>((resolve) =>
+        setTimeout(() => resolve({ timedOut: true }), 5000)
       );
 
       // Race between signOut and timeout
-      const signOutPromise = supabase.auth.signOut({ scope: 'global' });
+      const signOutPromise = supabase.auth.signOut({ scope: 'global' }).then(result => ({
+        ...result,
+        timedOut: false
+      }));
 
-      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
+      const result = await Promise.race([signOutPromise, timeoutPromise]) as any;
 
-      if (error) {
-        console.error('[Admin Dashboard] Logout error:', error);
+      if (result.timedOut) {
+        console.log('[Admin Dashboard] SignOut timed out after 5s, forcing redirect...');
+        router.replace('/auth/login');
+      } else if (result.error) {
+        console.error('[Admin Dashboard] Logout error:', result.error);
         // Even if there's an error, force redirect since we cleared storage
         console.log('[Admin Dashboard] Forcing redirect despite error...');
         router.replace('/auth/login');
@@ -137,9 +143,9 @@ const AdminDashboard: React.FC = () => {
         console.log('[Admin Dashboard] SignOut successful, waiting for auth listener to redirect...');
       }
     } catch (error: any) {
-      console.error('[Admin Dashboard] Logout error or timeout:', error);
-      // Force redirect even on timeout since storage is cleared
-      console.log('[Admin Dashboard] Forcing redirect after error/timeout...');
+      console.error('[Admin Dashboard] Unexpected logout error:', error);
+      // Force redirect even on error since storage is cleared
+      console.log('[Admin Dashboard] Forcing redirect after error...');
       router.replace('/auth/login');
     }
   };
