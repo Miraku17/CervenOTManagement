@@ -41,7 +41,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
   const convertToCSV = (data: any[]) => {
     if (!data || data.length === 0) return '';
 
-    const headers = ['Date', 'Employee Name', 'Email', 'Time In', 'Time Out'];
+    const headers = ['Date', 'Employee Name', 'Email', 'Time In', 'Time Out', 'Total Minutes', 'Total Hours', 'Clock In Address', 'Clock Out Address'];
     const csvRows = [headers.join(',')];
 
     for (const row of data) {
@@ -51,15 +51,35 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const fullName = `${firstName} ${lastName}`.trim();
       const email = row.profiles?.email || '';
       
-      const timeIn = row.time_in ? new Date(row.time_in).toLocaleTimeString() : 'N/A';
-      const timeOut = row.time_out ? new Date(row.time_out).toLocaleTimeString() : 'N/A';
+      const timeInDate = row.time_in ? new Date(row.time_in) : null;
+      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
+
+      const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
+      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
+
+      let totalMinutes = 0;
+      let totalHours = 0;
+
+      if (timeInDate && timeOutDate) {
+        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
+        totalMinutes = Math.floor(diffMs / 60000);
+        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
+      }
+
+      // Escape quotes in addresses and handle potentially missing location data
+      const addressIn = row.location_in ? `"${row.location_in.replace(/"/g, '""')}"` : 'N/A';
+      const addressOut = row.location_out ? `"${row.location_out.replace(/"/g, '""')}"` : 'N/A';
 
       const values = [
         date,
         `"${fullName}"`, // Quote names to handle commas
         email,
         timeIn,
-        timeOut
+        timeOut,
+        totalMinutes,
+        totalHours,
+        addressIn,
+        addressOut
       ];
       csvRows.push(values.join(','));
     }
