@@ -47,6 +47,7 @@ export interface AttendanceRecord {
   timeOut: string | null; // HH:mm
   status: 'Present' | 'Late' | 'Absent' | 'Half Day' | 'In Progress';
   totalHours?: number;
+  overtimeComment?: string | null;
 }
 
 export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME';

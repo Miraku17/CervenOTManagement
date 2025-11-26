@@ -37,6 +37,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
             timeOut: data.attendance.timeOut || '-',
             status: data.attendance.status,
             totalHours: data.attendance.totalHours ? parseFloat(data.attendance.totalHours) : undefined,
+            overtimeComment: data.attendance.overtimeComment,
           });
         } else {
           setAttendance(null);
@@ -176,6 +177,32 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
                                 Status: {attendance.status}
                             </span>
                         </div>
+                    )}
+
+                    {/* Overtime Comment Section */}
+                    {attendance?.overtimeComment && (
+                      <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-800">
+                        <h4 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            width="16" 
+                            height="16" 
+                            viewBox="0 0 24 24" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            strokeWidth="2" 
+                            strokeLinecap="round" 
+                            strokeLinejoin="round" 
+                            className="text-blue-400"
+                          >
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                          </svg>
+                          Overtime Comment
+                        </h4>
+                        <p className="text-slate-400 text-sm italic">
+                          "{attendance.overtimeComment}"
+                        </p>
+                      </div>
                     )}
 
                     {!attendance && (

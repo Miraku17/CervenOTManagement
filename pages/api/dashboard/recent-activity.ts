@@ -34,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         date,
         total_minutes,
         is_overtime_requested,
+        overtime_comment,
         user_id,
         profiles!inner(first_name, last_name, email)
       `)
@@ -79,6 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         duration: duration,
         status: record.time_out ? 'Completed' : 'Active',
         isOvertime: record.is_overtime_requested,
+        overtimeComment: record.overtime_comment || null,
         avatarSeed: `${profile.first_name}+${profile.last_name}`
       };
     }) || [];
