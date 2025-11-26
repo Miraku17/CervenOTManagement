@@ -97,30 +97,50 @@ const AdminDashboard: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    if (isLoggingOut) return; // Prevent multiple clicks
+    console.log('[Admin Dashboard] Logout clicked');
+
+    if (isLoggingOut) {
+      console.log('[Admin Dashboard] Already logging out, ignoring');
+      return;
+    }
+
+    console.log('[Admin Dashboard] Setting isLoggingOut to true');
+    setIsLoggingOut(true);
 
     try {
-      setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error('Logout error:', error);
-        alert('Failed to logout. Please try again.');
-        setIsLoggingOut(false);
-        return;
-      }
-
-      // Clear any local storage if needed
+      // Clear local storage first
+      console.log('[Admin Dashboard] Clearing localStorage and sessionStorage');
       if (typeof window !== 'undefined') {
         localStorage.clear();
+        sessionStorage.clear();
       }
 
-      // Navigate to login page
-      router.push('/auth/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      alert('An error occurred during logout.');
-      setIsLoggingOut(false);
+      // Sign out from Supabase with timeout - the auth listener will handle the redirect
+      console.log('[Admin Dashboard] Calling supabase.auth.signOut() with timeout...');
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut timeout')), 5000)
+      );
+
+      // Race between signOut and timeout
+      const signOutPromise = supabase.auth.signOut({ scope: 'global' });
+
+      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
+
+      if (error) {
+        console.error('[Admin Dashboard] Logout error:', error);
+        // Even if there's an error, force redirect since we cleared storage
+        console.log('[Admin Dashboard] Forcing redirect despite error...');
+        router.replace('/auth/login');
+      } else {
+        console.log('[Admin Dashboard] SignOut successful, waiting for auth listener to redirect...');
+      }
+    } catch (error: any) {
+      console.error('[Admin Dashboard] Logout error or timeout:', error);
+      // Force redirect even on timeout since storage is cleared
+      console.log('[Admin Dashboard] Forcing redirect after error/timeout...');
+      router.replace('/auth/login');
     }
   };
 

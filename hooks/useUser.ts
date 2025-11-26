@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 import { User } from '@supabase/supabase-js';
-import { WorkLog } from '@/types';
 
 interface UserProfile extends User {
   first_name?: string;
@@ -17,41 +16,91 @@ export const useUser = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    let mounted = true;
 
-      if (session) {
-        const user = session.user;
-        const { data: profile } = await supabase
+    const fetchUserProfile = async (authUser: User) => {
+      console.log('[useUser] Fetching profile for user:', authUser.email);
+      try {
+        const { data: profile, error } = await supabase
           .from('profiles')
           .select('*, positions(name)')
-          .eq('id', user.id)
+          .eq('id', authUser.id)
           .single();
-        
-        setUser({ ...user, ...profile });
+
+        if (error) {
+          console.error('[useUser] Error fetching user profile:', error);
+          if (mounted) {
+            console.log('[useUser] Setting user without profile data');
+            setUser({ ...authUser });
+          }
+          return;
+        }
+
+        if (mounted) {
+          console.log('[useUser] Profile fetched successfully. Role:', profile?.role);
+          setUser({ ...authUser, ...profile });
+        }
+      } catch (err) {
+        console.error('[useUser] Unexpected error fetching profile:', err);
+        if (mounted) setUser({ ...authUser });
       }
-      setLoading(false);
     };
 
-    getSession();
+    const initializeAuth = async () => {
+      try {
+        console.log('[useUser] Initializing auth...');
+        const { data: { session }, error } = await supabase.auth.getSession();
+
+        if (error) {
+          console.error('[useUser] Error getting session:', error);
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        if (session?.user) {
+          console.log('[useUser] Found existing session for user:', session.user.email);
+          await fetchUserProfile(session.user);
+        } else {
+          console.log('[useUser] No existing session found');
+        }
+
+        if (mounted) setLoading(false);
+      } catch (err) {
+        console.error('[useUser] Error initializing auth:', err);
+        if (mounted) setLoading(false);
+      }
+    };
+
+    initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
-        const user = session.user;
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*, positions(name)')
-          .eq('id', user.id)
-          .single();
+      console.log('[useUser] Auth state changed:', event, session?.user?.email || 'no user');
 
-        setUser({ ...user, ...profile });
-      } else {
-        setUser(null);
+      if (!mounted) {
+        console.log('[useUser] Component unmounted, ignoring auth change');
+        return;
       }
-      setLoading(false);
+
+      if (event === 'SIGNED_OUT') {
+        console.log('[useUser] User signed out, clearing user state');
+        setUser(null);
+        setLoading(false);
+      } else if (event === 'SIGNED_IN' && session?.user) {
+        console.log('[useUser] User signed in:', session.user.email);
+        await fetchUserProfile(session.user);
+        setLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        console.log('[useUser] Token refreshed for:', session.user.email);
+        await fetchUserProfile(session.user);
+      } else if (!session) {
+        console.log('[useUser] No session, clearing user state');
+        setUser(null);
+        setLoading(false);
+      }
     });
 
     return () => {
+      mounted = false;
       authListener.subscription.unsubscribe();
     };
   }, []);

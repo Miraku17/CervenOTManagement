@@ -3,26 +3,27 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { supabase } from "@/services/supabase";
-import { useUser } from "@/hooks/useUser"; // Import useUser hook
+import { useUser } from "@/hooks/useUser";
 import Aurora from "@/components/react_bits/Aurora";
+
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [displayedMessage, setDisplayedMessage] = useState<string | null>(null); // State for displaying messages
+  const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
   const router = useRouter();
-  const { user, loading: userLoading } = useUser(); // Use the useUser hook
+  const { user, loading: userLoading } = useUser();
 
-  // Handle redirect if user is already logged in
+  // Redirect authenticated users to their dashboard
   useEffect(() => {
+    console.log('[Login Page] Check - userLoading:', userLoading, 'user:', user?.email || 'none');
+
     if (!userLoading && user) {
-      if (user.role === "admin") {
-        router.replace("/admin/dashboard");
-      } else {
-        router.replace("/dashboard/employee");
-      }
+      const dashboardPath = user.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
+      console.log('[Login Page] User already logged in, redirecting to:', dashboardPath);
+      router.replace(dashboardPath);
     }
   }, [user, userLoading, router]);
 
@@ -39,40 +40,52 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[Login Page] Login form submitted');
     setLoading(true);
     setError(null);
-    setDisplayedMessage(null); // Clear any previous messages on login attempt
+    setDisplayedMessage(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      console.log('[Login Page] Calling signInWithPassword...');
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    if (data.user) {
-      // Fetch profile role after successful login
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      if (profileError) {
-        setError(profileError.message);
+      if (error) {
+        console.error('[Login Page] Login error:', error);
+        setError(error.message);
         setLoading(false);
         return;
       }
 
-      if (profile && profile.role === "admin") {
-        router.push("/admin/dashboard");
-      } else {
-        router.push("/dashboard/employee");
+      if (data.user) {
+        console.log('[Login Page] Login successful for:', data.user.email);
+
+        // Fetch profile role after successful login
+        console.log('[Login Page] Fetching user profile...');
+        const { data: profile, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user.id)
+          .single();
+
+        if (profileError) {
+          console.error('[Login Page] Profile fetch error:', profileError);
+          setError(profileError.message);
+          setLoading(false);
+          return;
+        }
+
+        // Redirect based on role - use replace to prevent back navigation to login
+        const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
+        console.log('[Login Page] Redirecting to:', dashboardPath, 'for role:', profile?.role);
+        router.replace(dashboardPath);
       }
+    } catch (err: any) {
+      console.error('[Login Page] Unexpected error:', err);
+      setError(err.message || "An unexpected error occurred");
+      setLoading(false);
     }
   };
 

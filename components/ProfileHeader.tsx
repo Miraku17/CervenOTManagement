@@ -3,12 +3,17 @@ import { UserProfile } from '@/types';
 import { Mail, MapPin, Phone, BadgeCheck, Briefcase } from 'lucide-react';
 
 interface ProfileHeaderProps {
-  user: UserProfile;
+  user: UserProfile | null;
 }
 
-export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
-  user: { first_name, last_name, positions, email, contact_number, address }
-}) => {
+export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user }) => {
+  // Return null if user is not available (during logout, etc.)
+  if (!user) {
+    return null;
+  }
+
+  const { first_name, last_name, positions, email, contact_number, address } = user;
+
   // Generate initials for avatar
   const initials = `${first_name?.[0] || ''}${last_name?.[0] || ''}`.toUpperCase();
 

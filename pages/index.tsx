@@ -1,8 +1,56 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { ArrowRight, Clock, Shield, Banknote, Ticket } from 'lucide-react';
+import { useUser } from '@/hooks/useUser';
 
 export default function LandingPage() {
+  const router = useRouter();
+  const { user, loading } = useUser();
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    console.log('[Index Page] Check - loading:', loading, 'user:', user?.email || 'none');
+
+    if (!loading && user) {
+      const dashboardPath = user.role === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
+      console.log('[Index Page] User logged in, redirecting to:', dashboardPath);
+      router.replace(dashboardPath);
+    }
+  }, [user, loading, router]);
+
+  // Show loading while checking authentication
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-8 h-8 text-white animate-pulse"
+            >
+              <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
+              <path d="M12 2.5V18" />
+              <path d="M7 18L12 10" />
+              <path d="M17 18L12 10" />
+            </svg>
+          </div>
+          <p className="text-white text-xl font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only show landing page if user is not authenticated
+  if (user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-blue-500/30">
       

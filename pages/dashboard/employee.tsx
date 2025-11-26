@@ -9,11 +9,10 @@ import { useUser } from '@/hooks/useUser';
 import { useRouter } from 'next/router';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
-
-
+import { withAuth } from '@/hoc/withAuth';
 
 const EmployeeDashboard: React.FC = () => {
-  const { user, loading } = useUser();
+  const { user } = useUser();
   const router = useRouter();
   const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
@@ -167,43 +166,6 @@ const EmployeeDashboard: React.FC = () => {
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
-
-  // Redirect to login if no authenticated user
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push('/auth/login');
-    }
-  }, [user, loading, router]);
-
-  // If user is not logged in or still loading, show a loading state
-  if (loading || !user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 flex flex-col items-center justify-center">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
-            <svg 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              className="w-8 h-8 text-white animate-pulse"
-            >
-               <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-               <path d="M12 2.5V18" />
-               <path d="M7 18L12 10" />
-               <path d="M17 18L12 10" />
-            </svg>
-          </div>
-          <h1 className="text-3xl font-bold tracking-tight text-white">
-            Cerventech<span className="text-blue-500">.HR</span>
-          </h1>
-        </div>
-        <div className="mt-4 text-xl font-medium animate-text-glow">Loading...</div>
-      </div>
-    );
-  }
 
   // Helper function to get user location
   const getUserLocation = (): Promise<{ latitude: number; longitude: number }> => {
@@ -445,30 +407,50 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   const handleLogout = async () => {
-    if (isLoggingOut) return; // Prevent multiple clicks
+    console.log('[Employee Dashboard] Logout clicked');
+
+    if (isLoggingOut) {
+      console.log('[Employee Dashboard] Already logging out, ignoring');
+      return;
+    }
+
+    console.log('[Employee Dashboard] Setting isLoggingOut to true');
+    setIsLoggingOut(true);
 
     try {
-      setIsLoggingOut(true);
-      const { error } = await supabase.auth.signOut();
-
-      if (error) {
-        console.error('Logout error:', error);
-        showToast('error', 'Failed to logout. Please try again.');
-        setIsLoggingOut(false);
-        return;
-      }
-
-      // Clear any local storage
+      // Clear local storage first
+      console.log('[Employee Dashboard] Clearing localStorage and sessionStorage');
       if (typeof window !== 'undefined') {
         localStorage.clear();
+        sessionStorage.clear();
       }
 
-      // Navigate to login page
-      router.push('/auth/login');
-    } catch (error) {
-      console.error('Logout error:', error);
-      showToast('error', 'An error occurred during logout.');
-      setIsLoggingOut(false);
+      // Sign out from Supabase with timeout - the auth listener will handle the redirect
+      console.log('[Employee Dashboard] Calling supabase.auth.signOut() with timeout...');
+
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut timeout')), 5000)
+      );
+
+      // Race between signOut and timeout
+      const signOutPromise = supabase.auth.signOut({ scope: 'global' });
+
+      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
+
+      if (error) {
+        console.error('[Employee Dashboard] Logout error:', error);
+        // Even if there's an error, force redirect since we cleared storage
+        console.log('[Employee Dashboard] Forcing redirect despite error...');
+        router.replace('/auth/login');
+      } else {
+        console.log('[Employee Dashboard] SignOut successful, waiting for auth listener to redirect...');
+      }
+    } catch (error: any) {
+      console.error('[Employee Dashboard] Logout error or timeout:', error);
+      // Force redirect even on timeout since storage is cleared
+      console.log('[Employee Dashboard] Forcing redirect after error/timeout...');
+      router.replace('/auth/login');
     }
   };
 
@@ -572,4 +554,4 @@ const EmployeeDashboard: React.FC = () => {
   );
 };
 
-export default EmployeeDashboard;
+export default withAuth(EmployeeDashboard, 'employee');
