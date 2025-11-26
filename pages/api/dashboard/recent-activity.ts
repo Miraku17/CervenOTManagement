@@ -65,17 +65,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: profile.email,
         date: activityDate.toLocaleDateString('en-US', {
           month: 'short',
-          day: 'numeric'
+          day: 'numeric',
+          timeZone: 'Asia/Manila'
         }),
         timeIn: timeIn.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
+          timeZone: 'Asia/Manila'
         }),
         timeOut: timeOut ? timeOut.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
+          timeZone: 'Asia/Manila'
         }) : null,
         duration: duration,
         status: record.time_out ? 'Completed' : 'Active',
