@@ -67,8 +67,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       }
 
       // Escape quotes in addresses and handle potentially missing location data
-      const addressIn = row.location_in ? `"${row.location_in.replace(/"/g, '""')}"` : 'N/A';
-      const addressOut = row.location_out ? `"${row.location_out.replace(/"/g, '""')}"` : 'N/A';
+      const addressIn = row.clock_in_address ? `"${row.clock_in_address.replace(/"/g, '""')}"` : 'N/A';
+      const addressOut = row.clock_out_address ? `"${row.clock_out_address.replace(/"/g, '""')}"` : 'N/A';
 
       const values = [
         date,
@@ -173,6 +173,12 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
 
   return (
     <div className="bg-slate-900 p-8 rounded-xl shadow-lg">
+      <style jsx>{`
+        input[type="date"]::-webkit-calendar-picker-indicator {
+          filter: invert(1);
+          cursor: pointer;
+        }
+      `}</style>
       <div className="flex items-center gap-3 mb-8">
         <FileDown className="w-8 h-8 text-blue-500" />
         <h2 className="text-2xl font-bold text-white">Export Data</h2>
