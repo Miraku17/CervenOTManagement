@@ -49,7 +49,18 @@ export const useUser = () => {
     const initializeAuth = async () => {
       try {
         console.log('[useUser] Initializing auth...');
-        const { data: { session }, error } = await supabase.auth.getSession();
+
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+        );
+
+        const sessionPromise = supabase.auth.getSession();
+
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]) as any;
 
         if (error) {
           console.error('[useUser] Error getting session:', error);

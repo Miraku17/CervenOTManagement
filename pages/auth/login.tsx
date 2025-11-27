@@ -114,7 +114,7 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md p-8 space-y-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl relative z-10 text-slate-200">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white">
-            Cerventech<span className="text-blue-500">.HR</span>
+            Cerventech INC
           </h1>
           <p className="mt-2 text-sm text-slate-400">Employee Portal Login</p>
         </div>

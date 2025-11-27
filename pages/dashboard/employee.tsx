@@ -418,39 +418,35 @@ const EmployeeDashboard: React.FC = () => {
     setIsLoggingOut(true);
 
     try {
-      // Clear local storage first
-      console.log('[Employee Dashboard] Clearing localStorage and sessionStorage');
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-
-      // Sign out from Supabase with timeout - the auth listener will handle the redirect
-      console.log('[Employee Dashboard] Calling supabase.auth.signOut() with timeout...');
-
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SignOut timeout')), 5000)
-      );
-
-      // Race between signOut and timeout
-      const signOutPromise = supabase.auth.signOut({ scope: 'global' });
-
-      const { error } = await Promise.race([signOutPromise, timeoutPromise]) as any;
+      // Sign out from Supabase FIRST
+      console.log('[Employee Dashboard] Calling supabase.auth.signOut()...');
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
 
       if (error) {
         console.error('[Employee Dashboard] Logout error:', error);
-        // Even if there's an error, force redirect since we cleared storage
-        console.log('[Employee Dashboard] Forcing redirect despite error...');
-        router.replace('/auth/login');
       } else {
-        console.log('[Employee Dashboard] SignOut successful, waiting for auth listener to redirect...');
+        console.log('[Employee Dashboard] SignOut successful');
       }
-    } catch (error: any) {
-      console.error('[Employee Dashboard] Logout error or timeout:', error);
-      // Force redirect even on timeout since storage is cleared
-      console.log('[Employee Dashboard] Forcing redirect after error/timeout...');
+
+      // Clear app-specific local storage after sign out
+      console.log('[Employee Dashboard] Clearing app-specific localStorage items');
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cerventch_activelog');
+        // Add any other app-specific keys you want to clear
+      }
+
+      // Redirect to login
+      console.log('[Employee Dashboard] Redirecting to login...');
       router.replace('/auth/login');
+    } catch (error: any) {
+      console.error('[Employee Dashboard] Logout error:', error);
+      // Clear storage and redirect even on error
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cerventch_activelog');
+      }
+      router.replace('/auth/login');
+    } finally {
+      setIsLoggingOut(false);
     }
   };
 
@@ -480,25 +476,12 @@ const EmployeeDashboard: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-2">
-              {/* Pyramid Logo */}
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-600/20">
-                <svg 
-                  viewBox="0 0 24 24" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  strokeWidth="2.5" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round" 
-                  className="w-5 h-5 text-white mb-0.5"
-                >
-                   <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-                   <path d="M12 2.5V18" />
-                   <path d="M7 18L12 10" />
-                   <path d="M17 18L12 10" />
-                </svg>
+              {/* Cerventech Logo */}
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-contain rounded-full border-2 border-gray-300" />
               </div>
               <span className="text-xl font-bold tracking-tight text-white">
-                Cerventech<span className="text-blue-500">.HR</span>
+                Cerventech<span className="text-blue-500"> INC</span>
               </span>
             </div>
             
