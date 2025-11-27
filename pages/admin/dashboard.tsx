@@ -283,10 +283,6 @@ const AdminDashboard: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-4">
-            <button className="p-2 text-slate-400 hover:text-blue-400 transition-colors relative">
-              <Bell size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
-            </button>
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white">
               AD
             </div>
