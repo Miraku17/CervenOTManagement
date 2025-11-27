@@ -7,6 +7,8 @@ import {
   Phone,
   Mail,
   Briefcase,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 import { Employee, Position } from "@/types";
 import EmployeeForm from "@/components/admin_dashboard/EmployeeForm";
@@ -15,6 +17,7 @@ interface EmployeeManagerProps {
   employees: Employee[];
   onSelectEmployee: (id: string) => void;
   onAddEmployee: (employee: Employee) => void;
+  onDeleteEmployee?: (id: string) => void;
   positions: Position[];
 }
 
@@ -22,10 +25,16 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   employees,
   onSelectEmployee,
   onAddEmployee,
+  onDeleteEmployee,
   positions,
 }) => {
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [deleteModal, setDeleteModal] = useState<{
+    isOpen: boolean;
+    employee: Employee | null;
+  }>({ isOpen: false, employee: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const filteredEmployees = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -35,6 +44,46 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         e.email.toLowerCase().includes(term)
     );
   }, [employees, searchTerm]);
+
+  const handleDeleteClick = (e: React.MouseEvent, employee: Employee) => {
+    e.stopPropagation();
+    setDeleteModal({ isOpen: true, employee });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.employee || !onDeleteEmployee) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/delete-employee', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ employeeId: deleteModal.employee.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete employee');
+      }
+
+      // Call the parent's delete handler to update the state
+      onDeleteEmployee(deleteModal.employee.id);
+
+      // Close the modal
+      setDeleteModal({ isOpen: false, employee: null });
+    } catch (error: any) {
+      alert(`Error deleting employee: ${error.message}`);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteModal({ isOpen: false, employee: null });
+  };
 
   if (isCreating) {
     return (
@@ -115,6 +164,13 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                   <p className="text-slate-400 text-sm">{employee.position}</p>
                 </div>
               </div>
+              <button
+                onClick={(e) => handleDeleteClick(e, employee)}
+                className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                title="Delete employee"
+              >
+                <Trash2 size={18} />
+              </button>
             </div>
 
             <div className="space-y-2.5">
@@ -141,6 +197,59 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
           </div>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.isOpen && deleteModal.employee && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="p-3 bg-red-500/10 rounded-full">
+                <AlertTriangle className="text-red-500" size={24} />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-white mb-2">
+                  Delete Employee
+                </h3>
+                <p className="text-slate-400 text-sm">
+                  Are you sure you want to delete{" "}
+                  <span className="font-semibold text-white">
+                    {deleteModal.employee.fullName}
+                  </span>
+                  ? This action cannot be undone and will remove the employee from
+                  both the system and authentication.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    <span>Delete</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -96,6 +96,17 @@ const AdminDashboard: React.FC = () => {
     setCurrentView('EMPLOYEES');
   };
 
+  const handleDeleteEmployee = (employeeId: string) => {
+    // Remove the employee from the state
+    setEmployees(prev => prev.filter(e => e.id !== employeeId));
+
+    // If the deleted employee was selected, go back to employees list
+    if (selectedEmployeeId === employeeId) {
+      setSelectedEmployeeId(null);
+      setCurrentView('EMPLOYEES');
+    }
+  };
+
   const handleLogout = async () => {
     console.log('[Admin Dashboard] Logout clicked');
 
@@ -285,10 +296,11 @@ const AdminDashboard: React.FC = () => {
             )}
             
             {currentView === 'EMPLOYEES' && (
-              <EmployeeManager 
-                employees={employees} 
+              <EmployeeManager
+                employees={employees}
                 onSelectEmployee={handleSelectEmployee}
                 onAddEmployee={handleAddEmployee}
+                onDeleteEmployee={handleDeleteEmployee}
                 positions={positions}
               />
             )}
