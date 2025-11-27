@@ -212,6 +212,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                                                     <Clock className="w-3.5 h-3.5 text-blue-400" />
                                                     {formatTime(log.startTime)}
                                                 </div>
+                                                <div className="mt-1 text-[10px] text-slate-400 max-w-[120px] truncate" title={log.clockInAddress || 'No address provided'}>
+                                                    {log.clockInAddress || 'No address provided'}
+                                                </div>
                                             </div>
                                             <ArrowRight className="w-4 h-4 text-slate-600" />
                                             <div className="text-right">
@@ -220,6 +223,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                                                     {log.endTime ? formatTime(log.endTime) : '--:--'}
                                                     <Clock className="w-3.5 h-3.5 text-rose-400" />
                                                 </div>
+                                                {log.endTime && (
+                                                    <div className="mt-1 text-[10px] text-slate-400 max-w-[120px] truncate ml-auto" title={log.clockOutAddress || 'No address provided'}>
+                                                        {log.clockOutAddress || 'No address provided'}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         {log.comment && (

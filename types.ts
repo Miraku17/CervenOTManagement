@@ -17,6 +17,8 @@ export interface WorkLog {
   durationSeconds: number;
   status: 'COMPLETED' | 'IN_PROGRESS';
   comment?: string;
+  clockInAddress?: string | null;
+  clockOutAddress?: string | null;
 }
 
 export interface DayStats {
@@ -45,6 +47,8 @@ export interface AttendanceRecord {
   date: string; // YYYY-MM-DD
   timeIn: string; // HH:mm
   timeOut: string | null; // HH:mm
+  clockInAddress?: string | null;
+  clockOutAddress?: string | null;
   status: 'Present' | 'Late' | 'Absent' | 'Half Day' | 'In Progress';
   totalHours?: number;
   overtimeComment?: string | null;

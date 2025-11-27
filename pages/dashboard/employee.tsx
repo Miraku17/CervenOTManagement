@@ -105,6 +105,8 @@ const EmployeeDashboard: React.FC = () => {
           durationSeconds: record.total_minutes ? record.total_minutes * 60 : 0,
           status: 'COMPLETED' as const,
           comment: record.overtime_comment || undefined,
+          clockInAddress: record.clock_in_address,
+          clockOutAddress: record.clock_out_address,
         }));
 
         setWorkLogs(logs);

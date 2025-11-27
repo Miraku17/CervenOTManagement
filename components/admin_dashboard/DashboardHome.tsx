@@ -21,6 +21,8 @@ interface RecentActivity {
   date: string;
   timeIn: string;
   timeOut: string | null;
+  clockInAddress: string | null;
+  clockOutAddress: string | null;
   duration: string | null;
   status: string;
   isOvertime: boolean;
@@ -142,16 +144,26 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                       <p className="text-xs text-slate-300">{activity.date}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time In</p>
-                      <p className="text-xs text-slate-300">{activity.timeIn}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time Out</p>
-                      <p className="text-xs text-slate-300">{activity.timeOut || '-'}</p>
-                    </div>
-                    <div>
                       <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Duration</p>
                       <p className="text-xs text-emerald-400 font-medium">{activity.duration || '-'}</p>
+                    </div>
+                    <div className="col-span-2 grid grid-cols-2 gap-2">
+                       <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time In</p>
+                          <p className="text-xs text-slate-300">{activity.timeIn}</p>
+                          <p className="text-[10px] text-slate-400 mt-1 truncate" title={activity.clockInAddress || 'No address provided'}>
+                            {activity.clockInAddress || 'No address provided'}
+                          </p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time Out</p>
+                          <p className="text-xs text-slate-300">{activity.timeOut || '-'}</p>
+                          {activity.timeOut && (
+                            <p className="text-[10px] text-slate-400 mt-1 truncate" title={activity.clockOutAddress || 'No address provided'}>
+                              {activity.clockOutAddress || 'No address provided'}
+                            </p>
+                          )}
+                       </div>
                     </div>
                   </div>
                   

@@ -35,6 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         total_minutes,
         is_overtime_requested,
         overtime_comment,
+        clock_in_address,
+        clock_out_address,
         user_id,
         profiles!inner(first_name, last_name, email)
       `)
@@ -80,6 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           hour12: true,
           timeZone: 'Asia/Manila'
         }) : null,
+        clockInAddress: record.clock_in_address || null,
+        clockOutAddress: record.clock_out_address || null,
         duration: duration,
         status: record.time_out ? 'Completed' : 'Active',
         isOvertime: record.is_overtime_requested,

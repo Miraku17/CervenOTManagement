@@ -35,6 +35,8 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
             date: data.attendance.date,
             timeIn: data.attendance.timeIn || '-',
             timeOut: data.attendance.timeOut || '-',
+            clockInAddress: data.attendance.clockInLocation?.address,
+            clockOutAddress: data.attendance.clockOutLocation?.address,
             status: data.attendance.status,
             totalHours: data.attendance.totalHours ? parseFloat(data.attendance.totalHours) : undefined,
             overtimeComment: data.attendance.overtimeComment,
@@ -154,11 +156,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
                             label="Time In"
                             value={attendance?.timeIn || '--:--'}
                             color="emerald"
+                            subtext={attendance?.clockInAddress || 'No address provided'}
                         />
                         <AttendanceCard
                             label="Time Out"
                             value={attendance?.timeOut || '--:--'}
                             color="amber"
+                            subtext={attendance?.clockOutAddress || (attendance?.timeOut !== '-' ? 'No address provided' : null)}
                         />
                         <AttendanceCard
                             label="Total Hours"
@@ -218,10 +222,11 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
   );
 };
 
-const AttendanceCard: React.FC<{ label: string; value: string; color: string }> = ({ label, value, color }) => (
-    <div className={`bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center`}>
+const AttendanceCard: React.FC<{ label: string; value: string; color: string; subtext?: string | null }> = ({ label, value, color, subtext }) => (
+    <div className={`bg-slate-950 border border-slate-800 p-6 rounded-2xl flex flex-col items-center justify-center text-center`}>
         <span className={`text-${color}-400 text-sm font-medium mb-2 uppercase tracking-wider`}>{label}</span>
         <span className="text-3xl font-bold text-white">{value}</span>
+        {subtext && <span className="text-xs text-slate-500 mt-2 max-w-full truncate px-2" title={subtext}>{subtext}</span>}
     </div>
 );
 
