@@ -170,7 +170,7 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   // Helper function to get user location
-  const getUserLocation = (): Promise<{ latitude: number; longitude: number }> => {
+  const getUserLocation = (highAccuracy = true): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
         reject(new Error('Geolocation is not supported by this browser'));
@@ -188,9 +188,9 @@ const EmployeeDashboard: React.FC = () => {
           reject(error);
         },
         {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0,
+          enableHighAccuracy: highAccuracy,
+          timeout: 20000,
+          maximumAge: 60000,
         }
       );
     });
@@ -259,11 +259,29 @@ const EmployeeDashboard: React.FC = () => {
       let address = null;
       
       try {
-        location = await getUserLocation();
+        try {
+          // Try high accuracy first
+          location = await getUserLocation(true);
+        } catch (err: any) {
+          if (err.code === 3) { // Timeout
+            console.log('High accuracy location timed out, trying low accuracy...');
+            location = await getUserLocation(false);
+          } else {
+            throw err;
+          }
+        }
         console.log('Clock-in location:', location);
-      } catch (locationError) {
+      } catch (locationError: any) {
         console.warn('Could not get location:', locationError);
-        showToast('error', 'Location access is required to clock in. Please allow location access.');
+        let errorMessage = 'Location access is required to clock in.';
+        if (locationError.code === 1) {
+            errorMessage = 'Location permission denied. Please enable location services in your browser settings.';
+        } else if (locationError.code === 2) {
+            errorMessage = 'Location unavailable. Check your network, GPS, or ensure you are using HTTPS.';
+        } else if (locationError.code === 3) {
+            errorMessage = 'Location request timed out. Please move to an area with better signal and try again.';
+        }
+        showToast('error', errorMessage);
         setIsClocking(false);
         return;
       }
@@ -338,11 +356,29 @@ const EmployeeDashboard: React.FC = () => {
       let address = null;
       
       try {
-        location = await getUserLocation();
+        try {
+           // Try high accuracy first
+           location = await getUserLocation(true);
+        } catch (err: any) {
+           if (err.code === 3) { // Timeout
+             console.log('High accuracy location timed out, trying low accuracy...');
+             location = await getUserLocation(false);
+           } else {
+             throw err;
+           }
+        }
         console.log('Clock-out location:', location);
-      } catch (locationError) {
+      } catch (locationError: any) {
         console.warn('Could not get location:', locationError);
-        showToast('error', 'Location access is required to clock out. Please allow location access.');
+        let errorMessage = 'Location access is required to clock out.';
+        if (locationError.code === 1) {
+            errorMessage = 'Location permission denied. Please enable location services in your browser settings.';
+        } else if (locationError.code === 2) {
+            errorMessage = 'Location unavailable. Check your network, GPS, or ensure you are using HTTPS.';
+        } else if (locationError.code === 3) {
+            errorMessage = 'Location request timed out. Please move to an area with better signal and try again.';
+        }
+        showToast('error', errorMessage);
         setIsClocking(false);
         return;
       }
