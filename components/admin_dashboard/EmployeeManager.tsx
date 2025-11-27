@@ -2,7 +2,7 @@ import React, { useState, useMemo } from "react";
 import {
   Search,
   Plus,
-  Filter,
+  FileDown,
   MapPin,
   Phone,
   Mail,
@@ -10,6 +10,8 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Employee, Position } from "@/types";
 import EmployeeForm from "@/components/admin_dashboard/EmployeeForm";
 
@@ -44,6 +46,41 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         e.email.toLowerCase().includes(term)
     );
   }, [employees, searchTerm]);
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+
+    const tableColumn = [
+      "Full Name",
+      "Email",
+      "Position",
+      "Status",
+      "Join Date",
+      "Contact",
+      "Address",
+    ];
+
+    const tableRows = employees.map((emp) => [
+      emp.fullName,
+      emp.email,
+      emp.position,
+      emp.status,
+      emp.joinDate,
+      emp.contact_number,
+      emp.address,
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [15, 23, 42] }, // Slate 900
+    });
+
+    doc.text("All Employees Data", 14, 15);
+    doc.save("employees_data.pdf");
+  };
 
   const handleDeleteClick = (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
@@ -119,9 +156,12 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         </div>
 
         <div className="flex gap-3">
-          <button className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2">
-            <Filter size={18} />
-            <span className="hidden sm:inline">Filter</span>
+          <button
+            onClick={handleExportPDF}
+            className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
+          >
+            <FileDown size={18} />
+            <span className="hidden sm:inline">Export All Data</span>
           </button>
           <button
             onClick={() => setIsCreating(true)}
