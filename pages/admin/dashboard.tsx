@@ -107,6 +107,11 @@ const AdminDashboard: React.FC = () => {
     }
   };
 
+  const handleUpdateEmployee = (updatedEmployee: Employee) => {
+    // Update the employee in the state
+    setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
+  };
+
   const handleLogout = async () => {
     console.log('[Admin Dashboard] Logout clicked');
 
@@ -306,9 +311,10 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {currentView === 'EMPLOYEE_DETAIL' && selectedEmployee && (
-              <EmployeeDetail 
-                employee={selectedEmployee} 
+              <EmployeeDetail
+                employee={selectedEmployee}
                 onBack={() => handleNavigate('EMPLOYEES')}
+                onUpdate={handleUpdateEmployee}
               />
             )}
 

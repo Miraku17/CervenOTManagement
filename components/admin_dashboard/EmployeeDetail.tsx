@@ -1,18 +1,68 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2 } from 'lucide-react';
-import { Employee, AttendanceRecord } from '@/types';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X } from 'lucide-react';
+import { Employee, AttendanceRecord, Position } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
+import { supabase } from '@/services/supabase';
 
 interface EmployeeDetailProps {
   employee: Employee;
   onBack: () => void;
+  onUpdate?: (updatedEmployee: Employee) => void;
 }
 
-const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => {
+const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpdate }) => {
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendance, setAttendance] = useState<AttendanceRecord | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Edit mode states
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [editFormData, setEditFormData] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    contact_number: '',
+    address: '',
+    positionId: '',
+  });
+
+  // Fetch positions
+  useEffect(() => {
+    const fetchPositions = async () => {
+      const { data, error } = await supabase.from('positions').select('*');
+      if (data) {
+        setPositions(data);
+      }
+      if (error) {
+        console.error('Error fetching positions:', error);
+      }
+    };
+    fetchPositions();
+  }, []);
+
+  // Initialize edit form when entering edit mode
+  useEffect(() => {
+    if (isEditMode && employee && positions.length > 0) {
+      const nameParts = employee.fullName.split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Try to find the current position
+      const currentPosition = positions.find(p => p.name === employee.position);
+
+      setEditFormData({
+        firstName,
+        lastName,
+        email: employee.email || '',
+        contact_number: employee.contact_number || '',
+        address: employee.address || '',
+        positionId: currentPosition?.id || '',
+      });
+    }
+  }, [isEditMode, employee, positions]);
 
   // Fetch attendance data when date changes
   useEffect(() => {
@@ -58,61 +108,257 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack }) => 
     }
   }, [selectedDate, employee.id]);
 
+  const handleSaveEdit = async () => {
+    setIsSaving(true);
+    setError(null);
+
+    // Validation
+    if (!editFormData.firstName.trim() || !editFormData.lastName.trim()) {
+      setError('First name and last name are required');
+      setIsSaving(false);
+      return;
+    }
+
+    if (!editFormData.email.trim()) {
+      setError('Email is required');
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/update-employee', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          employeeId: employee.id,
+          firstName: editFormData.firstName.trim(),
+          lastName: editFormData.lastName.trim(),
+          email: editFormData.email.trim(),
+          contact_number: editFormData.contact_number.trim(),
+          address: editFormData.address.trim(),
+          positionId: editFormData.positionId || undefined,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update employee');
+      }
+
+      // Update the local employee data
+      const updatedPosition = positions.find(p => String(p.id) === String(editFormData.positionId));
+      const updatedEmployee: Employee = {
+        ...employee,
+        fullName: `${editFormData.firstName} ${editFormData.lastName}`,
+        email: editFormData.email,
+        contact_number: editFormData.contact_number,
+        address: editFormData.address,
+        position: updatedPosition?.name || employee.position,
+      };
+
+      // Call the parent's update handler
+      if (onUpdate) {
+        onUpdate(updatedEmployee);
+      }
+
+      setIsEditMode(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setError(null);
+  };
+
   return (
     <div className="animate-fade-in space-y-6">
-      <button 
-        onClick={onBack}
-        className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-2"
-      >
-        <ArrowLeft size={20} />
-        <span>Back to Directory</span>
-      </button>
+      <div className="flex items-center justify-between mb-2">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
+        >
+          <ArrowLeft size={20} />
+          <span>Back to Directory</span>
+        </button>
+
+        {!isEditMode && (
+          <button
+            onClick={() => setIsEditMode(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+          >
+            <Edit2 size={18} />
+            <span>Edit Employee</span>
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
+          {error}
+        </div>
+      )}
 
       {/* Top Profile Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-blue-900/40 to-slate-900/0"></div>
-        
+
         <div className="relative flex flex-col md:flex-row gap-8 items-start">
             <div className="shrink-0">
-                <img 
-                    src={employee.avatarUrl} 
-                    alt={employee.fullName} 
+                <img
+                    src={employee.avatarUrl}
+                    alt={employee.fullName}
                     className="w-32 h-32 rounded-2xl border-4 border-slate-800 shadow-2xl object-cover"
                 />
             </div>
-            
+
             <div className="flex-1 space-y-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-white">{employee.fullName}</h1>
-                    <p className="text-lg text-blue-400 font-medium">{employee.position}</p>
-                </div>
+                {isEditMode ? (
+                  // Edit Mode
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">First Name</label>
+                        <input
+                          type="text"
+                          value={editFormData.firstName}
+                          onChange={(e) => setEditFormData({ ...editFormData, firstName: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block">Last Name</label>
+                        <input
+                          type="text"
+                          value={editFormData.lastName}
+                          onChange={(e) => setEditFormData({ ...editFormData, lastName: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">
-                    <div className="flex items-center gap-3">
-                        <Mail className="w-5 h-5 text-slate-500" />
-                        <span>{employee.email}</span>
+                    <div>
+                      <label className="text-sm text-slate-400 mb-2 block">Position</label>
+                      <select
+                        value={editFormData.positionId}
+                        onChange={(e) => setEditFormData({ ...editFormData, positionId: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="">Select Position</option>
+                        {positions.map((pos) => (
+                          <option key={pos.id} value={pos.id}>{pos.name}</option>
+                        ))}
+                      </select>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <Phone className="w-5 h-5 text-slate-500" />
-                    <span>{employee.contact_number || "N/A"}</span>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
+                          <Mail size={16} />
+                          Email
+                        </label>
+                        <input
+                          type="email"
+                          value={editFormData.email}
+                          onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
+                          <Phone size={16} />
+                          Contact Number
+                        </label>
+                        <input
+                          type="text"
+                          value={editFormData.contact_number}
+                          onChange={(e) => setEditFormData({ ...editFormData, contact_number: e.target.value })}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-slate-500" />
-                        <span>{employee.address}</span>
+
+                    <div>
+                      <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
+                        <MapPin size={16} />
+                        Address
+                      </label>
+                      <input
+                        type="text"
+                        value={editFormData.address}
+                        onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
-                    {/* <div className="flex items-center gap-3">
-                        <Briefcase className="w-5 h-5 text-slate-500" />
-                        <span>{employee.department}</span>
-                    </div> */}
-                </div>
+
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={handleSaveEdit}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSaving ? (
+                          <>
+                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Saving...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Save size={18} />
+                            <span>Save Changes</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                        className="flex items-center gap-2 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        <X size={18} />
+                        <span>Cancel</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  // View Mode
+                  <>
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">{employee.fullName}</h1>
+                        <p className="text-lg text-blue-400 font-medium">{employee.position}</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">
+                        <div className="flex items-center gap-3">
+                            <Mail className="w-5 h-5 text-slate-500" />
+                            <span>{employee.email}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <Phone className="w-5 h-5 text-slate-500" />
+                        <span>{employee.contact_number || "N/A"}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <MapPin className="w-5 h-5 text-slate-500" />
+                            <span>{employee.address}</span>
+                        </div>
+                    </div>
+                  </>
+                )}
             </div>
 
-            <div className="flex flex-col gap-3">
-                <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-sm font-medium text-center">
-                    {employee.status}
-                </span>
-                <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span>
-            </div>
+            {!isEditMode && (
+              <div className="flex flex-col gap-3">
+                  <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-sm font-medium text-center">
+                      {employee.status}
+                  </span>
+                  <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span>
+              </div>
+            )}
         </div>
       </div>
 
