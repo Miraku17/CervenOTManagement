@@ -92,7 +92,12 @@ export const useUser = () => {
         return;
       }
 
-      if (event === 'SIGNED_OUT') {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log('[useUser] Password recovery initiated, not setting user state');
+        // Don't set user state during password recovery to prevent auto-redirect
+        setUser(null);
+        setLoading(false);
+      } else if (event === 'SIGNED_OUT') {
         console.log('[useUser] User signed out, clearing user state');
         setUser(null);
         setLoading(false);
