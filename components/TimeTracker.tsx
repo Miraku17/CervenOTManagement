@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Square, Clock, Loader2 } from 'lucide-react';
+import { Play, Square, Clock, Loader2, MapPin, RefreshCw } from 'lucide-react';
 import { WorkLog } from '@/types';
 
 interface TimeTrackerProps {
@@ -7,9 +7,23 @@ interface TimeTrackerProps {
   onClockOut: (duration: number, comment?: string) => void;
   activeLog: WorkLog | null;
   isLoading?: boolean;
+  locationStatus?: {
+    hasLocation: boolean;
+    isRequesting: boolean;
+    error: string | null;
+    address: string | null;
+  };
+  onRefreshLocation?: () => void;
 }
 
-export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut, activeLog, isLoading = false }) => {
+export const TimeTracker: React.FC<TimeTrackerProps> = ({
+  onClockIn,
+  onClockOut,
+  activeLog,
+  isLoading = false,
+  locationStatus,
+  onRefreshLocation
+}) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [now, setNow] = useState(new Date());
   const [hasMounted, setHasMounted] = useState(false);
@@ -109,6 +123,71 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({ onClockIn, onClockOut,
                     </span>
                 )}
             </div>
+
+            {/* Location Status */}
+            {locationStatus && (
+              <div className="mb-4">
+                {locationStatus.error === 'denied' ? (
+                  // Special UI for denied permission
+                  <div className="p-4 rounded-lg bg-red-900/20 border border-red-500/50">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-red-400 mb-1">Location Permission Denied</p>
+                        <p className="text-xs text-slate-300 mb-3">
+                          To clock in/out, please enable location access:
+                        </p>
+                        <ol className="text-xs text-slate-400 space-y-1 mb-3 ml-4 list-decimal">
+                          <li>Click the lock/info icon in your browser's address bar</li>
+                          <li>Allow location access for this site</li>
+                          <li>Click the button below to retry</li>
+                        </ol>
+                        {onRefreshLocation && (
+                          <button
+                            onClick={onRefreshLocation}
+                            disabled={locationStatus.isRequesting}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <RefreshCw className={`w-4 h-4 ${locationStatus.isRequesting ? 'animate-spin' : ''}`} />
+                            {locationStatus.isRequesting ? 'Requesting...' : 'Request Location Again'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Normal location status display
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-lg bg-slate-700/30 border border-slate-600">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <MapPin className={`w-4 h-4 flex-shrink-0 ${locationStatus.hasLocation ? 'text-emerald-400' : 'text-amber-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        {locationStatus.isRequesting ? (
+                          <p className="text-xs text-slate-400">Requesting location...</p>
+                        ) : locationStatus.hasLocation && locationStatus.address ? (
+                          <p className="text-xs text-slate-300 truncate" title={locationStatus.address}>
+                            {locationStatus.address.split(',').slice(0, 2).join(',')}
+                          </p>
+                        ) : locationStatus.error ? (
+                          <p className="text-xs text-amber-400">{locationStatus.error}</p>
+                        ) : (
+                          <p className="text-xs text-slate-400">No location</p>
+                        )}
+                      </div>
+                    </div>
+                    {onRefreshLocation && (
+                      <button
+                        onClick={onRefreshLocation}
+                        disabled={locationStatus.isRequesting}
+                        className="flex-shrink-0 p-1.5 rounded-md hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Refresh location"
+                      >
+                        <RefreshCw className={`w-4 h-4 text-slate-400 ${locationStatus.isRequesting ? 'animate-spin' : ''}`} />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Current Date & Time Display */}
             <div className="flex flex-col items-center mb-6 border-b border-slate-700/50 pb-6">

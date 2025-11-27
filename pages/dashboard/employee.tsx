@@ -23,12 +23,10 @@ const EmployeeDashboard: React.FC = () => {
   const [confirmAction, setConfirmAction] = useState<'clockIn' | 'clockOut' | null>(null);
   const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number; comment?: string } | null>(null);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  useEffect(() => {
-    if (user?.id) {
-      checkActiveSession();
-    }
-  }, [user?.id]);
+  const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [currentAddress, setCurrentAddress] = useState<string | null>(null);
+  const [isRequestingLocation, setIsRequestingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   // Check for active clock-in session from database
   const checkActiveSession = async () => {
@@ -65,6 +63,14 @@ const EmployeeDashboard: React.FC = () => {
       console.error('Error checking active session:', error);
     }
   };
+
+  // Initialize session and location on mount
+  useEffect(() => {
+    if (user?.id) {
+      checkActiveSession();
+      requestLocationOnMount();
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (activeLog) {
@@ -169,6 +175,94 @@ const EmployeeDashboard: React.FC = () => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
+  // Request location (used both on mount and for manual refresh)
+  const requestLocation = async (showSuccessToast = true, retryCount = 0) => {
+    if (isRequestingLocation) return;
+
+    setIsRequestingLocation(true);
+    setLocationError(null);
+
+    try {
+      let location = null;
+
+      try {
+        // Try high accuracy first
+        location = await getUserLocation(true);
+      } catch (err: any) {
+        console.log('Location error:', err, 'Code:', err.code);
+
+        // Error code 0 = kCLErrorLocationUnknown - location currently unknown but may become available
+        if (err.code === 0 && retryCount < 2) {
+          console.log(`Location unknown (attempt ${retryCount + 1}/3), retrying in 2 seconds...`);
+          setIsRequestingLocation(false);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          return requestLocation(showSuccessToast, retryCount + 1);
+        } else if (err.code === 2) { // Position unavailable
+          console.log('High accuracy position unavailable, trying low accuracy (network-based)...');
+          try {
+            location = await getUserLocation(false);
+          } catch (lowAccErr: any) {
+            console.log('Low accuracy also failed:', lowAccErr);
+            throw err; // Throw original error
+          }
+        } else if (err.code === 3) { // Timeout
+          console.log('High accuracy location timed out, trying low accuracy...');
+          location = await getUserLocation(false);
+        } else {
+          throw err;
+        }
+      }
+
+      console.log('Location obtained:', location);
+      setCurrentLocation(location);
+
+      // Get readable address from coordinates
+      if (location) {
+        const address = await getAddressFromCoords(location.latitude, location.longitude);
+        console.log('Address obtained:', address);
+        setCurrentAddress(address);
+
+        if (address) {
+          if (showSuccessToast) {
+            showToast('success', 'Location accessed successfully');
+          }
+        } else {
+          setLocationError('Could not determine address');
+          showToast('warning', 'Location obtained but address unavailable. You can refresh location later.');
+        }
+      }
+    } catch (locationError: any) {
+      console.warn('Could not get location:', locationError);
+      let errorMessage = 'Location access is required for clocking in/out.';
+
+      if (locationError.code === 0) {
+        errorMessage = 'Location currently unavailable. Please try moving near a window or outside, then refresh.';
+      } else if (locationError.code === 1) {
+        errorMessage = 'Permission denied';
+        showToast('error', 'Location permission denied. Click the refresh button after enabling location in your browser.');
+        // Store that permission was denied so we can show special UI
+        setLocationError('denied');
+        setIsRequestingLocation(false);
+        return;
+      } else if (locationError.code === 2) {
+        errorMessage = 'Position unavailable';
+        showToast('error', 'Location services unavailable. Please check: 1) System location is enabled, 2) You have internet/WiFi, 3) Site uses HTTPS');
+      } else if (locationError.code === 3) {
+        errorMessage = 'Location request timed out. Please move to an area with better signal.';
+      }
+
+      setLocationError(errorMessage);
+      showToast('error', errorMessage);
+    } finally {
+      setIsRequestingLocation(false);
+    }
+  };
+
+  // Request location when component mounts
+  const requestLocationOnMount = async () => {
+    await requestLocation(true);
+  };
+
   // Helper function to get user location
   const getUserLocation = (highAccuracy = true): Promise<{ latitude: number; longitude: number }> => {
     return new Promise((resolve, reject) => {
@@ -177,20 +271,38 @@ const EmployeeDashboard: React.FC = () => {
         return;
       }
 
+      // Check if site is using HTTPS (required for geolocation)
+      const isSecure = window.location.protocol === 'https:' || window.location.hostname === 'localhost';
+      console.log('Site secure context:', isSecure);
+      console.log(`Requesting location with ${highAccuracy ? 'high' : 'low'} accuracy...`);
+
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log('Location position received:', {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            timestamp: new Date(position.timestamp).toISOString()
+          });
           resolve({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
           });
         },
         (error) => {
+          console.error('Geolocation error:', {
+            message: error.message,
+            code: error.code,
+            PERMISSION_DENIED: error.PERMISSION_DENIED,
+            POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
+            TIMEOUT: error.TIMEOUT
+          });
           reject(error);
         },
         {
           enableHighAccuracy: highAccuracy,
-          timeout: 20000,
-          maximumAge: 60000,
+          timeout: 30000, // Increased from 20s to 30s
+          maximumAge: 0, // Changed from 60000 to 0 to always get fresh location
         }
       );
     });
@@ -252,51 +364,20 @@ const EmployeeDashboard: React.FC = () => {
   const handleClockIn = async () => {
     if (!user?.id || isClocking) return;
 
+    // Check if we have location data
+    if (!currentLocation || !currentAddress) {
+      showToast('error', 'Location not available. Please wait or refresh location.');
+      setIsClocking(false);
+      return;
+    }
+
     setIsClocking(true);
     try {
-      // Get user location
-      let location = null;
-      let address = null;
-      
-      try {
-        try {
-          // Try high accuracy first
-          location = await getUserLocation(true);
-        } catch (err: any) {
-          if (err.code === 3) { // Timeout
-            console.log('High accuracy location timed out, trying low accuracy...');
-            location = await getUserLocation(false);
-          } else {
-            throw err;
-          }
-        }
-        console.log('Clock-in location:', location);
-      } catch (locationError: any) {
-        console.warn('Could not get location:', locationError);
-        let errorMessage = 'Location access is required to clock in.';
-        if (locationError.code === 1) {
-            errorMessage = 'Location permission denied. Please enable location services in your browser settings.';
-        } else if (locationError.code === 2) {
-            errorMessage = 'Location unavailable. Check your network, GPS, or ensure you are using HTTPS.';
-        } else if (locationError.code === 3) {
-            errorMessage = 'Location request timed out. Please move to an area with better signal and try again.';
-        }
-        showToast('error', errorMessage);
-        setIsClocking(false);
-        return;
-      }
+      const location = currentLocation;
+      const address = currentAddress;
 
-      // Get readable address from coordinates
-      if (location) {
-        address = await getAddressFromCoords(location.latitude, location.longitude);
-        console.log('Clock-in address:', address);
-      }
-
-      if (!address) {
-        showToast('error', 'Could not determine your address. Please try again.');
-        setIsClocking(false);
-        return;
-      }
+      console.log('Clock-in location:', location);
+      console.log('Clock-in address:', address);
 
       // Call clock-in API
       const response = await fetch('/api/attendance/clock-in', {
@@ -349,51 +430,20 @@ const EmployeeDashboard: React.FC = () => {
   const handleClockOut = async (finalDurationSeconds: number, comment?: string) => {
     if (!activeLog || !user?.id || isClocking) return;
 
+    // Check if we have location data
+    if (!currentLocation || !currentAddress) {
+      showToast('error', 'Location not available. Please wait or refresh location.');
+      setIsClocking(false);
+      return;
+    }
+
     setIsClocking(true);
     try {
-      // Get user location
-      let location = null;
-      let address = null;
-      
-      try {
-        try {
-           // Try high accuracy first
-           location = await getUserLocation(true);
-        } catch (err: any) {
-           if (err.code === 3) { // Timeout
-             console.log('High accuracy location timed out, trying low accuracy...');
-             location = await getUserLocation(false);
-           } else {
-             throw err;
-           }
-        }
-        console.log('Clock-out location:', location);
-      } catch (locationError: any) {
-        console.warn('Could not get location:', locationError);
-        let errorMessage = 'Location access is required to clock out.';
-        if (locationError.code === 1) {
-            errorMessage = 'Location permission denied. Please enable location services in your browser settings.';
-        } else if (locationError.code === 2) {
-            errorMessage = 'Location unavailable. Check your network, GPS, or ensure you are using HTTPS.';
-        } else if (locationError.code === 3) {
-            errorMessage = 'Location request timed out. Please move to an area with better signal and try again.';
-        }
-        showToast('error', errorMessage);
-        setIsClocking(false);
-        return;
-      }
+      const location = currentLocation;
+      const address = currentAddress;
 
-      // Get readable address from coordinates
-      if (location) {
-        address = await getAddressFromCoords(location.latitude, location.longitude);
-        console.log('Clock-out address:', address);
-      }
-
-      if (!address) {
-        showToast('error', 'Could not determine your address. Please try again.');
-        setIsClocking(false);
-        return;
-      }
+      console.log('Clock-out location:', location);
+      console.log('Clock-out address:', address);
 
       // Call clock-out API
       const response = await fetch('/api/attendance/clock-out', {
@@ -563,6 +613,13 @@ const EmployeeDashboard: React.FC = () => {
               onClockOut={requestClockOut}
               activeLog={activeLog}
               isLoading={isClocking}
+              locationStatus={{
+                hasLocation: !!currentLocation && !!currentAddress,
+                isRequesting: isRequestingLocation,
+                error: locationError,
+                address: currentAddress,
+              }}
+              onRefreshLocation={() => requestLocation(true)}
             />
           </div>
         </div>
