@@ -59,7 +59,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         email: employee.email || '',
         contact_number: employee.contact_number || '',
         address: employee.address || '',
-        positionId: currentPosition?.id || '',
+        positionId: currentPosition ? String(currentPosition.id) : '',
       });
     }
   }, [isEditMode, employee, positions]);
