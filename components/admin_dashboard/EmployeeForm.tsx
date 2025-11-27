@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Save, X, ChevronDown } from "lucide-react";
+import { Save, X, ChevronDown, Plus } from "lucide-react";
 import { Employee, Position } from "@/types";
 
 interface EmployeeFormProps {
@@ -21,6 +21,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [isCreatingNewPosition, setIsCreatingNewPosition] = useState(false);
+  const [newPositionName, setNewPositionName] = useState("");
 
   const resetForm = () => {
     setFormData({
@@ -34,6 +36,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     });
     setSuccess(false);
     setError(null);
+    setIsCreatingNewPosition(false);
+    setNewPositionName("");
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -42,15 +46,56 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     setSuccess(false);
     setLoading(true);
 
-    const selectedPosition = positions.find(p => p.name === formData.position);
+    let selectedPosition = positions.find(p => p.name === formData.position);
 
-    if (!formData.firstName || !formData.lastName || !formData.email || !selectedPosition) {
-      setError("First Name, Last Name, Email, and Position are required.");
+    // Validation
+    if (!formData.firstName || !formData.lastName || !formData.email) {
+      setError("First Name, Last Name, and Email are required.");
+      setLoading(false);
+      return;
+    }
+
+    if (!isCreatingNewPosition && !selectedPosition) {
+      setError("Please select a position or create a new one.");
+      setLoading(false);
+      return;
+    }
+
+    if (isCreatingNewPosition && !newPositionName.trim()) {
+      setError("Please enter a position name.");
       setLoading(false);
       return;
     }
 
     try {
+      // If creating a new position, create it first
+      if (isCreatingNewPosition) {
+        const positionResponse = await fetch('/api/positions/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ name: newPositionName.trim() }),
+        });
+
+        const positionResult = await positionResponse.json();
+
+        if (!positionResponse.ok) {
+          if (positionResponse.status === 409) {
+            // Position already exists, use it
+            selectedPosition = positionResult.position;
+          } else {
+            throw new Error(positionResult.error || 'Failed to create position');
+          }
+        } else {
+          selectedPosition = positionResult.position;
+        }
+      }
+
+      if (!selectedPosition) {
+        throw new Error('Position could not be determined');
+      }
+
       const response = await fetch('/api/create-employee', {
         method: 'POST',
         headers: {
@@ -166,34 +211,59 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
         </div>
 
         <div className="space-y-4 pt-4 border-t border-slate-800">
-          <h3 className="text-lg font-semibold text-blue-400">
-            Role & Position
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-blue-400">
+              Role & Position
+            </h3>
+            <button
+              type="button"
+              onClick={() => {
+                setIsCreatingNewPosition(!isCreatingNewPosition);
+                setFormData({ ...formData, position: "" });
+                setNewPositionName("");
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-blue-400 rounded-lg transition-colors text-sm"
+            >
+              <Plus size={16} />
+              {isCreatingNewPosition ? "Select Existing" : "Create New Position"}
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-slate-400">
                 Position/Title <span className="text-red-400">*</span>
               </label>
-              <div className="relative">
-                <select
-                  value={formData.position}
-                  onChange={(e) =>
-                    setFormData({ ...formData, position: e.target.value })
-                  }
+              {isCreatingNewPosition ? (
+                <input
+                  type="text"
+                  value={newPositionName}
+                  onChange={(e) => setNewPositionName(e.target.value)}
+                  placeholder="Enter new position name"
                   required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
-                >
-                  <option value="" disabled>
-                    Select a position
-                  </option>
-                  {positions.map((p) => (
-                    <option key={p.id} value={p.name}>
-                      {p.name}
+                  className="bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all placeholder-slate-600"
+                />
+              ) : (
+                <div className="relative">
+                  <select
+                    value={formData.position}
+                    onChange={(e) =>
+                      setFormData({ ...formData, position: e.target.value })
+                    }
+                    required
+                    className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
+                  >
+                    <option value="" disabled>
+                      Select a position
                     </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
-              </div>
+                    {positions.map((p) => (
+                      <option key={p.id} value={p.name}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+                </div>
+              )}
             </div>
           </div>
         </div>
