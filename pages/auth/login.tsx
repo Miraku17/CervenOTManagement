@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
 
     try {
       console.log('[Login Page] Calling signInWithPassword...');
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -59,10 +59,35 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      console.log('[Login Page] Sign in successful, auth state listener will handle redirect');
-      // Don't set loading to false here - let the useEffect handle redirect
-      // The useUser hook will fetch the profile via auth state change listener
-      // The useEffect above will handle the redirect once user state is updated
+      if (!data.user) {
+        console.error('[Login Page] No user data returned');
+        setError("Failed to sign in. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      console.log('[Login Page] Sign in successful for:', data.user.email);
+
+      // Fetch the user's profile to determine their role
+      console.log('[Login Page] Fetching user profile...');
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('[Login Page] Profile fetch error:', profileError);
+        // Even if profile fetch fails, redirect to default dashboard
+        console.log('[Login Page] Redirecting to default employee dashboard');
+        router.replace("/dashboard/employee");
+        return;
+      }
+
+      // Redirect based on role
+      const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
+      console.log('[Login Page] Redirecting to:', dashboardPath);
+      router.replace(dashboardPath);
     } catch (err: any) {
       console.error('[Login Page] Unexpected error:', err);
       setError(err.message || "An unexpected error occurred");

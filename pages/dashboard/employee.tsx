@@ -506,35 +506,41 @@ const EmployeeDashboard: React.FC = () => {
     setIsLoggingOut(true);
 
     try {
-      // Sign out from Supabase FIRST
+      // Try to sign out with a 2-second timeout
       console.log('[Employee Dashboard] Calling supabase.auth.signOut()...');
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
 
-      if (error) {
-        console.error('[Employee Dashboard] Logout error:', error);
-      } else {
+      const signOutPromise = supabase.auth.signOut({ scope: 'local' });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut timeout')), 2000)
+      );
+
+      try {
+        await Promise.race([signOutPromise, timeoutPromise]);
         console.log('[Employee Dashboard] SignOut successful');
+      } catch (error: any) {
+        console.warn('[Employee Dashboard] SignOut timed out or failed:', error.message);
+        // Continue anyway - we'll clear storage and redirect
       }
 
-      // Clear app-specific local storage after sign out
-      console.log('[Employee Dashboard] Clearing app-specific localStorage items');
+      // Clear local storage
+      console.log('[Employee Dashboard] Clearing localStorage and sessionStorage');
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('cerventch_activelog');
-        // Add any other app-specific keys you want to clear
+        localStorage.clear();
+        sessionStorage.clear();
       }
 
-      // Redirect to login
+      // Always redirect to login
       console.log('[Employee Dashboard] Redirecting to login...');
       router.replace('/auth/login');
     } catch (error: any) {
-      console.error('[Employee Dashboard] Logout error:', error);
+      console.error('[Employee Dashboard] Unexpected logout error:', error);
       // Clear storage and redirect even on error
       if (typeof window !== 'undefined') {
-        localStorage.removeItem('cerventch_activelog');
+        localStorage.clear();
+        sessionStorage.clear();
       }
+      console.log('[Employee Dashboard] Forcing redirect after error...');
       router.replace('/auth/login');
-    } finally {
-      setIsLoggingOut(false);
     }
   };
 
