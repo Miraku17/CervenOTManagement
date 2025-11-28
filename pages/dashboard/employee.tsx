@@ -575,7 +575,7 @@ const EmployeeDashboard: React.FC = () => {
                 <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-contain rounded-full border-2 border-gray-300" />
               </div>
               <span className="text-xl font-bold tracking-tight text-white">
-                Cerventech<span className="text-blue-500"> INC</span>
+                Cerventech Inc.
               </span>
             </div>
             

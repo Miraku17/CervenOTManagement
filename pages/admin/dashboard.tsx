@@ -178,7 +178,7 @@ const AdminDashboard: React.FC = () => {
             alt="Cerventech Logo"
             className="w-10 h-10 rounded-full object-cover shadow-lg border-2 border-gray-300"
           />
-          <h1 className="text-xl font-bold tracking-tight text-white">Cerventech<span className="text-blue-500"> INC</span></h1>
+          <h1 className="text-xl font-bold tracking-tight text-white">Cerventech Inc.</h1>
         </div>
 
         <nav className="flex-1 px-4 space-y-2 py-4">
@@ -239,7 +239,7 @@ const AdminDashboard: React.FC = () => {
                  alt="Cerventech Logo"
                  className="w-10 h-10 rounded-full object-cover shadow-lg border-2 border-gray-300"
                />
-               <h1 className="text-xl font-bold text-white">Cerventech<span className="text-blue-500"> INC</span></h1>
+               <h1 className="text-xl font-bold text-white">Cerventech Inc.</h1>
              </div>
              <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 text-slate-400">
                <X size={24} />

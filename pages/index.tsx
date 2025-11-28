@@ -31,7 +31,7 @@ export default function LandingPage() {
               alt="Cerventech Logo"
               className="w-10 h-10 rounded-lg object-cover shadow-lg shadow-blue-900/20"
             />
-            <span className="text-2xl font-bold tracking-tight">Cerventech</span>
+            <span className="text-2xl font-bold tracking-tight">Cerventech Inc.</span>
           </div>
           
           <div className="hidden md:flex items-center gap-8">
@@ -64,7 +64,7 @@ export default function LandingPage() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-8 text-white">
-            Cerventech <br />
+            Cerventech Inc.<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
               Workforce System
             </span>
