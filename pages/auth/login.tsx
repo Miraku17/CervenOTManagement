@@ -47,7 +47,7 @@ const LoginPage: React.FC = () => {
 
     try {
       console.log('[Login Page] Calling signInWithPassword...');
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
@@ -59,29 +59,10 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      if (data.user) {
-        console.log('[Login Page] Login successful for:', data.user.email);
-
-        // Fetch profile role after successful login
-        console.log('[Login Page] Fetching user profile...');
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('[Login Page] Profile fetch error:', profileError);
-          setError(profileError.message);
-          setLoading(false);
-          return;
-        }
-
-        // Redirect based on role - use replace to prevent back navigation to login
-        const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
-        console.log('[Login Page] Redirecting to:', dashboardPath, 'for role:', profile?.role);
-        router.replace(dashboardPath);
-      }
+      console.log('[Login Page] Sign in successful, auth state listener will handle redirect');
+      // Don't set loading to false here - let the useEffect handle redirect
+      // The useUser hook will fetch the profile via auth state change listener
+      // The useEffect above will handle the redirect once user state is updated
     } catch (err: any) {
       console.error('[Login Page] Unexpected error:', err);
       setError(err.message || "An unexpected error occurred");

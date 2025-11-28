@@ -140,7 +140,7 @@ const AdminDashboard: React.FC = () => {
       );
 
       // Race between signOut and timeout
-      const signOutPromise = supabase.auth.signOut({ scope: 'global' }).then(result => ({
+      const signOutPromise = supabase.auth.signOut({ scope: 'local' }).then(result => ({
         ...result,
         timedOut: false
       }));

@@ -508,7 +508,7 @@ const EmployeeDashboard: React.FC = () => {
     try {
       // Sign out from Supabase FIRST
       console.log('[Employee Dashboard] Calling supabase.auth.signOut()...');
-      const { error } = await supabase.auth.signOut({ scope: 'global' });
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
 
       if (error) {
         console.error('[Employee Dashboard] Logout error:', error);
