@@ -19,27 +19,6 @@ export default function LandingPage() {
     }
   }, [user, loading, router]);
 
-  // Show loading while checking authentication
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="flex items-center gap-4">
-          <img
-            src="/cerventech.png"
-            alt="Cerventech Logo"
-            className="w-12 h-12 rounded-lg object-cover shadow-lg shadow-blue-900/50 animate-pulse"
-          />
-          <p className="text-white text-xl font-medium">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only show landing page if user is not authenticated
-  if (user) {
-    return null;
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-blue-500/30">
       
