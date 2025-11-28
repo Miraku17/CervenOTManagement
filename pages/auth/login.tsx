@@ -59,29 +59,35 @@ const LoginPage: React.FC = () => {
         return;
       }
 
-      if (data.user) {
-        console.log('[Login Page] Login successful for:', data.user.email);
-
-        // Fetch profile role after successful login
-        console.log('[Login Page] Fetching user profile...');
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", data.user.id)
-          .single();
-
-        if (profileError) {
-          console.error('[Login Page] Profile fetch error:', profileError);
-          setError(profileError.message);
-          setLoading(false);
-          return;
-        }
-
-        // Redirect based on role - use replace to prevent back navigation to login
-        const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
-        console.log('[Login Page] Redirecting to:', dashboardPath, 'for role:', profile?.role);
-        router.replace(dashboardPath);
+      if (!data.user) {
+        console.error('[Login Page] No user data returned');
+        setError("Failed to sign in. Please try again.");
+        setLoading(false);
+        return;
       }
+
+      console.log('[Login Page] Sign in successful for:', data.user.email);
+
+      // Fetch the user's profile to determine their role
+      console.log('[Login Page] Fetching user profile...');
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('[Login Page] Profile fetch error:', profileError);
+        // Even if profile fetch fails, redirect to default dashboard
+        console.log('[Login Page] Redirecting to default employee dashboard');
+        router.replace("/dashboard/employee");
+        return;
+      }
+
+      // Redirect based on role
+      const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
+      console.log('[Login Page] Redirecting to:', dashboardPath);
+      router.replace(dashboardPath);
     } catch (err: any) {
       console.error('[Login Page] Unexpected error:', err);
       setError(err.message || "An unexpected error occurred");
@@ -114,7 +120,7 @@ const LoginPage: React.FC = () => {
       <div className="w-full max-w-md p-8 space-y-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl relative z-10 text-slate-200">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white">
-            Cerventech INC
+            Cerventech Inc.
           </h1>
           <p className="mt-2 text-sm text-slate-400">Employee Portal Login</p>
         </div>
