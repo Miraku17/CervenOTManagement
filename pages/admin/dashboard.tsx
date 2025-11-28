@@ -245,7 +245,7 @@ const AdminDashboard: React.FC = () => {
                <X size={24} />
              </button>
            </div>
-           <nav className="space-y-4">
+           <nav className="space-y-4 flex-1">
             <SidebarItem 
                 icon={<LayoutDashboard size={24} />} 
                 label="Dashboard" 
@@ -258,14 +258,46 @@ const AdminDashboard: React.FC = () => {
                 isActive={currentView === 'EMPLOYEES'}
                 onClick={() => handleNavigate('EMPLOYEES')}
               />
+              <SidebarItem 
+                icon={<Settings size={24} />} 
+                label="Export" 
+                isActive={currentView === 'EXPORT'} 
+                onClick={() => handleNavigate('EXPORT')}
+              />
+              <SidebarItem 
+                icon={<Users size={24} />} 
+                label="Edit Time" 
+                isActive={currentView === 'EDIT_TIME'}
+                onClick={() => handleNavigate('EDIT_TIME')}
+              />
            </nav>
+
+           <div className="p-4 border-t border-slate-800 mt-auto">
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900"
+              >
+                {isLoggingOut ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                    <span>Logging out...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogOut size={24} />
+                    <span>Logout</span>
+                  </>
+                )}
+              </button>
+           </div>
         </div>
       )}
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top Bar */}
-        <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-6 sticky top-0 z-20">
+        <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4">
             <button 
               className="md:hidden p-2 text-slate-400 hover:text-white"
@@ -286,7 +318,7 @@ const AdminDashboard: React.FC = () => {
         </header>
 
         {/* View Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           <div className="max-w-7xl mx-auto">
             {currentView === 'DASHBOARD' && (
               <DashboardHome employees={employees} />
