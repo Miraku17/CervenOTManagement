@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key } from 'lucide-react';
 import { Employee, AttendanceRecord, Position } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
 import { supabase } from '@/services/supabase';
+import UpdatePasswordModal from './UpdatePasswordModal';
 
 interface EmployeeDetailProps {
   employee: Employee;
@@ -28,6 +29,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
     address: '',
     positionId: '',
   });
+
+  // New state for password modal
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
 
   // Fetch positions
   useEffect(() => {
@@ -177,6 +181,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
     setError(null);
   };
 
+  const handlePasswordUpdate = (newPassword: string) => {
+    // For now, no functionality is required, just log it.
+    console.log(`Employee ${employee.fullName} password updated to: ${newPassword}`);
+    // In a real scenario, this would involve an API call to update the password.
+    // Display a success toast/message to the user.
+  };
+
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between mb-2">
@@ -189,13 +200,22 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         </button>
 
         {!isEditMode && (
-          <button
-            onClick={() => setIsEditMode(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-          >
-            <Edit2 size={18} />
-            <span>Edit Employee</span>
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setIsPasswordModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+            >
+              <Key size={18} />
+              <span>Update Password</span>
+            </button>
+            <button
+              onClick={() => setIsEditMode(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+            >
+              <Edit2 size={18} />
+              <span>Edit Employee</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -356,7 +376,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                   <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-sm font-medium text-center">
                       {employee.status}
                   </span>
-                  <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span>
+                  {/* <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span> */}
               </div>
             )}
         </div>
@@ -464,6 +484,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
             )}
         </div>
       </div>
+      {/* Password Update Modal */}
+      <UpdatePasswordModal
+        isOpen={isPasswordModalOpen}
+        onClose={() => setIsPasswordModalOpen(false)}
+        onSubmit={handlePasswordUpdate}
+        employeeName={employee.fullName}
+      />
     </div>
   );
 };
