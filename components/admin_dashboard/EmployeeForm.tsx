@@ -13,7 +13,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     firstName: "",
     lastName: "",
     email: "",
-    phone: "",
+    contact_number: "",
     address: "",
     position: "",
     department: "",
@@ -29,7 +29,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
       firstName: "",
       lastName: "",
       email: "",
-      phone: "",
+      contact_number: "",
       address: "",
       position: "",
       department: "",
@@ -191,9 +191,9 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
             />
             <InputGroup
               label="Phone Number"
-              value={formData.phone}
+              value={formData.contact_number}
               onChange={(e) =>
-                setFormData({ ...formData, phone: e.target.value })
+                setFormData({ ...formData, contact_number: e.target.value })
               }
               placeholder="+63 (XXX) YYY-YYYY"
             />
