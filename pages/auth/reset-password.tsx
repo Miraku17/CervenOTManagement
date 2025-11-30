@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
 import Link from 'next/link';
+import { withGuest } from '@/hoc/withGuest';
 
 const ResetPasswordPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
@@ -168,4 +169,4 @@ const ResetPasswordPage: React.FC = () => {
   );
 };
 
-export default ResetPasswordPage;
+export default withGuest(ResetPasswordPage);

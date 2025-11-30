@@ -1,6 +1,7 @@
 import { useRouter } from 'next/router';
 import { useUser } from '@/hooks/useUser';
 import React, { ComponentType, useEffect, useState } from 'react';
+import { LoadingScreen } from '@/components/LoadingScreen';
 
 interface WithAuthProps {
   // You can add any additional props here if needed
@@ -52,31 +53,14 @@ export const withAuth = <P extends object>(
       console.log('[withAuth] Access granted for user:', user.email, 'role:', user.role);
     }, [user, loading, router, requiredRole, isRedirecting]);
 
-    // Show loading state
-    if (loading || isRedirecting || !user) {
-      return (
-        <div className="flex h-screen items-center justify-center bg-slate-950">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-900/50">
-              <svg
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                className="w-8 h-8 text-white animate-pulse"
-              >
-                <path d="M2.5 18L12 2.5L21.5 18H2.5Z" />
-                <path d="M12 2.5V18" />
-                <path d="M7 18L12 10" />
-                <path d="M17 18L12 10" />
-              </svg>
-            </div>
-            <p className="text-white text-xl font-medium">Loading...</p>
-          </div>
-        </div>
-      );
+    // Show loading screen during initial auth check
+    if (loading) {
+      return <LoadingScreen message="Loading..." />;
+    }
+
+    // Return null during redirect or if no user (instant redirect)
+    if (isRedirecting || !user) {
+      return null;
     }
 
     // Verify role access before rendering

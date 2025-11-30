@@ -50,21 +50,15 @@ export const useUser = () => {
       try {
         console.log('[useUser] Initializing auth...');
 
-        // Add timeout to prevent infinite loading
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
-        );
-
-        const sessionPromise = supabase.auth.getSession();
-
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]) as any;
+        // Get the current session
+        const { data: { session }, error } = await supabase.auth.getSession();
 
         if (error) {
           console.error('[useUser] Error getting session:', error);
-          if (mounted) setLoading(false);
+          if (mounted) {
+            setUser(null);
+            setLoading(false);
+          }
           return;
         }
 
@@ -73,12 +67,19 @@ export const useUser = () => {
           await fetchUserProfile(session.user);
         } else {
           console.log('[useUser] No existing session found');
+          if (mounted) {
+            setUser(null);
+          }
         }
 
         if (mounted) setLoading(false);
       } catch (err) {
         console.error('[useUser] Error initializing auth:', err);
-        if (mounted) setLoading(false);
+        // Always ensure loading is set to false
+        if (mounted) {
+          setUser(null);
+          setLoading(false);
+        }
       }
     };
 
