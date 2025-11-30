@@ -53,10 +53,14 @@ export const withAuth = <P extends object>(
       console.log('[withAuth] Access granted for user:', user.email, 'role:', user.role);
     }, [user, loading, router, requiredRole, isRedirecting]);
 
-    // Show loading or redirecting state
-    if (loading || isRedirecting || !user) {
-      const message = isRedirecting ? 'Redirecting...' : 'Loading...';
-      return <LoadingScreen message={message} />;
+    // Show loading screen during initial auth check
+    if (loading) {
+      return <LoadingScreen message="Loading..." />;
+    }
+
+    // Return null during redirect or if no user (instant redirect)
+    if (isRedirecting || !user) {
+      return null;
     }
 
     // Verify role access before rendering

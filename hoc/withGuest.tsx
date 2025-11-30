@@ -35,14 +35,14 @@ export const withGuest = <P extends object>(
       console.log('[withGuest] Guest access granted');
     }, [user, loading, router, isRedirecting]);
 
-    // Show loading state while checking authentication
+    // Show loading screen during initial auth check
     if (loading) {
       return <LoadingScreen message="Loading..." />;
     }
 
-    // Don't render the component if redirecting
+    // Return null during redirect (instant redirect)
     if (isRedirecting || user) {
-      return <LoadingScreen message="Redirecting..." />;
+      return null;
     }
 
     return <WrappedComponent {...props} />;
