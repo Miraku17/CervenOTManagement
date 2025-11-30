@@ -48,32 +48,33 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   // Fetch employees
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, positions(name)')
-        .eq('role', 'employee');
+  const fetchEmployees = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, positions(name)')
+      .eq('role', 'employee');
 
-      if (data) {
-        const fetchedEmployees: Employee[] = data.map((profile: any) => ({
-          id: profile.id,
-          fullName: `${profile.first_name} ${profile.last_name}`,
-          email: profile.email,
-          contact_number: profile.contact_number || '',
-          address: profile.address || '',
-          position: profile.positions?.name || 'N/A',
-          department: profile.department || 'N/A', // Assuming department exists or set a default
-          joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
-          avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${profile.first_name}+${profile.last_name}`, // Static avatar
-          status: 'Active', // Default status for now
-        }));
-        setEmployees(fetchedEmployees);
-      }
-      if (error) {
-        console.error('Error fetching employees:', error);
-      }
-    };
+    if (data) {
+      const fetchedEmployees: Employee[] = data.map((profile: any) => ({
+        id: profile.id,
+        fullName: `${profile.first_name} ${profile.last_name}`,
+        email: profile.email,
+        contact_number: profile.contact_number || '',
+        address: profile.address || '',
+        position: profile.positions?.name || 'N/A',
+        department: profile.department || 'N/A', // Assuming department exists or set a default
+        joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
+        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${profile.first_name}+${profile.last_name}`, // Static avatar
+        status: 'Active', // Default status for now
+      }));
+      setEmployees(fetchedEmployees);
+    }
+    if (error) {
+      console.error('Error fetching employees:', error);
+    }
+  };
+
+  useEffect(() => {
     fetchEmployees();
   }, []);
 
@@ -90,9 +91,8 @@ const AdminDashboard: React.FC = () => {
     setCurrentView('EMPLOYEE_DETAIL');
   };
 
-  const handleAddEmployee = (newEmployee: Employee) => {
-    // In a real app, this would add to Supabase and then refetch or update state
-    setEmployees(prev => [newEmployee, ...prev]);
+  const handleAddEmployee = async (newEmployee: Employee) => {
+    await fetchEmployees();
     setCurrentView('EMPLOYEES');
   };
 
