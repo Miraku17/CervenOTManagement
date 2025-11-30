@@ -5,15 +5,13 @@ import { CalendarView } from '@/components/CalendarView';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut } from 'lucide-react';
-import { useUser } from '@/hooks/useUser';
-import { useRouter } from 'next/router';
+import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
 import { withAuth } from '@/hoc/withAuth';
 
 const EmployeeDashboard: React.FC = () => {
-  const { user } = useUser();
-  const router = useRouter();
+  const { user, logout, isLoggingOut } = useAuth();
   const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isClocking, setIsClocking] = useState(false);
@@ -22,7 +20,6 @@ const EmployeeDashboard: React.FC = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'clockIn' | 'clockOut' | null>(null);
   const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number; comment?: string } | null>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [currentAddress, setCurrentAddress] = useState<string | null>(null);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
@@ -494,55 +491,6 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    console.log('[Employee Dashboard] Logout clicked');
-
-    if (isLoggingOut) {
-      console.log('[Employee Dashboard] Already logging out, ignoring');
-      return;
-    }
-
-    console.log('[Employee Dashboard] Setting isLoggingOut to true');
-    setIsLoggingOut(true);
-
-    try {
-      // Try to sign out with a 2-second timeout
-      console.log('[Employee Dashboard] Calling supabase.auth.signOut()...');
-
-      const signOutPromise = supabase.auth.signOut({ scope: 'local' });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SignOut timeout')), 2000)
-      );
-
-      try {
-        await Promise.race([signOutPromise, timeoutPromise]);
-        console.log('[Employee Dashboard] SignOut successful');
-      } catch (error: any) {
-        console.warn('[Employee Dashboard] SignOut timed out or failed:', error.message);
-        // Continue anyway - we'll clear storage and redirect
-      }
-
-      // Clear local storage
-      console.log('[Employee Dashboard] Clearing localStorage and sessionStorage');
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-
-      // Always redirect to login
-      console.log('[Employee Dashboard] Redirecting to login...');
-      router.replace('/auth/login');
-    } catch (error: any) {
-      console.error('[Employee Dashboard] Unexpected logout error:', error);
-      // Clear storage and redirect even on error
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      console.log('[Employee Dashboard] Forcing redirect after error...');
-      router.replace('/auth/login');
-    }
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 pb-20">
@@ -584,7 +532,7 @@ const EmployeeDashboard: React.FC = () => {
                 Employee Portal v1.0
                 </div>
                 <button
-                    onClick={handleLogout}
+                    onClick={logout}
                     disabled={isLoggingOut}
                     className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >

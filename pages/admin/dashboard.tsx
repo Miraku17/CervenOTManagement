@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  Settings, 
-  LogOut, 
-  Bell, 
+import {
+  LayoutDashboard,
+  Users,
+  Settings,
+  LogOut,
+  Bell,
   Search,
   Menu,
   X
@@ -17,19 +17,14 @@ import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import { withAuth } from '@/hoc/withAuth';
 import { supabase } from '@/services/supabase';
-import { useRouter } from 'next/router';
-
-
-
-
+import { useAuth } from '@/hooks/useAuth';
 
 const AdminDashboard: React.FC = () => {
-  const router = useRouter();
+  const { logout, isLoggingOut } = useAuth();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const [positions, setPositions] = useState<Position[]>([]);
 
@@ -112,57 +107,6 @@ const AdminDashboard: React.FC = () => {
     setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
   };
 
-  const handleLogout = async () => {
-    console.log('[Admin Dashboard] Logout clicked');
-
-    if (isLoggingOut) {
-      console.log('[Admin Dashboard] Already logging out, ignoring');
-      return;
-    }
-
-    console.log('[Admin Dashboard] Setting isLoggingOut to true');
-    setIsLoggingOut(true);
-
-    try {
-      // Try to sign out with a 2-second timeout
-      console.log('[Admin Dashboard] Calling supabase.auth.signOut()...');
-
-      const signOutPromise = supabase.auth.signOut({ scope: 'local' });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SignOut timeout')), 2000)
-      );
-
-      try {
-        await Promise.race([signOutPromise, timeoutPromise]);
-        console.log('[Admin Dashboard] SignOut successful');
-      } catch (error: any) {
-        console.warn('[Admin Dashboard] SignOut timed out or failed:', error.message);
-        // Continue anyway - we'll clear storage and redirect
-      }
-
-      // Clear local storage
-      console.log('[Admin Dashboard] Clearing localStorage and sessionStorage');
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-
-      // Always redirect to login
-      console.log('[Admin Dashboard] Redirecting to login...');
-      router.replace('/auth/login');
-    } catch (error: any) {
-      console.error('[Admin Dashboard] Unexpected logout error:', error);
-      // Clear storage and redirect even on error
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      console.log('[Admin Dashboard] Forcing redirect after error...');
-      router.replace('/auth/login');
-    }
-  };
-
-
 
   const selectedEmployee = useMemo(() => 
     employees.find(e => e.id === selectedEmployeeId), 
@@ -210,7 +154,7 @@ const AdminDashboard: React.FC = () => {
 
         <div className="p-4 border-t border-slate-800">
           <button
-            onClick={handleLogout}
+            onClick={logout}
             disabled={isLoggingOut}
             className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -274,7 +218,7 @@ const AdminDashboard: React.FC = () => {
 
            <div className="p-4 border-t border-slate-800 mt-auto">
               <button
-                onClick={handleLogout}
+                onClick={logout}
                 disabled={isLoggingOut}
                 className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900"
               >

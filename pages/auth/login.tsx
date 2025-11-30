@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
-import { supabase } from "@/services/supabase";
-import { useUser } from "@/hooks/useUser";
+import { useAuth } from "@/hooks/useAuth";
+import { withGuest } from "@/hoc/withGuest";
 import Aurora from "@/components/react_bits/Aurora";
 
 const LoginPage: React.FC = () => {
@@ -14,18 +14,7 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
   const router = useRouter();
-  const { user, loading: userLoading } = useUser();
-
-  // Redirect authenticated users to their dashboard
-  useEffect(() => {
-    console.log('[Login Page] Check - userLoading:', userLoading, 'user:', user?.email || 'none');
-
-    if (!userLoading && user) {
-      const dashboardPath = user.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
-      console.log('[Login Page] User already logged in, redirecting to:', dashboardPath);
-      router.replace(dashboardPath);
-    }
-  }, [user, userLoading, router]);
+  const { login } = useAuth();
 
   // Handle messages from query parameters (e.g., reset_link_expired)
   useEffect(() => {
@@ -40,69 +29,20 @@ const LoginPage: React.FC = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('[Login Page] Login form submitted');
     setLoading(true);
     setError(null);
     setDisplayedMessage(null);
 
     try {
-      console.log('[Login Page] Calling signInWithPassword...');
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error('[Login Page] Login error:', error);
-        setError(error.message);
-        setLoading(false);
-        return;
-      }
-
-      if (!data.user) {
-        console.error('[Login Page] No user data returned');
-        setError("Failed to sign in. Please try again.");
-        setLoading(false);
-        return;
-      }
-
-      console.log('[Login Page] Sign in successful for:', data.user.email);
-
-      // Fetch the user's profile to determine their role
-      console.log('[Login Page] Fetching user profile...');
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
-
-      if (profileError) {
-        console.error('[Login Page] Profile fetch error:', profileError);
-        // Even if profile fetch fails, redirect to default dashboard
-        console.log('[Login Page] Redirecting to default employee dashboard');
-        router.replace("/dashboard/employee");
-        return;
-      }
-
-      // Redirect based on role
-      const dashboardPath = profile?.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
-      console.log('[Login Page] Redirecting to:', dashboardPath);
+      const dashboardPath = await login({ email, password });
       router.replace(dashboardPath);
     } catch (err: any) {
-      console.error('[Login Page] Unexpected error:', err);
+      console.error('[Login Page] Login error:', err);
       setError(err.message || "An unexpected error occurred");
+    } finally {
       setLoading(false);
     }
   };
-
-  // Show a loading indicator while checking user session
-  if (userLoading) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-950">
-        <p className="text-white">Loading...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
@@ -198,4 +138,4 @@ const LoginPage: React.FC = () => {
   );
 };
 
-export default LoginPage;
+export default withGuest(LoginPage);
