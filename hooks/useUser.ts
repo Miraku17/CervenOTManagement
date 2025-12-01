@@ -39,11 +39,11 @@ export const useUser = () => {
     };
 
     // Initialize auth state
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       if (!mounted) return;
 
-      if (session?.user) {
-        const userProfile = await fetchUserProfile(session.user);
+      if (authUser) {
+        const userProfile = await fetchUserProfile(authUser);
         if (mounted) {
           setUser(userProfile);
           setLoading(false);

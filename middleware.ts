@@ -55,8 +55,8 @@ export async function middleware(request: NextRequest) {
   );
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -70,18 +70,18 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = isAdminRoute || isDashboardRoute;
 
   // If user is not authenticated and trying to access protected route
-  if (!session && isProtectedRoute) {
+  if (!user && isProtectedRoute) {
     const redirectUrl = new URL('/auth/login', request.url);
     return NextResponse.redirect(redirectUrl);
   }
 
   // If user is authenticated
-  if (session) {
+  if (user) {
     // Fetch user role from profiles table
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
     const userRole = profile?.role;
