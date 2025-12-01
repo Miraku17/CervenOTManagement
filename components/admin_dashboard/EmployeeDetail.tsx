@@ -181,13 +181,6 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
     setError(null);
   };
 
-  const handlePasswordUpdate = (newPassword: string) => {
-    // For now, no functionality is required, just log it.
-    console.log(`Employee ${employee.fullName} password updated to: ${newPassword}`);
-    // In a real scenario, this would involve an API call to update the password.
-    // Display a success toast/message to the user.
-  };
-
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between mb-2">
@@ -532,7 +525,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       <UpdatePasswordModal
         isOpen={isPasswordModalOpen}
         onClose={() => setIsPasswordModalOpen(false)}
-        onSubmit={handlePasswordUpdate}
+        employeeId={employee.id}
         employeeName={employee.fullName}
       />
     </div>
