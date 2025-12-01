@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { supabase } from "@/services/supabase";
 import { useUser } from "./useUser";
 
@@ -10,7 +9,6 @@ interface LoginCredentials {
 
 export const useAuth = () => {
   const { user, loading } = useUser();
-  const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const login = async ({ email, password }: LoginCredentials) => {
@@ -42,15 +40,22 @@ export const useAuth = () => {
     if (isLoggingOut) return;
 
     setIsLoggingOut(true);
+    console.log("🔵 [LOGOUT] Starting logout...");
 
     try {
-      await supabase.auth.signOut({ scope: 'local' });
-      router.push("/auth/login");
-    } catch (error) {
-      console.error("[useAuth] Logout error:", error);
-      router.push("/auth/login");
+      // Always allow Supabase to fully handle clearing cookies
+      const { error } = await supabase.auth.signOut();
+
+      if (error) {
+        console.error("🔴 [LOGOUT ERROR]", error);
+      } else {
+        console.log("🟢 [LOGOUT] Successfully signed out");
+      }
+    } catch (err) {
+      console.error("🔴 [LOGOUT EXCEPTION]", err);
     } finally {
-      setIsLoggingOut(false);
+      console.log("🔵 Redirecting to login…");
+      window.location.assign("/auth/login"); // safer than href
     }
   };
 
