@@ -13,7 +13,7 @@ export default function LandingPage() {
   // Redirect authenticated users to their dashboard
   useEffect(() => {
     if (user) {
-      const dashboardPath = user.role === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
+      const dashboardPath = user.role === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
       router.replace(dashboardPath);
     }
   }, [user, router]);
