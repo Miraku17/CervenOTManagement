@@ -11,6 +11,10 @@ interface UserProfile extends User {
   role?: string;
 }
 
+/**
+ * Simplified useUser hook - only fetches user data for display
+ * Auth routing is handled by middleware.ts
+ */
 export const useUser = () => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,61 +22,37 @@ export const useUser = () => {
   useEffect(() => {
     let mounted = true;
 
-    const fetchUserProfile = async (authUser: User): Promise<UserProfile> => {
+    const fetchUser = async () => {
       try {
+        // Get authenticated user (middleware ensures this exists on protected routes)
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+
+        if (!authUser || !mounted) {
+          if (mounted) setLoading(false);
+          return;
+        }
+
+        // Fetch profile data
         const { data: profile } = await supabase
           .from("profiles")
           .select("*, positions(name)")
           .eq("id", authUser.id)
           .single();
 
-        return { ...authUser, ...profile };
+        if (mounted) {
+          setUser({ ...authUser, ...profile });
+          setLoading(false);
+        }
       } catch (err) {
-        console.error("[useUser] Profile fetch error:", err);
-        return { ...authUser };
+        console.error("[useUser] Error:", err);
+        if (mounted) setLoading(false);
       }
     };
 
-    // ---- INITIAL SESSION ----
-    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
-      if (!mounted) return;
-
-      if (authUser) {
-        const profile = await fetchUserProfile(authUser);
-        if (mounted) setUser(profile);
-      }
-
-      if (mounted) setLoading(false);
-    });
-
-    // ---- AUTH SUBSCRIPTION ----
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      console.log("[useUser] Auth event:", event);
-
-      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user);
-          if (mounted) setUser(profile);
-        }
-        if (mounted) setLoading(false);
-        return;
-      }
-
-      if (event === "SIGNED_OUT" || event === "PASSWORD_RECOVERY") {
-        if (mounted) {
-          setUser(null);
-          setLoading(false);
-        }
-        return;
-      }
-    });
+    fetchUser();
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
     };
   }, []);
 

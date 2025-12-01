@@ -1,22 +1,11 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { ArrowRight, Clock, Shield, Banknote, Ticket } from 'lucide-react';
-import { useUser } from '@/hooks/useUser';
 
 export default function LandingPage() {
-  const router = useRouter();
-  const { user } = useUser();
-
-  // Redirect authenticated users to their dashboard
-  useEffect(() => {
-    if (user) {
-      const dashboardPath = user.role === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
-      router.replace(dashboardPath);
-    }
-  }, [user, router]);
+  // Auth and routing is handled by middleware.ts - no need for client-side checks
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-50 selection:bg-blue-500/30">
