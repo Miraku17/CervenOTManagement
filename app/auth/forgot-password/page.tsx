@@ -1,8 +1,9 @@
+'use client';
+
 import React, { useState } from "react";
 import Silk from "@/components/react_bits/Silk";
 import { supabase } from "@/services/supabase";
 import Link from "next/link";
-import { withGuest } from "@/hoc/withGuest";
 
 const ForgotPasswordPage: React.FC = () => {
   const [email, setEmail] = useState("");
@@ -98,4 +99,4 @@ const ForgotPasswordPage: React.FC = () => {
   );
 };
 
-export default withGuest(ForgotPasswordPage);
+export default ForgotPasswordPage;

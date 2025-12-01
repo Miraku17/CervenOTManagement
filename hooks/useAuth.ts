@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useRouter } from 'next/router';
-import { supabase } from '@/services/supabase';
-import { useUser } from './useUser';
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/services/supabase";
+import { useUser } from "./useUser";
 
 interface LoginCredentials {
   email: string;
@@ -14,93 +14,79 @@ export const useAuth = () => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const login = async ({ email, password }: LoginCredentials) => {
-    console.log('[useAuth] Login attempt for:', email);
+    console.log("🔵 [LOGIN] Starting login...");
+    console.log("📧 Email entered:", email);
 
+    // Step 1 — try login
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
+    console.log("🟡 [LOGIN RESULT] data:", data);
+    console.log("🟡 [LOGIN RESULT] error:", error);
+
     if (error) {
-      console.error('[useAuth] Login error:', error);
+      console.error("🔴 [LOGIN ERROR] Failed to sign in:", error);
       throw error;
     }
 
     if (!data.user) {
-      console.error('[useAuth] No user data returned');
-      throw new Error('Failed to sign in. Please try again.');
+      console.error("🔴 [LOGIN ERROR] No user returned by Supabase.");
+      throw new Error("Failed to sign in");
     }
 
-    console.log('[useAuth] Sign in successful for:', data.user.email);
+    console.log("🟢 [LOGIN] Logged in user ID:", data.user.id);
 
-    // Fetch the user's profile to determine their role
-    console.log('[useAuth] Fetching user profile...');
+    // Step 2 — fetch profile
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', data.user.id)
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
       .single();
 
+    console.log("🟡 [PROFILE] profile:", profile);
+    console.log("🟡 [PROFILE] profileError:", profileError);
+
     if (profileError) {
-      console.error('[useAuth] Profile fetch error:', profileError);
-      // Even if profile fetch fails, redirect to default dashboard
-      console.log('[useAuth] Redirecting to default employee dashboard');
-      return '/dashboard/employee';
+      console.error(
+        "🔴 [PROFILE ERROR] Failed to fetch profile:",
+        profileError
+      );
+      throw profileError;
     }
 
-    // Return the dashboard path based on role
-    const dashboardPath = profile?.role === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
-    console.log('[useAuth] Login successful, dashboard:', dashboardPath);
-    return dashboardPath;
+    if (!profile?.role) {
+      console.error("🔴 [PROFILE ERROR] No role found for user!");
+      throw new Error("User has no assigned role.");
+    }
+
+    console.log("🟢 [PROFILE] User role:", profile.role);
+
+    // Step 3 — redirect based on role
+    const path =
+      profile.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
+
+    console.log("🟢 [REDIRECT] Redirecting to:", path);
+
+    return path;
   };
 
   const logout = async () => {
-    console.log('[useAuth] Logout initiated');
+    if (isLoggingOut) return;
 
-    if (isLoggingOut) {
-      console.log('[useAuth] Already logging out, ignoring');
-      return;
-    }
-
-    console.log('[useAuth] Setting isLoggingOut to true');
     setIsLoggingOut(true);
 
     try {
-      // Try to sign out with a 2-second timeout
-      console.log('[useAuth] Calling supabase.auth.signOut()...');
+      // Sign out from Supabase (this automatically clears auth storage)
+      await supabase.auth.signOut();
 
-      const signOutPromise = supabase.auth.signOut({ scope: 'local' });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('SignOut timeout')), 2000)
-      );
-
-      try {
-        await Promise.race([signOutPromise, timeoutPromise]);
-        console.log('[useAuth] SignOut successful');
-      } catch (error: any) {
-        console.warn('[useAuth] SignOut timed out or failed:', error.message);
-        // Continue anyway - we'll clear storage and redirect
-      }
-
-      // Clear local storage
-      console.log('[useAuth] Clearing localStorage and sessionStorage');
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-
-      // Redirect to login
-      console.log('[useAuth] Redirecting to login...');
-      router.replace('/auth/login');
-    } catch (error: any) {
-      console.error('[useAuth] Unexpected logout error:', error);
-      // Clear storage and redirect even on error
-      if (typeof window !== 'undefined') {
-        localStorage.clear();
-        sessionStorage.clear();
-      }
-      console.log('[useAuth] Forcing redirect after error...');
-      router.replace('/auth/login');
+      // Redirect to login page
+      router.push("/auth/login");
+    } catch (error) {
+      console.error("[useAuth] Logout error:", error);
+      // Force redirect even on error
+      router.push("/auth/login");
     } finally {
       setIsLoggingOut(false);
     }

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   LayoutDashboard,
@@ -15,7 +17,6 @@ import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
-import { withAuth } from '@/hoc/withAuth';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -108,8 +109,8 @@ const AdminDashboard: React.FC = () => {
   };
 
 
-  const selectedEmployee = useMemo(() => 
-    employees.find(e => e.id === selectedEmployeeId), 
+  const selectedEmployee = useMemo(() =>
+    employees.find(e => e.id === selectedEmployeeId),
   [employees, selectedEmployeeId]);
 
   return (
@@ -126,27 +127,27 @@ const AdminDashboard: React.FC = () => {
         </div>
 
         <nav className="flex-1 px-4 space-y-2 py-4">
-          <SidebarItem 
-            icon={<LayoutDashboard size={20} />} 
-            label="Dashboard" 
+          <SidebarItem
+            icon={<LayoutDashboard size={20} />}
+            label="Dashboard"
             isActive={currentView === 'DASHBOARD'}
             onClick={() => handleNavigate('DASHBOARD')}
           />
-          <SidebarItem 
-            icon={<Users size={20} />} 
-            label="Employees" 
+          <SidebarItem
+            icon={<Users size={20} />}
+            label="Employees"
             isActive={currentView === 'EMPLOYEES' || currentView === 'EMPLOYEE_DETAIL'}
             onClick={() => handleNavigate('EMPLOYEES')}
           />
-          <SidebarItem 
-            icon={<Settings size={20} />} 
-            label="Export" 
-            isActive={currentView === 'EXPORT'} 
+          <SidebarItem
+            icon={<Settings size={20} />}
+            label="Export"
+            isActive={currentView === 'EXPORT'}
             onClick={() => handleNavigate('EXPORT')}
           />
-          <SidebarItem 
-            icon={<Users size={20} />} 
-            label="Edit Time" 
+          <SidebarItem
+            icon={<Users size={20} />}
+            label="Edit Time"
             isActive={currentView === 'EDIT_TIME'}
             onClick={() => handleNavigate('EDIT_TIME')}
           />
@@ -190,27 +191,27 @@ const AdminDashboard: React.FC = () => {
              </button>
            </div>
            <nav className="space-y-4 flex-1">
-            <SidebarItem 
-                icon={<LayoutDashboard size={24} />} 
-                label="Dashboard" 
+            <SidebarItem
+                icon={<LayoutDashboard size={24} />}
+                label="Dashboard"
                 isActive={currentView === 'DASHBOARD'}
                 onClick={() => handleNavigate('DASHBOARD')}
               />
-              <SidebarItem 
-                icon={<Users size={24} />} 
-                label="Employees" 
+              <SidebarItem
+                icon={<Users size={24} />}
+                label="Employees"
                 isActive={currentView === 'EMPLOYEES'}
                 onClick={() => handleNavigate('EMPLOYEES')}
               />
-              <SidebarItem 
-                icon={<Settings size={24} />} 
-                label="Export" 
-                isActive={currentView === 'EXPORT'} 
+              <SidebarItem
+                icon={<Settings size={24} />}
+                label="Export"
+                isActive={currentView === 'EXPORT'}
                 onClick={() => handleNavigate('EXPORT')}
               />
-              <SidebarItem 
-                icon={<Users size={24} />} 
-                label="Edit Time" 
+              <SidebarItem
+                icon={<Users size={24} />}
+                label="Edit Time"
                 isActive={currentView === 'EDIT_TIME'}
                 onClick={() => handleNavigate('EDIT_TIME')}
               />
@@ -243,7 +244,7 @@ const AdminDashboard: React.FC = () => {
         {/* Top Bar */}
         <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               className="md:hidden p-2 text-slate-400 hover:text-white"
               onClick={() => setIsMobileMenuOpen(true)}
             >
@@ -253,7 +254,7 @@ const AdminDashboard: React.FC = () => {
               {currentView === 'EMPLOYEE_DETAIL' ? 'Employee Profile' : currentView.replace('_', ' ').toLowerCase()}
             </h2>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white">
               AD
@@ -267,7 +268,7 @@ const AdminDashboard: React.FC = () => {
             {currentView === 'DASHBOARD' && (
               <DashboardHome employees={employees} />
             )}
-            
+
             {currentView === 'EMPLOYEES' && (
               <EmployeeManager
                 employees={employees}
@@ -302,17 +303,17 @@ const AdminDashboard: React.FC = () => {
 };
 
 // Helper Component for Sidebar Items
-const SidebarItem: React.FC<{ 
-  icon: React.ReactNode; 
-  label: string; 
-  isActive: boolean; 
-  onClick: () => void; 
+const SidebarItem: React.FC<{
+  icon: React.ReactNode;
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
 }> = ({ icon, label, isActive, onClick }) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-      isActive 
-        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40' 
+      isActive
+        ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
   >
@@ -321,4 +322,4 @@ const SidebarItem: React.FC<{
   </button>
 );
 
-export default withAuth(AdminDashboard, 'admin');
+export default AdminDashboard;

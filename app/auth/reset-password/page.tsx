@@ -1,10 +1,11 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/router';
+import { useRouter } from 'next/navigation';
 import { Eye, EyeOff } from 'lucide-react';
 import Silk from '@/components/react_bits/Silk';
 import { supabase } from '@/services/supabase';
 import Link from 'next/link';
-import { withGuest } from '@/hoc/withGuest';
 
 const ResetPasswordPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
@@ -169,4 +170,4 @@ const ResetPasswordPage: React.FC = () => {
   );
 };
 
-export default withGuest(ResetPasswordPage);
+export default ResetPasswordPage;

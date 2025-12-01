@@ -18,8 +18,7 @@ export const useUser = () => {
   useEffect(() => {
     let mounted = true;
 
-    const fetchUserProfile = async (authUser: User) => {
-      console.log('[useUser] Fetching profile for user:', authUser.email);
+    const fetchUserProfile = async (authUser: User): Promise<UserProfile> => {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -28,97 +27,72 @@ export const useUser = () => {
           .single();
 
         if (error) {
-          console.error('[useUser] Error fetching user profile:', error);
-          if (mounted) {
-            console.log('[useUser] Setting user without profile data');
-            setUser({ ...authUser });
-          }
-          return;
+          console.warn('[useUser] Profile fetch error:', error.message);
+          return { ...authUser };
         }
 
-        if (mounted) {
-          console.log('[useUser] Profile fetched successfully. Role:', profile?.role);
-          setUser({ ...authUser, ...profile });
-        }
+        return { ...authUser, ...profile };
       } catch (err) {
         console.error('[useUser] Unexpected error fetching profile:', err);
-        if (mounted) setUser({ ...authUser });
+        return { ...authUser };
       }
     };
 
-    const initializeAuth = async () => {
-      try {
-        console.log('[useUser] Initializing auth...');
+    // Initialize auth state
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (!mounted) return;
 
-        // Get the current session
-        const { data: { session }, error } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error('[useUser] Error getting session:', error);
-          if (mounted) {
-            setUser(null);
-            setLoading(false);
-          }
-          return;
+      if (session?.user) {
+        const userProfile = await fetchUserProfile(session.user);
+        if (mounted) {
+          setUser(userProfile);
+          setLoading(false);
         }
-
-        if (session?.user) {
-          console.log('[useUser] Found existing session for user:', session.user.email);
-          await fetchUserProfile(session.user);
-        } else {
-          console.log('[useUser] No existing session found');
-          if (mounted) {
-            setUser(null);
-          }
-        }
-
-        if (mounted) setLoading(false);
-      } catch (err) {
-        console.error('[useUser] Error initializing auth:', err);
-        // Always ensure loading is set to false
+      } else {
         if (mounted) {
           setUser(null);
           setLoading(false);
         }
       }
-    };
+    });
 
-    initializeAuth();
+    // Listen to auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('[useUser] Auth state changed:', event, session?.user?.email || 'no user');
+      console.log('[useUser] Auth event:', event);
 
-      if (!mounted) {
-        console.log('[useUser] Component unmounted, ignoring auth change');
-        return;
-      }
+      switch (event) {
+        case 'SIGNED_IN':
+        case 'TOKEN_REFRESHED':
+          if (session?.user) {
+            const userProfile = await fetchUserProfile(session.user);
+            setUser(userProfile);
+          }
+          setLoading(false);
+          break;
 
-      if (event === 'PASSWORD_RECOVERY') {
-        console.log('[useUser] Password recovery initiated, not setting user state');
-        // Don't set user state during password recovery to prevent auto-redirect
-        setUser(null);
-        setLoading(false);
-      } else if (event === 'SIGNED_OUT') {
-        console.log('[useUser] User signed out, clearing user state');
-        setUser(null);
-        setLoading(false);
-      } else if (event === 'SIGNED_IN' && session?.user) {
-        console.log('[useUser] User signed in:', session.user.email);
-        await fetchUserProfile(session.user);
-        setLoading(false);
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        console.log('[useUser] Token refreshed for:', session.user.email);
-        await fetchUserProfile(session.user);
-      } else if (!session) {
-        console.log('[useUser] No session, clearing user state');
-        setUser(null);
-        setLoading(false);
+        case 'SIGNED_OUT':
+          setUser(null);
+          setLoading(false);
+          break;
+
+        case 'PASSWORD_RECOVERY':
+          setUser(null);
+          setLoading(false);
+          break;
+
+        default:
+          if (!session) {
+            setUser(null);
+            setLoading(false);
+          }
       }
     });
 
     return () => {
       mounted = false;
-      authListener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
