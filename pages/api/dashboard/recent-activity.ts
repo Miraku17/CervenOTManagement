@@ -35,12 +35,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (error) throw error;
 
+    // Get attendance IDs to fetch overtime requests
+    const attendanceIds = recentActivity?.map(a => a.id) || [];
+
+    // Fetch overtime requests for these attendance records
+    const { data: overtimeData } = await supabase
+      .from('overtime')
+      .select('attendance_id, comment, status, reviewer')
+      .in('attendance_id', attendanceIds);
+
+    // Fetch reviewer profiles if any
+    const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
+    let reviewersMap = new Map();
+    if (reviewerIds.length > 0) {
+      const { data: reviewers } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', reviewerIds);
+      reviewersMap = new Map(reviewers?.map(r => [r.id, r]) || []);
+    }
+
+    // Create overtime map
+    const overtimeMap = new Map(
+      overtimeData?.map(ot => [
+        ot.attendance_id,
+        {
+          comment: ot.comment,
+          status: ot.status,
+          reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null
+        }
+      ]) || []
+    );
+
     // Format the response
     const formattedActivity = recentActivity?.map(record => {
       const profile = record.profiles as any;
       const timeIn = new Date(record.time_in);
       const timeOut = record.time_out ? new Date(record.time_out) : null;
       const activityDate = new Date(record.date);
+      const overtime = overtimeMap.get(record.id);
 
       // Calculate duration
       let duration = null;
@@ -75,7 +108,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clockOutAddress: record.clock_out_address || null,
         duration: duration,
         status: record.time_out ? 'Completed' : 'Active',
-        avatarSeed: `${profile.first_name}+${profile.last_name}`
+        avatarSeed: `${profile.first_name}+${profile.last_name}`,
+        overtimeRequest: overtime ? {
+          comment: overtime.comment,
+          status: overtime.status,
+          reviewer: overtime.reviewer
+        } : null
       };
     }) || [];
 

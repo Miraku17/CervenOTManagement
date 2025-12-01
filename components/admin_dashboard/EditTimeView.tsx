@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Search, Calendar, Clock, Save, User, AlertCircle } from "lucide-react";
 import { Employee } from "@/types";
 import { format } from "date-fns";
+import { useUser } from "@/hooks/useUser";
 
 interface EditTimeViewProps {
   employees: Employee[];
@@ -11,11 +12,15 @@ interface AttendanceData {
   id: string;
   time_in: string;
   time_out: string | null;
-  overtime_comment: string | null;
-  is_overtime_requested: boolean;
+  overtimeRequest?: {
+    id: string;
+    comment: string | null;
+    status: 'pending' | 'approved' | 'rejected';
+  } | null;
 }
 
 const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
+  const { user } = useUser();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedDate, setSelectedDate] = useState<string>(
     format(new Date(), "yyyy-MM-dd")
@@ -35,6 +40,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
   const [editedTimeIn, setEditedTimeIn] = useState("");
   const [editedTimeOut, setEditedTimeOut] = useState("");
   const [editedOvertimeComment, setEditedOvertimeComment] = useState("");
+  const [editedOvertimeStatus, setEditedOvertimeStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   // Filter employees based on search
   const filteredEmployees = employees.filter(
@@ -93,21 +99,22 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             id: rawData.attendance.id,
             time_in: rawData.attendance.time_in,
             time_out: rawData.attendance.time_out,
-            overtime_comment: rawData.attendance.overtime_comment,
-            is_overtime_requested: rawData.attendance.is_overtime_requested,
+            overtimeRequest: rawData.attendance.overtimeRequest || null,
           });
 
           // Use formatted times from API (Supabase already applies +0800 timezone)
           setEditedTimeIn(formatDatetimeLocal(rawData.attendance.time_in));
           setEditedTimeOut(formatDatetimeLocal(rawData.attendance.time_out));
 
-          setEditedOvertimeComment(rawData.attendance.overtime_comment || "");
+          setEditedOvertimeComment(rawData.attendance.overtimeRequest?.comment || "");
+          setEditedOvertimeStatus(rawData.attendance.overtimeRequest?.status || 'pending');
         }
       } else {
         setAttendance(null);
         setEditedTimeIn("");
         setEditedTimeOut("");
         setEditedOvertimeComment("");
+        setEditedOvertimeStatus('pending');
       }
     } catch (error: any) {
       console.error("Error fetching attendance:", error);
@@ -133,6 +140,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
           timeIn: editedTimeIn,
           timeOut: editedTimeOut || null,
           overtimeComment: editedOvertimeComment || null,
+          overtimeStatus: editedOvertimeStatus,
+          overtimeRequestId: attendance.overtimeRequest?.id || null,
+          adminId: user?.id || null,
         }),
       });
 
@@ -322,6 +332,24 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                         />
                       </div>
 
+                      {/* Overtime Status */}
+                      {attendance.overtimeRequest && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Overtime Status
+                          </label>
+                          <select
+                            value={editedOvertimeStatus}
+                            onChange={(e) => setEditedOvertimeStatus(e.target.value as 'pending' | 'approved' | 'rejected')}
+                            className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                      )}
+
                       {/* Overtime Comment */}
                       <div>
                         <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -336,6 +364,11 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                           rows={3}
                           className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
                         />
+                        {!attendance.overtimeRequest && editedOvertimeComment && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Adding a comment will create a new overtime request
+                          </p>
+                        )}
                       </div>
 
                       {/* Save Button */}

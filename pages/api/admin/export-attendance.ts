@@ -25,9 +25,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       query = query.eq('user_id', userId);
     }
 
-    const { data, error } = await query;
+    const { data: attendanceData, error } = await query;
 
     if (error) throw error;
+
+    // Get attendance IDs to fetch overtime requests
+    const attendanceIds = attendanceData?.map(a => a.id) || [];
+
+    // Fetch overtime requests for these attendance records
+    const { data: overtimeData } = await supabase
+      .from('overtime')
+      .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
+      .in('attendance_id', attendanceIds);
+
+    // Fetch reviewer profiles if any
+    const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
+    let reviewersMap = new Map();
+    if (reviewerIds.length > 0) {
+      const { data: reviewers } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name')
+        .in('id', reviewerIds);
+      reviewersMap = new Map(reviewers?.map(r => [r.id, r]) || []);
+    }
+
+    // Create overtime map
+    const overtimeMap = new Map(
+      overtimeData?.map(ot => [
+        ot.attendance_id,
+        {
+          comment: ot.comment,
+          status: ot.status,
+          approved_hours: ot.approved_hours,
+          requested_at: ot.requested_at,
+          approved_at: ot.approved_at,
+          reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null
+        }
+      ]) || []
+    );
+
+    // Merge overtime data with attendance data
+    const data = attendanceData?.map(record => ({
+      ...record,
+      overtimeRequest: overtimeMap.get(record.id) || null
+    }));
 
     return res.status(200).json({ data });
 

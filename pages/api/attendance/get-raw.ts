@@ -36,6 +36,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Fetch overtime request if exists
+    const { data: overtimeData } = await supabase
+      .from('overtime')
+      .select('id, comment, status')
+      .eq('attendance_id', data.id)
+      .single();
+
     // Format times for datetime-local input (Supabase already applies +0800 timezone)
     const formatForInput = (isoTime: string | null) => {
       if (!isoTime) return null;
@@ -47,6 +54,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ...data,
       time_in_formatted: formatForInput(data.time_in),
       time_out_formatted: formatForInput(data.time_out),
+      overtimeRequest: overtimeData ? {
+        id: overtimeData.id,
+        comment: overtimeData.comment,
+        status: overtimeData.status
+      } : null
     };
 
     return res.status(200).json({

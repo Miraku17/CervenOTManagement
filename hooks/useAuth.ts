@@ -44,7 +44,7 @@ export const useAuth = () => {
     setIsLoggingOut(true);
 
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'local' });
       router.push("/auth/login");
     } catch (error) {
       console.error("[useAuth] Logout error:", error);

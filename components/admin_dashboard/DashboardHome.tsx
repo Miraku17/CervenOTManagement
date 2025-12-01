@@ -25,9 +25,15 @@ interface RecentActivity {
   clockOutAddress: string | null;
   duration: string | null;
   status: string;
-  isOvertime: boolean;
-  overtimeComment: string | null;
   avatarSeed: string;
+  overtimeRequest?: {
+    comment: string | null;
+    status: 'pending' | 'approved' | 'rejected';
+    reviewer: {
+      first_name: string;
+      last_name: string;
+    } | null;
+  } | null;
 }
 
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
@@ -121,9 +127,15 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-sm font-semibold text-white truncate">{activity.employeeName}</p>
-                        {activity.isOvertime && (
-                          <span className="px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] font-bold text-amber-400 uppercase">
-                            OT
+                        {activity.overtimeRequest && (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            activity.overtimeRequest.status === 'approved'
+                              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                              : activity.overtimeRequest.status === 'rejected'
+                              ? 'bg-red-500/10 border border-red-500/20 text-red-400'
+                              : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
+                          }`}>
+                            OT: {activity.overtimeRequest.status}
                           </span>
                         )}
                       </div>
@@ -167,12 +179,27 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                     </div>
                   </div>
                   
-                  {activity.overtimeComment && (
-                    <div className="mt-3 pt-3 border-t border-slate-800/50 flex items-start gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 mt-0.5 shrink-0">
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                      </svg>
-                      <p className="text-xs text-slate-400 italic line-clamp-2">"{activity.overtimeComment}"</p>
+                  {activity.overtimeRequest && (
+                    <div className="mt-3 pt-3 border-t border-slate-800/50">
+                      {activity.overtimeRequest.comment && (
+                        <div className="flex items-start gap-2 mb-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 mt-0.5 shrink-0">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                          </svg>
+                          <p className="text-xs text-slate-400 italic line-clamp-2">"{activity.overtimeRequest.comment}"</p>
+                        </div>
+                      )}
+                      {activity.overtimeRequest.reviewer && (
+                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                          </svg>
+                          <span>Reviewed by {activity.overtimeRequest.reviewer.first_name} {activity.overtimeRequest.reviewer.last_name}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

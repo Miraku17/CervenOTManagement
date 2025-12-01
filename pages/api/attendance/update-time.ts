@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { attendanceId, timeIn, timeOut } = req.body;
+  const { attendanceId, timeIn, timeOut, overtimeComment, overtimeStatus, overtimeRequestId, adminId } = req.body;
 
   if (!attendanceId) {
     return res.status(400).json({ error: 'Attendance ID is required' });
@@ -27,20 +27,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const timeInUTC = fromZonedTime(timeIn, "Asia/Manila").toISOString();
     const timeOutUTC = timeOut ? fromZonedTime(timeOut, "Asia/Manila").toISOString() : null;
 
-    // Calculate updated total minutes if both times exist
-    let updatedTotalMinutes = null;
-    if (timeOutUTC) {
-      const diffMs = new Date(timeOutUTC).getTime() - new Date(timeInUTC).getTime();
-      updatedTotalMinutes = Math.floor(diffMs / 60000);
-    }
-
-    // Update the attendance record
+    // Update the attendance record (total_minutes is auto-calculated by database)
     const { data, error } = await supabase
       .from('attendance')
       .update({
         time_in: timeInUTC,
         time_out: timeOutUTC,
-        total_minutes: updatedTotalMinutes,
         updated_at: new Date().toISOString(),
       })
       .eq('id', attendanceId)
@@ -48,6 +40,55 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .single();
 
     if (error) throw error;
+
+    // Handle overtime comment and status update
+    if (overtimeComment !== undefined || overtimeStatus !== undefined) {
+      if (overtimeRequestId) {
+        // Update existing overtime request
+        const updates: any = {
+          updated_at: new Date().toISOString()
+        };
+
+        if (overtimeComment !== undefined) {
+          updates.comment = overtimeComment || null;
+        }
+
+        if (overtimeStatus !== undefined) {
+          updates.status = overtimeStatus;
+          // Set approved_at and reviewer when status changes to approved or rejected
+          if (overtimeStatus === 'approved' || overtimeStatus === 'rejected') {
+            updates.approved_at = new Date().toISOString();
+            if (adminId) {
+              updates.reviewer = adminId;
+            }
+          }
+        }
+
+        await supabase
+          .from('overtime')
+          .update(updates)
+          .eq('id', overtimeRequestId);
+      } else if (overtimeComment) {
+        // Create new overtime request if comment is provided
+        const { data: attendanceData } = await supabase
+          .from('attendance')
+          .select('user_id')
+          .eq('id', attendanceId)
+          .single();
+
+        if (attendanceData) {
+          await supabase
+            .from('overtime')
+            .insert({
+              attendance_id: attendanceId,
+              requested_by: attendanceData.user_id,
+              comment: overtimeComment,
+              status: overtimeStatus || 'pending',
+              requested_at: new Date().toISOString()
+            });
+        }
+      }
+    }
 
     return res.status(200).json({
       message: 'Attendance updated successfully',

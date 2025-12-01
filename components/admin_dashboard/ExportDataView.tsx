@@ -41,7 +41,24 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
   const convertToCSV = (data: any[]) => {
     if (!data || data.length === 0) return '';
 
-    const headers = ['Date', 'Employee Name', 'Email', 'Time In', 'Time Out', 'Total Minutes', 'Total Hours', 'Clock In Address', 'Clock Out Address'];
+    const headers = [
+      'Date',
+      'Employee Name',
+      'Email',
+      'Time In',
+      'Time Out',
+      'Total Minutes',
+      'Total Hours',
+      'Clock In Address',
+      'Clock Out Address',
+      'Has Overtime Request',
+      'Overtime Status',
+      'Overtime Comment',
+      'Overtime Approved Hours',
+      'Overtime Requested At',
+      'Overtime Approved/Rejected At',
+      'Overtime Reviewer'
+    ];
     const csvRows = [headers.join(',')];
 
     for (const row of data) {
@@ -50,7 +67,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
       const email = row.profiles?.email || '';
-      
+
       const timeInDate = row.time_in ? new Date(row.time_in) : null;
       const timeOutDate = row.time_out ? new Date(row.time_out) : null;
 
@@ -70,6 +87,23 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const addressIn = row.clock_in_address ? `"${row.clock_in_address.replace(/"/g, '""')}"` : 'N/A';
       const addressOut = row.clock_out_address ? `"${row.clock_out_address.replace(/"/g, '""')}"` : 'N/A';
 
+      // Handle overtime request data
+      const hasOvertimeRequest = row.overtimeRequest ? 'Yes' : 'No';
+      const overtimeStatus = row.overtimeRequest?.status || 'N/A';
+      const overtimeComment = row.overtimeRequest?.comment
+        ? `"${row.overtimeRequest.comment.replace(/"/g, '""')}"`
+        : 'N/A';
+      const overtimeApprovedHours = row.overtimeRequest?.approved_hours || 'N/A';
+      const overtimeRequestedAt = row.overtimeRequest?.requested_at
+        ? new Date(row.overtimeRequest.requested_at).toLocaleString()
+        : 'N/A';
+      const overtimeApprovedAt = row.overtimeRequest?.approved_at
+        ? new Date(row.overtimeRequest.approved_at).toLocaleString()
+        : 'N/A';
+      const overtimeReviewer = row.overtimeRequest?.reviewer
+        ? `"${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}"`
+        : 'N/A';
+
       const values = [
         date,
         `"${fullName}"`, // Quote names to handle commas
@@ -79,7 +113,14 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         totalMinutes,
         totalHours,
         addressIn,
-        addressOut
+        addressOut,
+        hasOvertimeRequest,
+        overtimeStatus,
+        overtimeComment,
+        overtimeApprovedHours,
+        overtimeRequestedAt,
+        overtimeApprovedAt,
+        overtimeReviewer
       ];
       csvRows.push(values.join(','));
     }

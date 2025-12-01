@@ -93,7 +93,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
             clockOutAddress: data.attendance.clockOutLocation?.address,
             status: data.attendance.status,
             totalHours: data.attendance.totalHours ? parseFloat(data.attendance.totalHours) : undefined,
-            overtimeComment: data.attendance.overtimeComment,
+            overtimeRequest: data.attendance.overtimeRequest,
           });
         } else {
           setAttendance(null);
@@ -449,29 +449,73 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         </div>
                     )}
 
-                    {/* Overtime Comment Section */}
-                    {attendance?.overtimeComment && (
-                      <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-800">
-                        <h4 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
-                          <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            width="16" 
-                            height="16" 
-                            viewBox="0 0 24 24" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            strokeWidth="2" 
-                            strokeLinecap="round" 
-                            strokeLinejoin="round" 
-                            className="text-blue-400"
-                          >
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                          </svg>
-                          Overtime Comment
-                        </h4>
-                        <p className="text-slate-400 text-sm italic">
-                          "{attendance.overtimeComment}"
-                        </p>
+                    {/* Overtime Request Section */}
+                    {attendance?.overtimeRequest && (
+                      <div className="mt-6 p-5 bg-slate-800/50 rounded-xl border border-slate-700">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+                            <Clock className="text-blue-400" size={16} />
+                            Overtime Request
+                          </h4>
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            attendance.overtimeRequest.status === 'approved'
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : attendance.overtimeRequest.status === 'rejected'
+                              ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            {attendance.overtimeRequest.status.charAt(0).toUpperCase() + attendance.overtimeRequest.status.slice(1)}
+                          </span>
+                        </div>
+
+                        {attendance.overtimeRequest.comment && (
+                          <div className="mb-3">
+                            <p className="text-xs text-slate-500 mb-1">Comment:</p>
+                            <p className="text-slate-300 text-sm italic">
+                              "{attendance.overtimeRequest.comment}"
+                            </p>
+                          </div>
+                        )}
+
+                        <div className="space-y-2 text-xs">
+                          <div className="flex items-center gap-2 text-slate-400">
+                            <Calendar size={14} />
+                            <span>Requested: {new Date(attendance.overtimeRequest.requestedAt).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}</span>
+                          </div>
+
+                          {attendance.overtimeRequest.approvedAt && (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <Calendar size={14} />
+                              <span>{attendance.overtimeRequest.status === 'approved' ? 'Approved' : 'Rejected'}: {new Date(attendance.overtimeRequest.approvedAt).toLocaleString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}</span>
+                            </div>
+                          )}
+
+                          {attendance.overtimeRequest.reviewer && (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <Briefcase size={14} />
+                              <span>Reviewed by: {attendance.overtimeRequest.reviewer.first_name} {attendance.overtimeRequest.reviewer.last_name}</span>
+                            </div>
+                          )}
+
+                          {attendance.overtimeRequest.approvedHours !== null && (
+                            <div className="flex items-center gap-2 text-slate-400">
+                              <Clock size={14} />
+                              <span>Approved Hours: {attendance.overtimeRequest.approvedHours} hrs</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 

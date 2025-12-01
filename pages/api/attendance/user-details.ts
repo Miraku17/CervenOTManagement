@@ -51,6 +51,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Fetch overtime request for this attendance record if exists
+    const { data: overtimeData } = await supabase
+      .from('overtime')
+      .select('*')
+      .eq('attendance_id', data.id)
+      .single();
+
+    // If overtime exists, fetch reviewer profile
+    let reviewerProfile = null;
+    if (overtimeData?.reviewer) {
+      const { data: reviewer } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, email')
+        .eq('id', overtimeData.reviewer)
+        .single();
+      reviewerProfile = reviewer;
+    }
+
     // Format the response
     const formattedAttendance = {
       id: data.id,
@@ -78,6 +96,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lat: data.clock_out_lat,
         lng: data.clock_out_lng,
         address: data.clock_out_address
+      } : null,
+      overtimeRequest: overtimeData ? {
+        id: overtimeData.id,
+        comment: overtimeData.comment,
+        status: overtimeData.status,
+        requestedAt: overtimeData.requested_at,
+        approvedAt: overtimeData.approved_at,
+        approvedHours: overtimeData.approved_hours,
+        reviewer: reviewerProfile,
       } : null
     };
 

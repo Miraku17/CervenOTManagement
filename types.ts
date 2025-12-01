@@ -52,6 +52,19 @@ export interface AttendanceRecord {
   status: 'Present' | 'Late' | 'Absent' | 'Half Day' | 'In Progress';
   totalHours?: number;
   overtimeComment?: string | null;
+  overtimeRequest?: {
+    id: string;
+    comment: string | null;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt: string;
+    approvedAt: string | null;
+    approvedHours: number | null;
+    reviewer: {
+      first_name: string;
+      last_name: string;
+      email: string;
+    } | null;
+  } | null;
 }
 
 export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS';
