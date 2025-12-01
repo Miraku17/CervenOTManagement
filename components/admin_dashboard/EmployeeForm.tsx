@@ -17,6 +17,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     address: "",
     position: "",
     department: "",
+    role: "employee",
   });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -33,6 +34,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
       address: "",
       position: "",
       department: "",
+      role: "employee",
     });
     setSuccess(false);
     setError(null);
@@ -104,6 +106,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
         body: JSON.stringify({
           ...formData,
           positionId: selectedPosition.id,
+          role: formData.role,
           password: Math.random().toString(36).slice(-12), // Generate a random temporary password
         }),
       });
@@ -229,6 +232,25 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
             </button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-400">
+                Role <span className="text-red-400">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.role}
+                  onChange={(e) =>
+                    setFormData({ ...formData, role: e.target.value })
+                  }
+                  required
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all appearance-none pr-10"
+                >
+                  <option value="employee">Employee</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
+              </div>
+            </div>
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-slate-400">
                 Position/Title <span className="text-red-400">*</span>

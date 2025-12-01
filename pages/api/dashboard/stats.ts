@@ -21,8 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get total employees
     const { count: totalEmployees, error: employeeError } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'employee');
+      .select('*', { count: 'exact', head: true });
 
     if (employeeError) throw employeeError;
 

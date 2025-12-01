@@ -56,27 +56,19 @@ export async function middleware(request: NextRequest) {
 
     const userRole = profile?.role || 'employee';
 
-    // Redirect authenticated users visiting public routes to dashboard
+    // Redirect authenticated users visiting public routes to employee dashboard
     if (isPublicRoute) {
-      const redirectPath =
-        userRole === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
 
-    // Role-based access control
+    // Role-based access control - only admins can access admin dashboard
     if (pathname.startsWith('/dashboard/admin') && userRole !== 'admin') {
       return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
 
-    if (pathname.startsWith('/dashboard/employee') && userRole === 'admin') {
-      return NextResponse.redirect(new URL('/dashboard/admin', request.url));
-    }
-
-    // Redirect generic /dashboard root to role-specific dashboard
+    // Redirect generic /dashboard root to employee dashboard
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const redirectPath =
-        userRole === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
-      return NextResponse.redirect(new URL(redirectPath, request.url));
+      return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
   }
 

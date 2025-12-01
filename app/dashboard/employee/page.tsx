@@ -5,13 +5,15 @@ import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2 } from 'lucide-react';
+import { LogOut, Loader2, Shield } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
+import { useRouter } from 'next/navigation';
 
 const EmployeeDashboard: React.FC = () => {
   const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isClocking, setIsClocking] = useState(false);
@@ -28,6 +30,26 @@ const EmployeeDashboard: React.FC = () => {
   // Loading states
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Admin check
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user?.id) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      setIsAdmin(profile?.role === 'admin');
+    };
+
+    checkAdminStatus();
+  }, [user?.id]);
 
   // Check for active clock-in session from database
   const checkActiveSession = async () => {
@@ -588,9 +610,15 @@ const EmployeeDashboard: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4">
-                <div className="hidden md:block text-sm text-slate-500 border-r border-slate-700 pr-4">
-                Employee Portal v1.0
-                </div>
+                {isAdmin && (
+                  <button
+                    onClick={() => router.push('/dashboard/admin')}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium border-r border-slate-700 mr-2"
+                  >
+                    <Shield className="w-4 h-4" />
+                    <span>Admin Dashboard</span>
+                  </button>
+                )}
                 <button
                     onClick={logout}
                     disabled={isLoggingOut}

@@ -21,15 +21,36 @@ import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 const AdminDashboard: React.FC = () => {
-  const { logout, isLoggingOut } = useAuth();
+  const { logout, isLoggingOut, user } = useAuth();
+  const router = useRouter();
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [positions, setPositions] = useState<Position[]>([]);
+
+  // Check if user is admin, redirect if not
+  useEffect(() => {
+    const checkAdminAccess = async () => {
+      if (!user?.id) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.role !== 'admin') {
+        router.push('/dashboard/employee');
+      }
+    };
+
+    checkAdminAccess();
+  }, [user?.id, router]);
 
   // Fetch positions
   useEffect(() => {
@@ -49,8 +70,7 @@ const AdminDashboard: React.FC = () => {
   const fetchEmployees = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*, positions(name)')
-      .eq('role', 'employee');
+      .select('*, positions(name)');
 
     if (data) {
       const fetchedEmployees: Employee[] = data.map((profile: any) => ({
@@ -89,7 +109,7 @@ const AdminDashboard: React.FC = () => {
     setCurrentView('EMPLOYEE_DETAIL');
   };
 
-  const handleAddEmployee = async (newEmployee: Employee) => {
+  const handleAddEmployee = async () => {
     await fetchEmployees();
     setCurrentView('EMPLOYEES');
   };
@@ -270,6 +290,13 @@ const AdminDashboard: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/dashboard/employee')}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium flex items-center gap-2"
+            >
+              <Users size={16} />
+              <span className="hidden sm:inline">Employee View</span>
+            </button>
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm font-bold text-white">
               AD
             </div>
