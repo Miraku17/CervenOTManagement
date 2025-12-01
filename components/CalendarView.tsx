@@ -66,7 +66,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
   const renderDays = () => {
     const days = [];
     for (let i = 0; i < firstDayOfMonth; i++) {
-        days.push(<div key={`empty-${i}`} className="h-24 bg-slate-900/30 border border-slate-800 rounded-lg"></div>);
+        days.push(<div key={`empty-${i}`} className="h-16 sm:h-20 md:h-24 bg-slate-900/30 border border-slate-800 rounded-lg"></div>);
     }
 
     for (let d = 1; d <= daysInMonth; d++) {
@@ -78,11 +78,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
         const isSelected = selectedDate === dateStr;
 
         days.push(
-            <div 
-                key={d} 
+            <div
+                key={d}
                 onClick={() => setSelectedDate(dateStr)}
                 className={`
-                    h-24 p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
+                    h-16 sm:h-20 md:h-24 p-1.5 sm:p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
                     ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-900/20' : ''}
                     ${!isSelected && isToday ? 'border-blue-500/50 bg-blue-500/10' : ''}
                     ${!isSelected && !isToday ? 'border-slate-700 bg-slate-800 hover:bg-slate-750 hover:border-slate-500' : ''}
@@ -91,19 +91,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                 `}
             >
                 <div className="flex justify-between items-start z-10 relative">
-                    <span className={`text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-400'} group-hover:text-blue-300`}>{d}</span>
+                    <span className={`text-xs sm:text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-400'} group-hover:text-blue-300`}>{d}</span>
                     {hasWork && (
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                        <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
                     )}
                 </div>
-                
+
                 {hasWork ? (
                     <div className="mt-auto z-10 relative">
-                        <span className="text-lg font-bold text-slate-200">{hours}</span>
-                        <span className="text-xs text-slate-500 ml-1">hrs</span>
+                        <span className="text-sm sm:text-base md:text-lg font-bold text-slate-200">{hours}</span>
+                        <span className="text-[10px] sm:text-xs text-slate-500 ml-0.5 sm:ml-1">hrs</span>
                     </div>
                 ) : (
-                    <div className="mt-auto text-xs text-slate-600 font-medium z-10 relative">-</div>
+                    <div className="mt-auto text-[10px] sm:text-xs text-slate-600 font-medium z-10 relative">-</div>
                 )}
             </div>
         );
@@ -123,13 +123,13 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
 
   return (
     <>
-        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-                <h3 className="text-slate-100 font-semibold flex items-center gap-2">
-                    <CalendarIcon className="w-5 h-5 text-blue-400" />
+        <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-4 md:p-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+                <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
+                    <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
                     Work Calendar
                 </h3>
-                <div className="flex items-center gap-4 text-slate-400 text-sm">
+                <div className="flex items-center gap-3 sm:gap-4 text-slate-400 text-xs sm:text-sm w-full sm:w-auto justify-between sm:justify-start">
                    <span className="font-medium">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
                    <div className="flex gap-1">
                        <button
@@ -154,77 +154,84 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-7 gap-2 mb-2 text-center text-xs text-slate-500 font-medium uppercase tracking-wider">
-                <div>Sun</div>
-                <div>Mon</div>
-                <div>Tue</div>
-                <div>Wed</div>
-                <div>Thu</div>
-                <div>Fri</div>
-                <div>Sat</div>
+            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-[10px] sm:text-xs text-slate-500 font-medium uppercase tracking-wider">
+                <div className="hidden sm:block">Sun</div>
+                <div className="hidden sm:block">Mon</div>
+                <div className="hidden sm:block">Tue</div>
+                <div className="hidden sm:block">Wed</div>
+                <div className="hidden sm:block">Thu</div>
+                <div className="hidden sm:block">Fri</div>
+                <div className="hidden sm:block">Sat</div>
+                <div className="sm:hidden">S</div>
+                <div className="sm:hidden">M</div>
+                <div className="sm:hidden">T</div>
+                <div className="sm:hidden">W</div>
+                <div className="sm:hidden">T</div>
+                <div className="sm:hidden">F</div>
+                <div className="sm:hidden">S</div>
             </div>
-            <div className="grid grid-cols-7 gap-2">
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
                 {hasMounted ? renderDays() : null}
             </div>
         </div>
 
         {/* Modal Overlay */}
         {selectedDate && (
-            <div 
-                className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm transition-opacity"
+            <div
+                className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-sm transition-opacity"
                 onClick={() => setSelectedDate(null)}
             >
-                <div 
-                    className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100"
+                <div
+                    className="bg-slate-900 border-t sm:border border-slate-700 w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] sm:max-h-none"
                     onClick={e => e.stopPropagation()}
                 >
-                    <div className="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900">
+                    <div className="p-4 sm:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900">
                         <div>
-                            <h3 className="text-lg font-bold text-white">
+                            <h3 className="text-base sm:text-lg font-bold text-white">
                                 {hasMounted ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' }) : ''}
                             </h3>
                             <p className="text-slate-400 text-xs">Daily Log Details</p>
                         </div>
-                        <button 
+                        <button
                             onClick={() => setSelectedDate(null)}
                             className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
                         >
-                            <X className="w-5 h-5" />
+                            <X className="w-4 h-4 sm:w-5 sm:h-5" />
                         </button>
                     </div>
                     
-                    <div className="p-5 max-h-[60vh] overflow-y-auto bg-slate-900/50">
+                    <div className="p-3 sm:p-5 max-h-[60vh] overflow-y-auto bg-slate-900/50">
                         {(logsByDate[selectedDate] || []).length > 0 ? (
                             <div className="space-y-3">
                                 {logsByDate[selectedDate].map((log, idx) => (
-                                    <div key={log.id} className="bg-slate-800 rounded-xl p-4 border border-slate-700 flex flex-col gap-3">
+                                    <div key={log.id} className="bg-slate-800 rounded-xl p-3 sm:p-4 border border-slate-700 flex flex-col gap-3">
                                         <div className="flex items-center justify-between border-b border-slate-700/50 pb-2">
-                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Session {idx + 1}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs text-slate-400">{formatDuration(log.durationSeconds)}</span>
+                                            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">Session {idx + 1}</span>
+                                            <div className="flex items-center gap-1.5 sm:gap-2">
+                                                <span className="text-[10px] sm:text-xs text-slate-400">{formatDuration(log.durationSeconds)}</span>
                                                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                             </div>
                                         </div>
-                                        <div className="flex items-center justify-between text-slate-200 pt-1">
-                                            <div>
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between text-slate-200 pt-1 gap-3 sm:gap-0">
+                                            <div className="flex-1">
                                                 <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Clock In</span>
-                                                <div className="flex items-center gap-1.5 font-mono text-base text-white">
-                                                    <Clock className="w-3.5 h-3.5 text-blue-400" />
+                                                <div className="flex items-center gap-1.5 font-mono text-sm sm:text-base text-white">
+                                                    <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-blue-400" />
                                                     {formatTime(log.startTime)}
                                                 </div>
-                                                <div className="mt-1 text-[10px] text-slate-400 max-w-[120px] truncate" title={log.clockInAddress || 'No address provided'}>
+                                                <div className="mt-1 text-[10px] text-slate-400 max-w-full sm:max-w-[120px] truncate" title={log.clockInAddress || 'No address provided'}>
                                                     {log.clockInAddress || 'No address provided'}
                                                 </div>
                                             </div>
-                                            <ArrowRight className="w-4 h-4 text-slate-600" />
-                                            <div className="text-right">
+                                            <ArrowRight className="hidden sm:block w-4 h-4 text-slate-600 flex-shrink-0" />
+                                            <div className="flex-1 sm:text-right">
                                                 <span className="text-[10px] text-slate-500 uppercase block mb-0.5">Clock Out</span>
-                                                <div className="flex items-center justify-end gap-1.5 font-mono text-base text-white">
+                                                <div className="flex items-center sm:justify-end gap-1.5 font-mono text-sm sm:text-base text-white">
+                                                    <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-rose-400 sm:order-2" />
                                                     {log.endTime ? formatTime(log.endTime) : '--:--'}
-                                                    <Clock className="w-3.5 h-3.5 text-rose-400" />
                                                 </div>
                                                 {log.endTime && (
-                                                    <div className="mt-1 text-[10px] text-slate-400 max-w-[120px] truncate ml-auto" title={log.clockOutAddress || 'No address provided'}>
+                                                    <div className="mt-1 text-[10px] text-slate-400 max-w-full sm:max-w-[120px] truncate sm:ml-auto" title={log.clockOutAddress || 'No address provided'}>
                                                         {log.clockOutAddress || 'No address provided'}
                                                     </div>
                                                 )}
@@ -255,9 +262,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                         )}
                     </div>
 
-                    <div className="p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
-                        <span className="text-slate-400 text-sm font-medium">Total Hours</span>
-                        <span className="text-xl font-bold text-blue-400 font-mono">
+                    <div className="p-3 sm:p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
+                        <span className="text-slate-400 text-xs sm:text-sm font-medium">Total Hours</span>
+                        <span className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
                              {(getDailyTotalSeconds(selectedDate) / 3600).toFixed(2)} <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>
                         </span>
                     </div>
