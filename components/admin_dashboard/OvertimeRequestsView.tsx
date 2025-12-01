@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Check, X, Clock, AlertCircle } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { ConfirmModal } from '@/components/ConfirmModal';
 
 interface OvertimeRequest {
   id: string;
@@ -13,6 +14,7 @@ interface OvertimeRequest {
   reviewer?: {
     first_name: string;
     last_name: string;
+    email?: string;
   };
   attendance: {
     date: string;
@@ -21,7 +23,15 @@ interface OvertimeRequest {
   comment: string;
   status: 'pending' | 'approved' | 'rejected';
   requested_at: string;
+  approved_at: string | null;
   approved_hours: number | null;
+}
+
+interface ConfirmationState {
+  isOpen: boolean;
+  requestId: string | null;
+  action: 'approve' | 'reject' | null;
+  employeeName: string;
 }
 
 const OvertimeRequestsView: React.FC = () => {
@@ -30,6 +40,12 @@ const OvertimeRequestsView: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<ConfirmationState>({
+    isOpen: false,
+    requestId: null,
+    action: null,
+    employeeName: '',
+  });
 
   useEffect(() => {
     fetchRequests();
@@ -54,17 +70,46 @@ const OvertimeRequestsView: React.FC = () => {
     }
   };
 
-  const handleAction = async (id: string, action: 'approve' | 'reject') => {
-    setProcessingId(id);
+  const openConfirmation = (id: string, action: 'approve' | 'reject') => {
+    const request = requests.find(r => r.id === id);
+    if (!request) return;
+
+    setConfirmation({
+      isOpen: true,
+      requestId: id,
+      action,
+      employeeName: `${request.requested_by.first_name} ${request.requested_by.last_name}`,
+    });
+  };
+
+  const closeConfirmation = () => {
+    setConfirmation({
+      isOpen: false,
+      requestId: null,
+      action: null,
+      employeeName: '',
+    });
+  };
+
+  const handleConfirmedAction = async () => {
+    if (!confirmation.requestId || !confirmation.action) return;
+
+    setProcessingId(confirmation.requestId);
+    closeConfirmation();
+
     try {
       const adminId = user?.id;
-      
+
       const response = await fetch('/api/admin/update-overtime', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ id, action, adminId }),
+        body: JSON.stringify({
+          id: confirmation.requestId,
+          action: confirmation.action,
+          adminId
+        }),
       });
 
       if (!response.ok) {
@@ -74,17 +119,18 @@ const OvertimeRequestsView: React.FC = () => {
 
       // Refresh list
       await fetchRequests();
-      
+
     } catch (err: any) {
-      console.error(`Error ${action}ing request:`, err);
-      alert(`Failed to ${action} request: ${err.message}`);
+      console.error(`Error ${confirmation.action}ing request:`, err);
+      setError(`Failed to ${confirmation.action} request: ${err.message}`);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleApprove = (id: string) => handleAction(id, 'approve');
-  const handleReject = (id: string) => handleAction(id, 'reject');
+  const handleApprove = (id: string) => openConfirmation(id, 'approve');
+  const handleReject = (id: string) => openConfirmation(id, 'reject');
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -125,8 +171,45 @@ const OvertimeRequestsView: React.FC = () => {
     );
   }
 
+  const getConfirmationConfig = () => {
+    if (confirmation.action === 'approve') {
+      return {
+        title: 'Approve Overtime Request',
+        message: `Are you sure you want to approve the overtime request for ${confirmation.employeeName}?`,
+        confirmText: 'Approve',
+        type: 'info' as const,
+      };
+    } else {
+      return {
+        title: 'Reject Overtime Request',
+        message: `Are you sure you want to reject the overtime request for ${confirmation.employeeName}?`,
+        confirmText: 'Reject',
+        type: 'danger' as const,
+      };
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmation.isOpen}
+        {...getConfirmationConfig()}
+        onConfirm={handleConfirmedAction}
+        onCancel={closeConfirmation}
+      />
+
+      {/* Error Toast */}
+      {error && (
+        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right z-50">
+          <AlertCircle size={20} />
+          <p>{error}</p>
+          <button onClick={() => setError(null)} className="ml-2 hover:text-red-300">
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-white">Overtime Requests</h2>
@@ -188,14 +271,26 @@ const OvertimeRequestsView: React.FC = () => {
                       {(request.attendance.total_minutes / 60).toFixed(2)} hrs
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex flex-col items-start gap-1">
+                      <div className="flex flex-col items-start gap-1.5">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
                           {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
                         </span>
                         {request.status !== 'pending' && request.reviewer && (
-                          <span className="text-[10px] text-slate-500">
-                            by {request.reviewer.first_name} {request.reviewer.last_name}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-xs text-slate-400 font-medium">
+                              by {request.reviewer.first_name} {request.reviewer.last_name}
+                            </span>
+                            {request.approved_at && (
+                              <span className="text-[10px] text-slate-500">
+                                {new Date(request.approved_at).toLocaleDateString(undefined, {
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </span>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -207,19 +302,27 @@ const OvertimeRequestsView: React.FC = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => handleApprove(request.id)}
-                            disabled={processingId === request.id}
-                            className={`p-1.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors ${processingId === request.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={processingId !== null}
+                            className={`p-1.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Approve"
                           >
-                            <Check size={16} />
+                            {processingId === request.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <Check size={16} />
+                            )}
                           </button>
                           <button
                             onClick={() => handleReject(request.id)}
-                            disabled={processingId === request.id}
-                            className={`p-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors ${processingId === request.id ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            disabled={processingId !== null}
+                            className={`p-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Reject"
                           >
-                            <X size={16} />
+                            {processingId === request.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <X size={16} />
+                            )}
                           </button>
                         </div>
                       )}

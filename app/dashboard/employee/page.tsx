@@ -309,12 +309,7 @@ const EmployeeDashboard: React.FC = () => {
   const getAddressFromCoords = async (latitude: number, longitude: number): Promise<string | null> => {
     try {
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
-        {
-          headers: {
-            'User-Agent': 'CerventechHR/1.0'
-          }
-        }
+        `/api/geocode/reverse?lat=${latitude}&lon=${longitude}`
       );
 
       if (!response.ok) {
@@ -322,7 +317,7 @@ const EmployeeDashboard: React.FC = () => {
       }
 
       const data = await response.json();
-      return data.display_name || null;
+      return data.address || null;
     } catch (error) {
       console.error('Reverse geocoding error:', error);
       return null;

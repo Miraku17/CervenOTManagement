@@ -1,40 +1,62 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase Admin Client (Service Role) for admin-level access
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Fallback for safety in case env vars are missing
-const supabase = createClient(supabaseUrl, supabaseServiceKey || 'placeholder');
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Ensure only GET requests are handled for fetching
+  if (!supabase) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
   try {
-    // --- Data Fetching ---
-    // We verify the relationship using the specific foreign key constraint to avoid ambiguity
-    // (since both 'requested_by' and 'approved_by' point to 'profiles')
-    const { data, error } = await supabase
+    // First, fetch all overtime requests
+    const { data: overtimeData, error: overtimeError } = await supabase
       .from('overtime')
-      .select(`
-        *,
-        requested_by:profiles!overtime_requests_requested_by_fkey (first_name, last_name, email),
-        reviewer:profiles!reviewer (first_name, last_name, email),
-        attendance (date, total_minutes)
-      `)
+      .select('*')
       .order('requested_at', { ascending: false });
 
-    if (error) {
-      console.error('Supabase query error details:', error);
-      // Return the specific error from Supabase to help debugging
-      return res.status(500).json({ message: 'Database query failed', error: error.message, details: error });
+    if (overtimeError) {
+      console.error('Overtime query error:', overtimeError);
+      return res.status(500).json({ message: 'Database query failed', error: overtimeError.message });
     }
 
-    return res.status(200).json({ data });
+    if (!overtimeData || overtimeData.length === 0) {
+      return res.status(200).json({ data: [] });
+    }
+
+    // Get unique user IDs for batch fetching
+    const requesterIds = [...new Set(overtimeData.map(ot => ot.requested_by))];
+    const reviewerIds = [...new Set(overtimeData.map(ot => ot.reviewer).filter(Boolean))];
+    const attendanceIds = [...new Set(overtimeData.map(ot => ot.attendance_id))];
+
+    // Fetch all related data in parallel
+    const [requestersResult, reviewersResult, attendanceResult] = await Promise.all([
+      supabase.from('profiles').select('id, first_name, last_name, email').in('id', requesterIds),
+      reviewerIds.length > 0
+        ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', reviewerIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase.from('attendance').select('id, date, total_minutes').in('id', attendanceIds),
+    ]);
+
+    // Create lookup maps
+    const requestersMap = new Map(requestersResult.data?.map(p => [p.id, p]) || []);
+    const reviewersMap = new Map(reviewersResult.data?.map(p => [p.id, p]) || []);
+    const attendanceMap = new Map(attendanceResult.data?.map(a => [a.id, a]) || []);
+
+    // Combine the data
+    const transformedData = overtimeData.map(ot => ({
+      ...ot,
+      requested_by: requestersMap.get(ot.requested_by),
+      reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null,
+      attendance: attendanceMap.get(ot.attendance_id),
+    }));
+
+    console.log('Overtime requests fetched:', transformedData.length);
+    console.log('Sample request with reviewer:', transformedData.find(r => r.reviewer));
+
+    return res.status(200).json({ data: transformedData });
 
   } catch (error: any) {
     console.error('API Error fetching overtime requests:', error.message);

@@ -27,17 +27,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updated_at: now,
     };
 
-    // Only add approved_by if it's a valid UUID (simple regex check)
+    // Add reviewer (admin who approved/rejected)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const isValidUUID = adminId && uuidRegex.test(adminId);
     if (isValidUUID) {
-        updates.reviewer = adminId;
+      updates.reviewer = adminId;
+    } else {
+      console.warn('Invalid or missing adminId, reviewer will not be set:', adminId);
     }
 
-    // If approving, we might want to calculate approved_hours based on attendance, 
-    // but for now we'll just update the status. 
-    // If we wanted to auto-fill approved_hours, we'd need to fetch the attendance record first.
-    
+    console.log(`Updating overtime request ${id}:`, updates);
+
     const { data, error } = await supabase
       .from('overtime')
       .update(updates)
@@ -46,6 +46,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .single();
 
     if (error) throw error;
+
+    console.log(`Overtime request ${status} successfully:`, data);
 
     return res.status(200).json({ message: `Overtime request ${status}`, data });
 
