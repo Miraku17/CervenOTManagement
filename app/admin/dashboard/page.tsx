@@ -9,7 +9,8 @@ import {
   Bell,
   Search,
   Menu,
-  X
+  X,
+  FileText
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -17,6 +18,7 @@ import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
+import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -151,6 +153,12 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'EDIT_TIME'}
             onClick={() => handleNavigate('EDIT_TIME')}
           />
+          <SidebarItem
+            icon={<FileText size={20} />}
+            label="Overtime Requests"
+            isActive={currentView === 'OVERTIME_REQUESTS'}
+            onClick={() => handleNavigate('OVERTIME_REQUESTS')}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -214,6 +222,12 @@ const AdminDashboard: React.FC = () => {
                 label="Edit Time"
                 isActive={currentView === 'EDIT_TIME'}
                 onClick={() => handleNavigate('EDIT_TIME')}
+              />
+              <SidebarItem
+                icon={<FileText size={24} />}
+                label="Overtime Requests"
+                isActive={currentView === 'OVERTIME_REQUESTS'}
+                onClick={() => handleNavigate('OVERTIME_REQUESTS')}
               />
            </nav>
 
@@ -293,6 +307,10 @@ const AdminDashboard: React.FC = () => {
 
             {currentView === 'EDIT_TIME' && (
               <EditTimeView employees={employees} />
+            )}
+
+            {currentView === 'OVERTIME_REQUESTS' && (
+              <OvertimeRequestsView />
             )}
 
           </div>
