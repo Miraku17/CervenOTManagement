@@ -1,13 +1,11 @@
+// middleware.ts
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  });
+  const response = NextResponse.next();
 
+  // Initialize Supabase SSR client
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -17,62 +15,34 @@ export async function middleware(request: NextRequest) {
           return request.cookies.get(name)?.value;
         },
         set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          });
+          response.cookies.set({ name, value, ...options });
         },
         remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          });
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          });
+          response.cookies.set({ name, value: '', ...options });
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
   const { pathname } = request.nextUrl;
 
-  // Public routes that don't require authentication
-  const publicRoutes = ['/auth/login', '/auth/forgot-password', '/auth/reset-password'];
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  // Public routes (no login required)
+  const isRootPath = pathname === '/' || pathname === '';
+  const isAuthRoute = pathname.startsWith('/auth/login') ||
+                      pathname.startsWith('/auth/forgot-password') ||
+                      pathname.startsWith('/auth/reset-password');
+  const isPublicRoute = isRootPath || isAuthRoute;
 
   // Protected routes
-  const isAdminRoute = pathname.startsWith('/admin');
   const isDashboardRoute = pathname.startsWith('/dashboard');
-  const isProtectedRoute = isAdminRoute || isDashboardRoute;
+  const isProtectedRoute = isDashboardRoute;
 
-  // If user is not authenticated and trying to access protected route
+  // Get authenticated user
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Redirect unauthenticated users from protected routes
   if (!user && isProtectedRoute) {
-    const redirectUrl = new URL('/auth/login', request.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
   // If user is authenticated
@@ -84,43 +54,36 @@ export async function middleware(request: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    const userRole = profile?.role;
+    const userRole = profile?.role || 'employee';
 
-    // Redirect authenticated users away from login page
+    // Redirect authenticated users visiting public routes to dashboard
     if (isPublicRoute) {
-      const redirectPath = userRole === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
-      const redirectUrl = new URL(redirectPath, request.url);
-      return NextResponse.redirect(redirectUrl);
+      const redirectPath =
+        userRole === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     }
 
     // Role-based access control
-    if (isAdminRoute && userRole !== 'admin') {
-      // Non-admin users trying to access admin routes
-      const redirectUrl = new URL('/dashboard/employee', request.url);
-      return NextResponse.redirect(redirectUrl);
+    if (pathname.startsWith('/dashboard/admin') && userRole !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
 
-    if (isDashboardRoute && pathname.startsWith('/dashboard/employee') && userRole === 'admin') {
-      // Admin users trying to access employee dashboard
-      const redirectUrl = new URL('/admin/dashboard', request.url);
-      return NextResponse.redirect(redirectUrl);
+    if (pathname.startsWith('/dashboard/employee') && userRole === 'admin') {
+      return NextResponse.redirect(new URL('/dashboard/admin', request.url));
     }
 
-    // Redirect root dashboard to role-specific dashboard
+    // Redirect generic /dashboard root to role-specific dashboard
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-      const redirectPath = userRole === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
-      const redirectUrl = new URL(redirectPath, request.url);
-      return NextResponse.redirect(redirectUrl);
+      const redirectPath =
+        userRole === 'admin' ? '/dashboard/admin' : '/dashboard/employee';
+      return NextResponse.redirect(new URL(redirectPath, request.url));
     }
   }
 
   return response;
 }
 
+// Apply middleware only to relevant routes
 export const config = {
-  matcher: [
-    '/admin/:path*',
-    '/dashboard/:path*',
-    '/auth/:path*',
-  ],
+  matcher: ['/dashboard/:path*', '/auth/:path*', '/'],
 };
