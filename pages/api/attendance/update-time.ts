@@ -12,7 +12,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { attendanceId, timeIn, timeOut, overtimeComment } = req.body;
+  const { attendanceId, timeIn, timeOut } = req.body;
 
   if (!attendanceId) {
     return res.status(400).json({ error: 'Attendance ID is required' });
@@ -31,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let updatedTotalMinutes = null;
     if (timeOutUTC) {
       const diffMs = new Date(timeOutUTC).getTime() - new Date(timeInUTC).getTime();
-      updatedTotalMinutes = Math.floor(diffMs / 60000); 
+      updatedTotalMinutes = Math.floor(diffMs / 60000);
     }
 
     // Update the attendance record
@@ -40,9 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         time_in: timeInUTC,
         time_out: timeOutUTC,
-        updated_total_minutes: updatedTotalMinutes,
-        is_overtime_requested: overtimeComment ? true : false,
-        overtime_comment: overtimeComment || null,
+        total_minutes: updatedTotalMinutes,
         updated_at: new Date().toISOString(),
       })
       .eq('id', attendanceId)

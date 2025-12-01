@@ -24,8 +24,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         time_out,
         date,
         total_minutes,
-        is_overtime_requested,
-        overtime_comment,
         clock_in_address,
         clock_out_address,
         user_id,
@@ -77,8 +75,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clockOutAddress: record.clock_out_address || null,
         duration: duration,
         status: record.time_out ? 'Completed' : 'Active',
-        isOvertime: record.is_overtime_requested,
-        overtimeComment: record.overtime_comment || null,
         avatarSeed: `${profile.first_name}+${profile.last_name}`
       };
     }) || [];

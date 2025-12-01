@@ -28,8 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         time_in,
         time_out,
         total_minutes,
-        is_overtime_requested,
-        overtime_comment,
         clock_in_lat,
         clock_in_lng,
         clock_in_address,
@@ -70,8 +68,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }) : null,
       totalHours: data.total_minutes ? (data.total_minutes / 60).toFixed(2) : null,
       totalMinutes: data.total_minutes,
-      isOvertimeRequested: data.is_overtime_requested,
-      overtimeComment: data.overtime_comment,
       status: data.time_out ? 'Present' : 'In Progress',
       clockInLocation: {
         lat: data.clock_in_lat,

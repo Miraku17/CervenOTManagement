@@ -47,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         clock_in_lat: latitude || null,
         clock_in_lng: longitude || null,
         clock_in_address: address || null,
-        is_overtime_requested: false,
+        // is_overtime_requested: false,
         created_at: now.toISOString(),
         updated_at: now.toISOString(),
       })

@@ -47,22 +47,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const totalHours = Math.round(totalMinutes / 60);
 
     // Count overtime requests this week
-    const { data: overtimeData, error: overtimeError } = await supabase
-      .from('attendance')
-      .select('id')
-      .gte('date', weekStart)
-      .eq('is_overtime_requested', true);
+    const { count: overtimeRequests, error: overtimeError } = await supabase
+      .from('overtime')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', weekStart);
 
     if (overtimeError) throw overtimeError;
-
-    const overtimeRequests = overtimeData?.length || 0;
 
     return res.status(200).json({
       stats: {
         totalEmployees: totalEmployees || 0,
         clockedInToday: clockedInCount,
         activeNow: activeNow,
-        overtimeRequests: overtimeRequests,
+        overtimeRequests: overtimeRequests || 0,
         weeklyHours: totalHours,
       }
     });

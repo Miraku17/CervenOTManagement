@@ -88,10 +88,10 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
 
   const isRunning = !!activeLog;
 
-  // Calculate hours worked and check if overtime is eligible
+  // Calculate hours worked
   const hoursWorked = elapsedSeconds / 3600;
-  const isOvertimeEligible = hoursWorked >= 8;
-  const hoursUntilOvertime = Math.max(0, 8 - hoursWorked);
+  // Overtime is always eligible now per user request
+  const isOvertimeEligible = true; 
 
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col items-center justify-center relative overflow-hidden h-full">
@@ -210,21 +210,18 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
 
                 <div className="text-slate-400 text-sm text-center">
                    {isRunning
-                     ? (isOvertimeEligible
-                         ? (isOvertime ? 'Currently logging overtime work' : 'Regular hours completed')
-                         : 'Currently logging work hours')
+                     ? (isOvertime ? 'Currently logging overtime work' : 'Currently logging work hours')
                      : 'Ready to start a new session'}
                 </div>
 
                 {isRunning && (
                   <div className="w-full space-y-3 px-4 py-3 bg-slate-700/30 rounded-lg border border-slate-600">
                     <div className="space-y-2">
-                      <label className={`flex items-center space-x-2 ${isOvertimeEligible ? 'text-slate-300' : 'text-slate-500'}`}>
+                      <label className="flex items-center space-x-2 text-slate-300">
                         <input
                           type="checkbox"
                           className="form-checkbox h-4 w-4 text-blue-600 bg-slate-900 border-slate-500 rounded focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                           checked={isOvertime}
-                          disabled={!isOvertimeEligible}
                           onChange={(e) => {
                             setIsOvertime(e.target.checked);
                             if (!e.target.checked) setOvertimeError(null);
@@ -232,16 +229,6 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                         />
                         <span>Mark as Overtime</span>
                       </label>
-                      {!isOvertimeEligible && (
-                        <p className="text-xs text-amber-400/80 ml-6">
-                          Overtime available after 8 hours. ({hoursUntilOvertime.toFixed(1)}h remaining)
-                        </p>
-                      )}
-                      {isOvertimeEligible && !isOvertime && (
-                        <p className="text-xs text-emerald-400/80 ml-6">
-                          You've worked {hoursWorked.toFixed(1)} hours. Overtime is now available!
-                        </p>
-                      )}
                     </div>
                     {isOvertime && (
                       <>

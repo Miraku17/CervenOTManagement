@@ -1,5 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin } from '@/lib/supabase-server';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase Admin Client (Service Role) for admin-level access
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// Fallback for safety in case env vars are missing
+const supabase = createClient(supabaseUrl, supabaseServiceKey || 'placeholder');
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Ensure only GET requests are handled for fetching
@@ -8,33 +15,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // --- Authentication and Authorization Placeholder ---
-    // In a real implementation, verify the user's session/role here.
-    // You can use a library helper or check the Authorization header.
-    
-    // Example:
-    // const token = req.headers.authorization?.split(' ')[1];
-    // const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    // if (authError || !user) return res.status(401).json({ message: 'Unauthorized' });
+    // --- Data Fetching ---
+    // We verify the relationship using the specific foreign key constraint to avoid ambiguity
+    // (since both 'requested_by' and 'approved_by' point to 'profiles')
+    const { data, error } = await supabase
+      .from('overtime')
+      .select(`
+        *,
+        requested_by:profiles!overtime_requests_requested_by_fkey (first_name, last_name, email),
+        reviewer:profiles!reviewer (first_name, last_name, email),
+        attendance (date, total_minutes)
+      `)
+      .order('requested_at', { ascending: false });
 
-    // --- Data Fetching Placeholder ---
-    // This is where you would query your 'overtime_requests' table in Supabase
-    // Example:
-    // const { data, error } = await supabase
-    //   .from('overtime_requests')
-    //   .select('*')
-    //   .order('created_at', { ascending: false });
+    if (error) {
+      console.error('Supabase query error details:', error);
+      // Return the specific error from Supabase to help debugging
+      return res.status(500).json({ message: 'Database query failed', error: error.message, details: error });
+    }
 
-    // if (error) {
-    //   console.error('Supabase query error:', error);
-    //   throw new Error('Failed to fetch overtime requests from database.');
-    // }
-
-    // --- Response Placeholder ---
-    // return res.status(200).json({ overtimeRequests: data });
-
-    // For now, just return a success message as a template
-    return res.status(200).json({ message: 'Overtime request API template ready to be implemented.', data: [] });
+    return res.status(200).json({ data });
 
   } catch (error: any) {
     console.error('API Error fetching overtime requests:', error.message);
