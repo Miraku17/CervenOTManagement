@@ -1,3 +1,4 @@
+'use client';
 import React, { useState, useEffect } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
@@ -8,7 +9,6 @@ import { LogOut } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
-import { withAuth } from '@/hoc/withAuth';
 
 const EmployeeDashboard: React.FC = () => {
   const { user, logout, isLoggingOut } = useAuth();
@@ -586,4 +586,4 @@ const EmployeeDashboard: React.FC = () => {
   );
 };
 
-export default withAuth(EmployeeDashboard, 'employee');
+export default EmployeeDashboard;

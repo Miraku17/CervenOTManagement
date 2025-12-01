@@ -1,31 +1,31 @@
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/router";
+'use client';
+
+import React, { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { withGuest } from "@/hoc/withGuest";
 import Aurora from "@/components/react_bits/Aurora";
 
-const LoginPage: React.FC = () => {
+function LoginPageContent() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
-  const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
 
-  // Handle messages from query parameters (e.g., reset_link_expired)
+  // Handle messages from query parameters
   useEffect(() => {
-    if (router.query.message === "reset_link_expired") {
+    const message = searchParams?.get('message');
+    if (message === "reset_link_expired") {
       setDisplayedMessage(
         "Reset password link is invalid or has expired. Please try again."
       );
-      // Clear the query parameter from the URL
-      router.replace(router.pathname, undefined, { shallow: true });
     }
-  }, [router.query.message, router]);
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,19 +34,23 @@ const LoginPage: React.FC = () => {
     setDisplayedMessage(null);
 
     try {
-      const dashboardPath = await login({ email, password });
-      router.replace(dashboardPath);
+      await login({ email, password });
+
+      // Give a moment for the session to sync to cookies
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate to dashboard - middleware will redirect to correct role-based dashboard
+      window.location.href = '/dashboard';
     } catch (err: any) {
       console.error('[Login Page] Login error:', err);
       setError(err.message || "An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
-      {/* 🌈 Silk Full-Screen Background */}
+      {/* Background */}
       <div className="fixed inset-0 -z-10 w-full h-full">
         <Aurora
           colorStops={["#3B82F6", "#1D4ED8", "#1E3A8A"]}
@@ -56,7 +60,7 @@ const LoginPage: React.FC = () => {
         />
       </div>
 
-      {/* ⭐ Centered Login Card */}
+      {/* Login Card */}
       <div className="w-full max-w-md p-8 space-y-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl relative z-10 text-slate-200">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white">
@@ -136,6 +140,12 @@ const LoginPage: React.FC = () => {
       </div>
     </div>
   );
-};
+}
 
-export default withGuest(LoginPage);
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
+  );
+}
