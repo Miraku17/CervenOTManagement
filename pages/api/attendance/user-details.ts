@@ -1,14 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase URL or anon key');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabaseServer as supabase } from '@/lib/supabase-server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -37,8 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         time_in,
         time_out,
         total_minutes,
-        is_overtime_requested,
-        overtime_comment,
         clock_in_lat,
         clock_in_lng,
         clock_in_address,
@@ -79,8 +68,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }) : null,
       totalHours: data.total_minutes ? (data.total_minutes / 60).toFixed(2) : null,
       totalMinutes: data.total_minutes,
-      isOvertimeRequested: data.is_overtime_requested,
-      overtimeComment: data.overtime_comment,
       status: data.time_out ? 'Present' : 'In Progress',
       clockInLocation: {
         lat: data.clock_in_lat,

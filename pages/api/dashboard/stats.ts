@@ -1,14 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase URL or anon key');
-}
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabaseServer as supabase } from '@/lib/supabase-server';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -56,22 +47,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const totalHours = Math.round(totalMinutes / 60);
 
     // Count overtime requests this week
-    const { data: overtimeData, error: overtimeError } = await supabase
-      .from('attendance')
-      .select('id')
-      .gte('date', weekStart)
-      .eq('is_overtime_requested', true);
+    const { count: overtimeRequests, error: overtimeError } = await supabase
+      .from('overtime')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', weekStart);
 
     if (overtimeError) throw overtimeError;
-
-    const overtimeRequests = overtimeData?.length || 0;
 
     return res.status(200).json({
       stats: {
         totalEmployees: totalEmployees || 0,
         clockedInToday: clockedInCount,
         activeNow: activeNow,
-        overtimeRequests: overtimeRequests,
+        overtimeRequests: overtimeRequests || 0,
         weeklyHours: totalHours,
       }
     });

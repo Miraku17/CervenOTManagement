@@ -54,7 +54,7 @@ export interface AttendanceRecord {
   overtimeComment?: string | null;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS';
 
 export interface Position {
   id: number;

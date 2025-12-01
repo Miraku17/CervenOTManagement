@@ -1,14 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase environment variables');
-}
-
-const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+import { supabaseAdmin } from './supabase-server';
 
 export interface AuthenticatedRequest extends NextApiRequest {
   user?: {
@@ -25,6 +16,10 @@ export const withAuth = (
   }
 ) => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
+    if (!supabaseAdmin) {
+      return res.status(500).json({ error: 'Server configuration error: Admin client not available' });
+    }
+
     try {
       // Get the authorization header
       const authHeader = req.headers.authorization;

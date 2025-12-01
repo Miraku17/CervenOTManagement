@@ -1,24 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { createClient } from '@supabase/supabase-js';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { fromZonedTime } from 'date-fns-tz';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase URL or service role key');
-}
-
-// Use service role key for admin operations
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (!supabase) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   if (req.method !== 'PUT') {
     res.setHeader('Allow', ['PUT']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { attendanceId, timeIn, timeOut, overtimeComment } = req.body;
+  const { attendanceId, timeIn, timeOut } = req.body;
 
   if (!attendanceId) {
     return res.status(400).json({ error: 'Attendance ID is required' });
@@ -37,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let updatedTotalMinutes = null;
     if (timeOutUTC) {
       const diffMs = new Date(timeOutUTC).getTime() - new Date(timeInUTC).getTime();
-      updatedTotalMinutes = Math.floor(diffMs / 60000); 
+      updatedTotalMinutes = Math.floor(diffMs / 60000);
     }
 
     // Update the attendance record
@@ -46,9 +40,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         time_in: timeInUTC,
         time_out: timeOutUTC,
-        updated_total_minutes: updatedTotalMinutes,
-        is_overtime_requested: overtimeComment ? true : false,
-        overtime_comment: overtimeComment || null,
+        total_minutes: updatedTotalMinutes,
         updated_at: new Date().toISOString(),
       })
       .eq('id', attendanceId)
