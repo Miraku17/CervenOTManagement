@@ -17,7 +17,6 @@ export const useAuth = () => {
     console.log("🔵 [LOGIN] Starting login...");
     console.log("📧 Email entered:", email);
 
-    // Step 1 — try login
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -37,39 +36,6 @@ export const useAuth = () => {
     }
 
     console.log("🟢 [LOGIN] Logged in user ID:", data.user.id);
-
-    // Step 2 — fetch profile
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.user.id)
-      .single();
-
-    console.log("🟡 [PROFILE] profile:", profile);
-    console.log("🟡 [PROFILE] profileError:", profileError);
-
-    if (profileError) {
-      console.error(
-        "🔴 [PROFILE ERROR] Failed to fetch profile:",
-        profileError
-      );
-      throw profileError;
-    }
-
-    if (!profile?.role) {
-      console.error("🔴 [PROFILE ERROR] No role found for user!");
-      throw new Error("User has no assigned role.");
-    }
-
-    console.log("🟢 [PROFILE] User role:", profile.role);
-
-    // Step 3 — redirect based on role
-    const path =
-      profile.role === "admin" ? "/admin/dashboard" : "/dashboard/employee";
-
-    console.log("🟢 [REDIRECT] Redirecting to:", path);
-
-    return path;
   };
 
   const logout = async () => {
@@ -78,14 +44,10 @@ export const useAuth = () => {
     setIsLoggingOut(true);
 
     try {
-      // Sign out from Supabase (this automatically clears auth storage)
       await supabase.auth.signOut();
-
-      // Redirect to login page
       router.push("/auth/login");
     } catch (error) {
       console.error("[useAuth] Logout error:", error);
-      // Force redirect even on error
       router.push("/auth/login");
     } finally {
       setIsLoggingOut(false);

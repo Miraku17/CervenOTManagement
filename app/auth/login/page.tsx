@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -14,17 +14,8 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, user } = useAuth();
-
-  // Redirect if already logged in
-  useEffect(() => {
-    if (user) {
-      const dashboardPath = user.role === 'admin' ? '/admin/dashboard' : '/dashboard/employee';
-      router.replace(dashboardPath);
-    }
-  }, [user, router]);
+  const { login } = useAuth();
 
   // Handle messages from query parameters
   useEffect(() => {
@@ -43,20 +34,19 @@ function LoginPageContent() {
     setDisplayedMessage(null);
 
     try {
-      const dashboardPath = await login({ email, password });
-      router.push(dashboardPath);
+      await login({ email, password });
+
+      // Give a moment for the session to sync to cookies
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Navigate to dashboard - middleware will redirect to correct role-based dashboard
+      window.location.href = '/dashboard';
     } catch (err: any) {
       console.error('[Login Page] Login error:', err);
       setError(err.message || "An unexpected error occurred");
-    } finally {
       setLoading(false);
     }
   };
-
-  // Don't render if already logged in
-  if (user) {
-    return null;
-  }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center">
