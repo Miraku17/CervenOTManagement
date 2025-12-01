@@ -5,13 +5,13 @@ import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut } from 'lucide-react';
+import { LogOut, Loader2 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
 
 const EmployeeDashboard: React.FC = () => {
-  const { user, logout, isLoggingOut } = useAuth();
+  const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
   const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isClocking, setIsClocking] = useState(false);
@@ -24,6 +24,10 @@ const EmployeeDashboard: React.FC = () => {
   const [currentAddress, setCurrentAddress] = useState<string | null>(null);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
   const [locationError, setLocationError] = useState<string | null>(null);
+
+  // Loading states
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
 
   // Check for active clock-in session from database
   const checkActiveSession = async () => {
@@ -58,16 +62,31 @@ const EmployeeDashboard: React.FC = () => {
       }
     } catch (error) {
       console.error('Error checking active session:', error);
+    } finally {
+      setIsCheckingSession(false);
     }
   };
 
-  // Initialize session and location on mount
+  // Initialize dashboard - load all data in parallel
   useEffect(() => {
-    if (user?.id) {
-      checkActiveSession();
-      requestLocationOnMount();
-    }
-  }, [user?.id]);
+    if (!user?.id || authLoading) return;
+
+    const initializeDashboard = async () => {
+      console.log('Initializing employee dashboard...');
+
+      // Run all initialization tasks in parallel
+      await Promise.all([
+        checkActiveSession(),
+        fetchAttendanceRecords(),
+        requestLocationOnMount()
+      ]);
+
+      console.log('Dashboard initialization complete');
+      setIsInitialLoad(false);
+    };
+
+    initializeDashboard();
+  }, [user?.id, authLoading]);
 
   useEffect(() => {
     if (activeLog) {
@@ -76,13 +95,6 @@ const EmployeeDashboard: React.FC = () => {
       localStorage.removeItem('cerventch_activelog');
     }
   }, [activeLog]);
-
-  // Fetch attendance records from database
-  useEffect(() => {
-    if (user?.id) {
-      fetchAttendanceRecords();
-    }
-  }, [user?.id]);
 
   const fetchAttendanceRecords = async () => {
     if (!user?.id || isFetchingLogs) return;
@@ -486,6 +498,59 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
+
+  // Show loading screen while initializing
+  if (authLoading || isInitialLoad || isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 flex items-center justify-center">
+        <div className="text-center space-y-6">
+          {/* Cerventech Logo */}
+          <div className="flex justify-center mb-4">
+            <div className="w-24 h-24 rounded-2xl flex items-center justify-center bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-4">
+              <img
+                src="/cerventech.png"
+                alt="Cerventech Logo"
+                className="h-full w-full object-contain rounded-full border-2 border-gray-300"
+              />
+            </div>
+          </div>
+
+          {/* Loading spinner */}
+          <div className="flex justify-center">
+            <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
+          </div>
+
+          {/* Loading text */}
+          <div className="space-y-2">
+            <h2 className="text-2xl font-bold text-white">Loading Dashboard...</h2>
+            <p className="text-slate-400 text-sm">
+              {authLoading
+                ? 'Authenticating your session...'
+                : isCheckingSession
+                ? 'Checking active work session...'
+                : 'Preparing your workspace...'}
+            </p>
+          </div>
+
+          {/* Loading progress indicators */}
+          <div className="mt-8 space-y-2 max-w-md mx-auto">
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Authentication</span>
+              <span>{authLoading ? '⏳' : '✓'}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Active Session Check</span>
+              <span>{isCheckingSession ? '⏳' : '✓'}</span>
+            </div>
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Loading Data</span>
+              <span>{isInitialLoad ? '⏳' : '✓'}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-slate-200 pb-20">
