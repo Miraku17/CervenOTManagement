@@ -10,7 +10,8 @@ import {
   Search,
   Menu,
   X,
-  FileText
+  FileText,
+  Calendar
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -19,6 +20,7 @@ import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
+import LeaveRequestsView from '@/components/admin_dashboard/LeaveRequestsView';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -179,6 +181,12 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'OVERTIME_REQUESTS'}
             onClick={() => handleNavigate('OVERTIME_REQUESTS')}
           />
+          <SidebarItem
+            icon={<Calendar size={20} />}
+            label="Leave Requests"
+            isActive={currentView === 'LEAVE_REQUESTS'}
+            onClick={() => handleNavigate('LEAVE_REQUESTS')}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -248,6 +256,12 @@ const AdminDashboard: React.FC = () => {
                 label="Overtime Requests"
                 isActive={currentView === 'OVERTIME_REQUESTS'}
                 onClick={() => handleNavigate('OVERTIME_REQUESTS')}
+              />
+              <SidebarItem
+                icon={<Calendar size={24} />}
+                label="Leave Requests"
+                isActive={currentView === 'LEAVE_REQUESTS'}
+                onClick={() => handleNavigate('LEAVE_REQUESTS')}
               />
            </nav>
 
@@ -338,6 +352,10 @@ const AdminDashboard: React.FC = () => {
 
             {currentView === 'OVERTIME_REQUESTS' && (
               <OvertimeRequestsView />
+            )}
+
+            {currentView === 'LEAVE_REQUESTS' && (
+              <LeaveRequestsView />
             )}
 
           </div>
