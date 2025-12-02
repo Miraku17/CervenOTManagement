@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
+import OvertimeHistory from '@/components/employee_dashboard/OvertimeHistory';
+import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHistory';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield } from 'lucide-react';
+import { LogOut, Loader2, Shield, FileText, CalendarDays } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -358,6 +360,20 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
+  const scrollToOvertime = () => {
+    const element = document.getElementById('overtime-history');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const scrollToLeave = () => {
+    const element = document.getElementById('leave-history');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   // Wrapper functions that show confirmation modals
   const requestClockIn = () => {
     setConfirmAction('clockIn');
@@ -610,6 +626,20 @@ const EmployeeDashboard: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4">
+                <button
+                  onClick={scrollToOvertime}
+                  className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Overtime Requests</span>
+                </button>
+                <button
+                  onClick={scrollToLeave}
+                  className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>Leave Requests</span>
+                </button>
                 {isAdmin && (
                   <button
                     onClick={() => router.push('/dashboard/admin')}
@@ -668,6 +698,14 @@ const EmployeeDashboard: React.FC = () => {
 
         <div>
           <CalendarView logs={workLogs} />
+        </div>
+
+        <div>
+          <OvertimeHistory />
+        </div>
+
+        <div>
+          <LeaveRequestHistory />
         </div>
       </main>
     </div>
