@@ -16,6 +16,7 @@ interface LeaveRequest {
     first_name: string;
     last_name: string;
   } | null;
+  reviewer_comment?: string | null;
 }
 
 interface LeaveRequestHistoryProps {
@@ -45,7 +46,8 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
           reviewer:reviewer_id (
             first_name,
             last_name
-          )
+          ),
+          reviewer_comment
         `)
         .eq('employee_id', user!.id)
         .order('created_at', { ascending: false });
@@ -158,6 +160,7 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
                   <th className="px-6 py-4 font-medium">Duration</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium w-1/3">Reason</th>
+                  <th className="px-6 py-4 font-medium">Reviewer Comment</th>
                   <th className="px-6 py-4 font-medium">Reviewer</th>
                 </tr>
               </thead>
@@ -189,6 +192,11 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
                       <td className="px-6 py-4">
                         <p className="truncate max-w-xs" title={request.reason}>
                           {request.reason}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="truncate max-w-xs text-slate-400 italic" title={request.reviewer_comment || ''}>
+                          {request.reviewer_comment || '-'}
                         </p>
                       </td>
                       <td className="px-6 py-4">
@@ -254,9 +262,18 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
                       </p>
                     </div>
                     
+                    {request.reviewer_comment && (
+                       <div className="pt-2">
+                        <span className="text-slate-500 text-xs block mb-1">Reviewer Comment:</span>
+                        <p className="text-slate-400 bg-slate-800/30 p-2 rounded-lg italic">
+                          "{request.reviewer_comment}"
+                        </p>
+                      </div>
+                    )}
+                    
                     {request.reviewer && (
                        <div className="pt-2">
-                        <span className="text-slate-500 text-xs block mb-1">Reviewer:</span>
+                        <span className="text-slate-500 text-xs block mb-1">Reviewed by:</span>
                         <p className="text-slate-400">
                           {request.reviewer.first_name} {request.reviewer.last_name}
                         </p>

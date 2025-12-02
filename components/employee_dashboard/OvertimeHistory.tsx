@@ -153,7 +153,7 @@ const OvertimeHistory: React.FC = () => {
                   <th className="px-6 py-4 font-medium">Duration</th>
                   <th className="px-6 py-4 font-medium">Status</th>
                   <th className="px-6 py-4 font-medium w-1/3">Comment</th>
-                  <th className="px-6 py-4 font-medium">Reviewer Note</th>
+                  <th className="px-6 py-4 font-medium">Reviewer</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
@@ -191,14 +191,9 @@ const OvertimeHistory: React.FC = () => {
                     <td className="px-6 py-4">
                       {request.reviewer && request.status !== 'pending' ? (
                         <div className="flex flex-col gap-1">
-                          <span className="text-xs text-slate-500">
-                            by {request.reviewer.first_name}
+                          <span className="text-xs text-slate-400">
+                            {request.reviewer.first_name} {request.reviewer.last_name}
                           </span>
-                          {/* If there were a reviewer comment, it would go here, but current type def assumes 'comment' is requester's. 
-                              However, logically reviewer comment might be separate. 
-                              Assuming 'comment' is requester's based on previous code. 
-                              The API response might need adjustment if we want reviewer comments. 
-                              For now, showing generic status message as before. */}
                         </div>
                       ) : (
                         <span className="text-slate-600">-</span>

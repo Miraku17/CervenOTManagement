@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { differenceInDays, parseISO } from 'date-fns';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -14,6 +15,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // 1. Calculate duration
+    const start = parseISO(startDate);
+    const end = parseISO(endDate);
+    const duration = differenceInDays(end, start) + 1;
+
+    if (duration <= 0) {
+      return res.status(400).json({ error: 'End date must be after start date.' });
+    }
+
+    // 2. Check Leave Credits
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('leave_credits')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      throw new Error('Failed to fetch user profile.');
+    }
+
+    const currentCredits = profile.leave_credits || 0;
+    if (currentCredits < duration) {
+      return res.status(400).json({ 
+        error: `Insufficient leave credits. You have ${currentCredits} credits but requested ${duration} days.` 
+      });
+    }
+
+    // 3. Check for Overlapping Approved Requests
+    // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
+    const { data: overlappingRequests, error: overlapError } = await supabaseAdmin
+      .from('leave_requests')
+      .select('id')
+      .eq('employee_id', userId)
+      .eq('status', 'approved')
+      .lte('start_date', endDate)
+      .gte('end_date', startDate);
+
+    if (overlapError) {
+      throw new Error('Failed to check overlapping requests.');
+    }
+
+    if (overlappingRequests && overlappingRequests.length > 0) {
+      return res.status(400).json({ 
+        error: 'You already have an approved leave request that overlaps with these dates.' 
+      });
+    }
+
+    // 4. Insert Request
     const { data, error } = await supabaseAdmin
       .from('leave_requests')
       .insert({
