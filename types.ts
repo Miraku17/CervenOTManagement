@@ -4,6 +4,7 @@ export interface UserProfile {
   first_name?: string;
   last_name?: string;
   email?: string;
+  employee_id?: string;
   positions?: { name: string };
   contact_number?: string;
   address?: string;
@@ -30,6 +31,7 @@ export interface DayStats {
 
 export interface Employee {
   id: string;
+  employee_id: string;
   fullName: string;
   email: string;
   contact_number: string;

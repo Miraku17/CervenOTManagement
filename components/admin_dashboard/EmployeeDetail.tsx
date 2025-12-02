@@ -24,6 +24,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
+    employee_id: '',
     email: '',
     contact_number: '',
     address: '',
@@ -60,6 +61,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       setEditFormData({
         firstName,
         lastName,
+        employee_id: employee.employee_id || '',
         email: employee.email || '',
         contact_number: employee.contact_number || '',
         address: employee.address || '',
@@ -139,6 +141,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
           employeeId: employee.id,
           firstName: editFormData.firstName.trim(),
           lastName: editFormData.lastName.trim(),
+          employee_id: editFormData.employee_id.trim(),
           email: editFormData.email.trim(),
           contact_number: editFormData.contact_number.trim(),
           address: editFormData.address.trim(),
@@ -157,6 +160,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       const updatedEmployee: Employee = {
         ...employee,
         fullName: `${editFormData.firstName} ${editFormData.lastName}`,
+        employee_id: editFormData.employee_id,
         email: editFormData.email,
         contact_number: editFormData.contact_number,
         address: editFormData.address,
@@ -257,6 +261,16 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                     </div>
 
                     <div>
+                      <label className="text-sm text-slate-400 mb-2 block">Employee ID</label>
+                      <input
+                        type="text"
+                        value={editFormData.employee_id}
+                        onChange={(e) => setEditFormData({ ...editFormData, employee_id: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
                       <label className="text-sm text-slate-400 mb-2 block">Position</label>
                       <select
                         value={editFormData.positionId}
@@ -344,6 +358,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                     <div>
                         <h1 className="text-3xl font-bold text-white">{employee.fullName}</h1>
                         <p className="text-lg text-blue-400 font-medium">{employee.position}</p>
+                        {employee.employee_id && (
+                          <p className="text-sm text-slate-500 mt-1">ID: {employee.employee_id}</p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">

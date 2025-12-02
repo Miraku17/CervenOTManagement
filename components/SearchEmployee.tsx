@@ -24,7 +24,7 @@ const SearchEmployee: React.FC<SearchEmployeeProps> = ({ employees, onEmployeeSe
       <h2 className="text-2xl font-bold mb-4">Search Employee</h2>
       <input
         type="text"
-        placeholder="Search by name or email"
+        placeholder="Search by name,email or employee id"
         // onChange={handleSearch}
         className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
