@@ -1,6 +1,6 @@
 import React from 'react';
 import { UserProfile } from '@/types';
-import { Mail, MapPin, Phone, BadgeCheck, Briefcase } from 'lucide-react';
+import { Mail, MapPin, Phone, BadgeCheck, Briefcase, CalendarCheck } from 'lucide-react';
 
 interface ProfileHeaderProps {
   user: UserProfile | null;
@@ -12,7 +12,7 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user }) => {
     return null;
   }
 
-  const { first_name, last_name, positions, email, contact_number, address } = user;
+  const { first_name, last_name, positions, email, contact_number, address, leave_credits } = user;
 
   // Generate initials for avatar
   const initials = `${first_name?.[0] || ''}${last_name?.[0] || ''}`.toUpperCase();
@@ -72,6 +72,14 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({ user }) => {
             </div>
           )}
         </div>
+
+        {/* Leave Credits */}
+        {user.leave_credits !== undefined && (
+          <div className="flex items-center justify-center gap-2 px-3 py-1.5 bg-purple-500/10 rounded-full border border-purple-500/20">
+            <CalendarCheck className="w-3.5 h-3.5 text-purple-400" />
+            <span className="text-sm text-purple-300 font-medium">{user.leave_credits} Leave Credits</span>
+          </div>
+        )}
 
         {/* Contact Information Grid */}
         <div className="w-full space-y-2 pt-2">

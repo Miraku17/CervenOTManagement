@@ -1,57 +1,64 @@
-import React, { useState } from 'react';
-import { Calendar, CheckCircle, XCircle, Clock, AlertCircle, Filter, CalendarDays } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, CheckCircle, XCircle, Clock, AlertCircle, Filter, CalendarDays, Loader2 } from 'lucide-react';
+import { supabase } from '@/services/supabase';
+import { useAuth } from '@/hooks/useAuth';
+import { differenceInDays, parseISO } from 'date-fns';
 
 interface LeaveRequest {
   id: string;
-  type: 'Vacation' | 'Sick' | 'Personal' | 'Emergency';
-  startDate: string;
-  endDate: string;
-  totalDays: number;
+  leave_type: string;
+  start_date: string;
+  end_date: string;
   status: 'pending' | 'approved' | 'rejected';
   reason: string;
-  createdAt: string;
-  reviewerNote?: string;
+  created_at: string;
+  reviewer?: {
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
-// Mock Data
-const MOCK_REQUESTS: LeaveRequest[] = [
-  {
-    id: '1',
-    type: 'Vacation',
-    startDate: '2023-12-20',
-    endDate: '2023-12-26',
-    totalDays: 5,
-    status: 'pending',
-    reason: 'Christmas vacation with family.',
-    createdAt: '2023-12-01T10:00:00Z',
-  },
-  {
-    id: '2',
-    type: 'Sick',
-    startDate: '2023-11-15',
-    endDate: '2023-11-16',
-    totalDays: 2,
-    status: 'approved',
-    reason: 'Flu symptoms.',
-    createdAt: '2023-11-14T08:30:00Z',
-    reviewerNote: 'Get well soon.',
-  },
-  {
-    id: '3',
-    type: 'Personal',
-    startDate: '2023-10-05',
-    endDate: '2023-10-05',
-    totalDays: 1,
-    status: 'rejected',
-    reason: 'Personal errands.',
-    createdAt: '2023-10-01T09:15:00Z',
-    reviewerNote: 'Please schedule personal errands on weekends if possible due to high workload.',
-  },
-];
+interface LeaveRequestHistoryProps {
+  refreshTrigger?: number;
+}
 
-const LeaveRequestHistory: React.FC = () => {
-  const [requests] = useState<LeaveRequest[]>(MOCK_REQUESTS);
+const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigger = 0 }) => {
+  const { user } = useAuth();
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchRequests();
+    }
+  }, [user?.id, refreshTrigger]);
+
+  const fetchRequests = async () => {
+    try {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('leave_requests')
+        .select(`
+          *,
+          reviewer:reviewer_id (
+            first_name,
+            last_name
+          )
+        `)
+        .eq('employee_id', user!.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setRequests(data || []);
+    } catch (err: any) {
+      console.error('Error fetching leave requests:', err);
+      setError('Failed to load leave history');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -75,10 +82,27 @@ const LeaveRequestHistory: React.FC = () => {
     }
   };
 
+  const calculateDuration = (start: string, end: string) => {
+    try {
+      const diff = differenceInDays(parseISO(end), parseISO(start)) + 1;
+      return diff > 0 ? diff : 0;
+    } catch {
+      return 0;
+    }
+  };
+
   const filteredRequests = requests.filter(req => {
     if (filter === 'all') return true;
     return req.status === filter;
   });
+
+  if (isLoading) {
+    return (
+      <div id="leave-history" className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex justify-center items-center min-h-[200px]">
+        <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div id="leave-history" className="space-y-6 animate-fade-in scroll-mt-24">
@@ -105,7 +129,12 @@ const LeaveRequestHistory: React.FC = () => {
         </div>
       </div>
 
-      {filteredRequests.length === 0 ? (
+      {error ? (
+        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 flex items-center gap-2">
+          <AlertCircle size={20} />
+          {error}
+        </div>
+      ) : filteredRequests.length === 0 ? (
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-12 text-center">
           <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
             <CalendarDays className="text-slate-500" size={32} />
@@ -128,105 +157,115 @@ const LeaveRequestHistory: React.FC = () => {
                   <th className="px-6 py-4 font-medium">Dates</th>
                   <th className="px-6 py-4 font-medium">Duration</th>
                   <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium w-1/4">Reason</th>
-                  <th className="px-6 py-4 font-medium w-1/4">Reviewer Note</th>
+                  <th className="px-6 py-4 font-medium w-1/3">Reason</th>
+                  <th className="px-6 py-4 font-medium">Reviewer</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50 text-sm text-slate-300">
-                {filteredRequests.map((request) => (
-                  <tr key={request.id} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-medium text-blue-300">
-                        {request.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col text-xs">
-                        <span className="text-slate-300">From: {new Date(request.startDate).toLocaleDateString()}</span>
-                        <span className="text-slate-500">To: {new Date(request.endDate).toLocaleDateString()}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-400">
-                      {request.totalDays} day{request.totalDays > 1 ? 's' : ''}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
-                        {getStatusIcon(request.status)}
-                        <span className="capitalize">{request.status}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="truncate max-w-xs" title={request.reason}>
-                        {request.reason}
-                      </p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="truncate max-w-xs text-slate-400 italic" title={request.reviewerNote || ''}>
-                        {request.reviewerNote || '-'}
-                      </p>
-                    </td>
-                  </tr>
-                ))}
+                {filteredRequests.map((request) => {
+                  const duration = calculateDuration(request.start_date, request.end_date);
+                  return (
+                    <tr key={request.id} className="hover:bg-slate-800/30 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-medium text-blue-300">
+                          {request.leave_type}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col text-xs">
+                          <span className="text-slate-300">From: {new Date(request.start_date).toLocaleDateString()}</span>
+                          <span className="text-slate-500">To: {new Date(request.end_date).toLocaleDateString()}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap font-mono text-slate-400">
+                        {duration} day{duration !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
+                          {getStatusIcon(request.status)}
+                          <span className="capitalize">{request.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="truncate max-w-xs" title={request.reason}>
+                          {request.reason}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {request.reviewer ? (
+                          <span className="text-xs text-slate-400">
+                            {request.reviewer.first_name} {request.reviewer.last_name}
+                          </span>
+                        ) : (
+                          <span className="text-slate-600">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
           {/* Mobile Card View */}
           <div className="md:hidden space-y-4">
-            {filteredRequests.map((request) => (
-              <div 
-                key={request.id}
-                className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
-              >
-                <div className="flex justify-between items-start mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium text-blue-300">
-                      {request.type}
-                    </span>
-                  </div>
-                  <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
-                    {getStatusIcon(request.status)}
-                    <span className="capitalize">{request.status}</span>
-                  </div>
-                </div>
-
-                <div className="space-y-3 text-sm">
-                  <div className="flex justify-between py-2 border-b border-slate-800/50">
-                    <span className="text-slate-500">Duration</span>
-                    <span className="text-slate-300 font-mono">
-                      {request.totalDays} day{request.totalDays > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-800/50">
-                    <div>
-                      <span className="text-slate-500 text-xs block">From</span>
-                      <span className="text-slate-300">{new Date(request.startDate).toLocaleDateString()}</span>
+            {filteredRequests.map((request) => {
+              const duration = calculateDuration(request.start_date, request.end_date);
+              return (
+                <div 
+                  key={request.id}
+                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
+                >
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-sm font-medium text-blue-300">
+                        {request.leave_type}
+                      </span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-slate-500 text-xs block">To</span>
-                      <span className="text-slate-300">{new Date(request.endDate).toLocaleDateString()}</span>
+                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
+                      {getStatusIcon(request.status)}
+                      <span className="capitalize">{request.status}</span>
                     </div>
                   </div>
 
-                  <div className="pt-2">
-                    <span className="text-slate-500 text-xs block mb-1">Reason:</span>
-                    <p className="text-slate-300 bg-slate-800/30 p-2 rounded-lg italic">
-                      "{request.reason}"
-                    </p>
-                  </div>
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between py-2 border-b border-slate-800/50">
+                      <span className="text-slate-500">Duration</span>
+                      <span className="text-slate-300 font-mono">
+                        {duration} day{duration !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-4 py-2 border-b border-slate-800/50">
+                      <div>
+                        <span className="text-slate-500 text-xs block">From</span>
+                        <span className="text-slate-300">{new Date(request.start_date).toLocaleDateString()}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-slate-500 text-xs block">To</span>
+                        <span className="text-slate-300">{new Date(request.end_date).toLocaleDateString()}</span>
+                      </div>
+                    </div>
 
-                  {request.reviewerNote && (
                     <div className="pt-2">
-                      <span className="text-slate-500 text-xs block mb-1">Reviewer Note:</span>
-                      <p className="text-slate-400 bg-slate-800/30 p-2 rounded-lg italic">
-                        "{request.reviewerNote}"
+                      <span className="text-slate-500 text-xs block mb-1">Reason:</span>
+                      <p className="text-slate-300 bg-slate-800/30 p-2 rounded-lg italic">
+                        "{request.reason}"
                       </p>
                     </div>
-                  )}
+                    
+                    {request.reviewer && (
+                       <div className="pt-2">
+                        <span className="text-slate-500 text-xs block mb-1">Reviewer:</span>
+                        <p className="text-slate-400">
+                          {request.reviewer.first_name} {request.reviewer.last_name}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}

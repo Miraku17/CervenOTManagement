@@ -8,6 +8,7 @@ export interface UserProfile {
   positions?: { name: string };
   contact_number?: string;
   address?: string;
+  leave_credits?: number;
 }
 
 export interface WorkLog {

@@ -35,7 +35,7 @@ export const useUser = () => {
         // Fetch profile data
         const { data: profile } = await supabase
           .from("profiles")
-          .select("*, positions(name)")
+          .select("*, positions(name), leave_credits")
           .eq("id", authUser.id)
           .single();
 

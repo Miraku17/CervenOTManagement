@@ -5,6 +5,7 @@ import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
 import OvertimeHistory from '@/components/employee_dashboard/OvertimeHistory';
 import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHistory';
+import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut, Loader2, Shield, FileText, CalendarDays } from 'lucide-react';
@@ -89,6 +90,14 @@ const EmployeeDashboard: React.FC = () => {
     } finally {
       setIsCheckingSession(false);
     }
+  };
+
+  const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
+  const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
+
+  const handleLeaveSuccess = () => {
+    showToast('success', 'Leave request submitted successfully!');
+    setLeaveRefreshTrigger(prev => prev + 1);
   };
 
   // Initialize dashboard - load all data in parallel
@@ -611,6 +620,13 @@ const EmployeeDashboard: React.FC = () => {
         type={confirmAction === 'clockIn' ? 'info' : 'warning'}
       />
 
+      <FileLeaveModal
+        isOpen={isFileLeaveModalOpen}
+        onClose={() => setIsFileLeaveModalOpen(false)}
+        onSuccess={handleLeaveSuccess}
+        userId={user?.id || ''}
+      />
+
       {/* Navbar */}
       <nav className="sticky top-0 z-50 bg-gradient-to-r from-slate-950/80 via-blue-950/80 to-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -627,18 +643,11 @@ const EmployeeDashboard: React.FC = () => {
             
             <div className="flex items-center gap-4">
                 <button
-                  onClick={scrollToOvertime}
-                  className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span>Overtime Requests</span>
-                </button>
-                <button
-                  onClick={scrollToLeave}
+                  onClick={() => setIsFileLeaveModalOpen(true)}
                   className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
                 >
                   <CalendarDays className="w-4 h-4" />
-                  <span>Leave Requests</span>
+                  <span>File a Leave</span>
                 </button>
                 {isAdmin && (
                   <button
@@ -705,7 +714,7 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         <div>
-          <LeaveRequestHistory />
+          <LeaveRequestHistory refreshTrigger={leaveRefreshTrigger} />
         </div>
       </main>
     </div>
