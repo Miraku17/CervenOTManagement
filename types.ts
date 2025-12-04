@@ -70,7 +70,7 @@ export interface AttendanceRecord {
   } | null;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE';
 
 export interface Position {
   id: number;
