@@ -79,6 +79,7 @@ const AdminDashboard: React.FC = () => {
     if (data) {
       const fetchedEmployees: Employee[] = data.map((profile: any) => ({
         id: profile.id,
+        employee_id: profile.employee_id || 'N/A',
         fullName: `${profile.first_name} ${profile.last_name}`,
         email: profile.email,
         contact_number: profile.contact_number || '',

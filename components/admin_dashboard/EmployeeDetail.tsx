@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key, CalendarDays } from 'lucide-react';
 import { Employee, AttendanceRecord, Position } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
 import { supabase } from '@/services/supabase';
 import UpdatePasswordModal from './UpdatePasswordModal';
+import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 
 interface EmployeeDetailProps {
   employee: Employee;
@@ -31,8 +32,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
     positionId: '',
   });
 
-  // New state for password modal
+  // New state for password modal and schedule modal
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Fetch positions
   useEffect(() => {
@@ -198,6 +200,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
 
         {!isEditMode && (
           <div className="flex gap-3">
+            <button
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+            >
+              <CalendarDays size={18} />
+              <span>View Schedule</span>
+            </button>
             <button
               onClick={() => setIsPasswordModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
@@ -544,6 +553,12 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         onClose={() => setIsPasswordModalOpen(false)}
         employeeId={employee.id}
         employeeName={employee.fullName}
+      />
+      {/* Schedule Calendar Modal */}
+      <WorkScheduleCalendar
+        userId={employee.id}
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
       />
     </div>
   );
