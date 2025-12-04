@@ -8,6 +8,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Server misconfiguration: Missing admin privileges.' });
+  }
+
   const { userId, type, startDate, endDate, reason } = req.body;
 
   if (!userId || !type || !startDate || !endDate || !reason) {

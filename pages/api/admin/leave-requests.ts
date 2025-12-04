@@ -7,6 +7,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Supabase admin client not available' });
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('leave_requests')

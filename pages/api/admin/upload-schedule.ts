@@ -26,6 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Check for dry run parameter
   const isDryRun = req.query.dryRun === 'true';
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Supabase admin client not available' });
+  }
+
   try {
     let csvText = '';
     for await (const chunk of req) {

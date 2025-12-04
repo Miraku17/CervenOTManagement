@@ -21,6 +21,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const newStatus = action === 'approve' ? 'approved' : 'rejected';
   const now = new Date().toISOString();
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Supabase admin client not available' });
+  }
+
   try {
     // 1. Fetch the leave request first to get employee_id and duration
     const { data: request, error: fetchError } = await supabaseAdmin
