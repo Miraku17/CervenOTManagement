@@ -10,7 +10,9 @@ import {
   Search,
   Menu,
   X,
-  FileText
+  FileText,
+  Calendar,
+  FileUp
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -19,6 +21,8 @@ import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
+import LeaveRequestsView from '@/components/admin_dashboard/LeaveRequestsView';
+import ImportScheduleView from '@/components/admin_dashboard/ImportScheduleView';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -75,6 +79,7 @@ const AdminDashboard: React.FC = () => {
     if (data) {
       const fetchedEmployees: Employee[] = data.map((profile: any) => ({
         id: profile.id,
+        employee_id: profile.employee_id || 'N/A',
         fullName: `${profile.first_name} ${profile.last_name}`,
         email: profile.email,
         contact_number: profile.contact_number || '',
@@ -179,6 +184,18 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'OVERTIME_REQUESTS'}
             onClick={() => handleNavigate('OVERTIME_REQUESTS')}
           />
+          <SidebarItem
+            icon={<Calendar size={20} />}
+            label="Leave Requests"
+            isActive={currentView === 'LEAVE_REQUESTS'}
+            onClick={() => handleNavigate('LEAVE_REQUESTS')}
+          />
+          <SidebarItem
+            icon={<FileUp size={20} />}
+            label="Import Schedule"
+            isActive={currentView === 'IMPORT_SCHEDULE'}
+            onClick={() => handleNavigate('IMPORT_SCHEDULE')}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -248,6 +265,18 @@ const AdminDashboard: React.FC = () => {
                 label="Overtime Requests"
                 isActive={currentView === 'OVERTIME_REQUESTS'}
                 onClick={() => handleNavigate('OVERTIME_REQUESTS')}
+              />
+              <SidebarItem
+                icon={<Calendar size={24} />}
+                label="Leave Requests"
+                isActive={currentView === 'LEAVE_REQUESTS'}
+                onClick={() => handleNavigate('LEAVE_REQUESTS')}
+              />
+              <SidebarItem
+                icon={<FileUp size={24} />}
+                label="Import Schedule"
+                isActive={currentView === 'IMPORT_SCHEDULE'}
+                onClick={() => handleNavigate('IMPORT_SCHEDULE')}
               />
            </nav>
 
@@ -338,6 +367,14 @@ const AdminDashboard: React.FC = () => {
 
             {currentView === 'OVERTIME_REQUESTS' && (
               <OvertimeRequestsView />
+            )}
+
+            {currentView === 'LEAVE_REQUESTS' && (
+              <LeaveRequestsView />
+            )}
+
+            {currentView === 'IMPORT_SCHEDULE' && (
+              <ImportScheduleView />
             )}
 
           </div>

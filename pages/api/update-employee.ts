@@ -11,7 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { employeeId, firstName, lastName, email, contact_number, address, positionId } = req.body;
+  const { employeeId, firstName, lastName, email, contact_number, address, positionId, employee_id: newEmployeeId } = req.body;
 
   if (!employeeId) {
     return res.status(400).json({ error: 'Employee ID is required.' });
@@ -25,6 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (email !== undefined) updateData.email = email;
   if (contact_number !== undefined) updateData.contact_number = contact_number;
   if (address !== undefined) updateData.address = address;
+  if (newEmployeeId !== undefined) updateData.employee_id = newEmployeeId;
   // Only update positionId if it's provided and not an empty string
   if (positionId !== undefined && positionId !== '') {
     updateData.position_id = positionId;

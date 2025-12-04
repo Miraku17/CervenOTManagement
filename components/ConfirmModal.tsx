@@ -10,6 +10,7 @@ interface ConfirmModalProps {
   onConfirm: () => void;
   onCancel: () => void;
   type?: 'info' | 'warning' | 'danger';
+  children?: React.ReactNode;
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -21,6 +22,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel,
   type = 'info',
+  children,
 }) => {
   if (!isOpen) return null;
 
@@ -56,6 +58,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             <div>
               <h3 className="text-lg font-bold text-white">{title}</h3>
               <p className="text-slate-400 text-sm mt-1">{message}</p>
+              {children && <div className="mt-4">{children}</div>}
             </div>
           </div>
           <button

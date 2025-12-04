@@ -4,9 +4,11 @@ export interface UserProfile {
   first_name?: string;
   last_name?: string;
   email?: string;
+  employee_id?: string;
   positions?: { name: string };
   contact_number?: string;
   address?: string;
+  leave_credits?: number;
 }
 
 export interface WorkLog {
@@ -30,6 +32,7 @@ export interface DayStats {
 
 export interface Employee {
   id: string;
+  employee_id: string;
   fullName: string;
   email: string;
   contact_number: string;
@@ -67,7 +70,7 @@ export interface AttendanceRecord {
   } | null;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE';
 
 export interface Position {
   id: number;

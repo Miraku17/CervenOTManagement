@@ -12,6 +12,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
+    employee_id: "",
     email: "",
     contact_number: "",
     address: "",
@@ -29,6 +30,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
     setFormData({
       firstName: "",
       lastName: "",
+      employee_id: "",
       email: "",
       contact_number: "",
       address: "",
@@ -105,6 +107,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
         },
         body: JSON.stringify({
           ...formData,
+          employee_id: formData.employee_id,
           positionId: selectedPosition.id,
           role: formData.role,
           password: Math.random().toString(36).slice(-12), // Generate a random temporary password
@@ -180,6 +183,15 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({ onSubmit, onCancel, positio
                 setFormData({ ...formData, lastName: e.target.value })
               }
               placeholder="Doe"
+              required
+            />
+            <InputGroup
+              label="Employee ID"
+              value={formData.employee_id}
+              onChange={(e) =>
+                setFormData({ ...formData, employee_id: e.target.value })
+              }
+              placeholder="EMP-001"
               required
             />
             <InputGroup

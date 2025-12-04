@@ -43,7 +43,8 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     return employees.filter(
       (e) =>
         e.fullName.toLowerCase().includes(term) ||
-        e.email.toLowerCase().includes(term)
+        e.email.toLowerCase().includes(term) ||
+        e.employee_id?.toLowerCase().includes(term)
     );
   }, [employees, searchTerm]);
 
@@ -202,6 +203,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     {employee.fullName}
                   </h3>
                   <p className="text-slate-400 text-sm">{employee.position}</p>
+                  <p className="text-slate-500 text-xs">ID: {employee.employee_id || "N/A"}</p>
                 </div>
               </div>
               <button

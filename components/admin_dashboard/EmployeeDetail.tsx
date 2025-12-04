@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key, CalendarDays } from 'lucide-react';
 import { Employee, AttendanceRecord, Position } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
 import { supabase } from '@/services/supabase';
 import UpdatePasswordModal from './UpdatePasswordModal';
+import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 
 interface EmployeeDetailProps {
   employee: Employee;
@@ -24,14 +25,16 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   const [editFormData, setEditFormData] = useState({
     firstName: '',
     lastName: '',
+    employee_id: '',
     email: '',
     contact_number: '',
     address: '',
     positionId: '',
   });
 
-  // New state for password modal
+  // New state for password modal and schedule modal
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Fetch positions
   useEffect(() => {
@@ -60,6 +63,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       setEditFormData({
         firstName,
         lastName,
+        employee_id: employee.employee_id || '',
         email: employee.email || '',
         contact_number: employee.contact_number || '',
         address: employee.address || '',
@@ -139,6 +143,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
           employeeId: employee.id,
           firstName: editFormData.firstName.trim(),
           lastName: editFormData.lastName.trim(),
+          employee_id: editFormData.employee_id.trim(),
           email: editFormData.email.trim(),
           contact_number: editFormData.contact_number.trim(),
           address: editFormData.address.trim(),
@@ -157,6 +162,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       const updatedEmployee: Employee = {
         ...employee,
         fullName: `${editFormData.firstName} ${editFormData.lastName}`,
+        employee_id: editFormData.employee_id,
         email: editFormData.email,
         contact_number: editFormData.contact_number,
         address: editFormData.address,
@@ -194,6 +200,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
 
         {!isEditMode && (
           <div className="flex gap-3">
+            <button
+              onClick={() => setIsScheduleModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+            >
+              <CalendarDays size={18} />
+              <span>View Schedule</span>
+            </button>
             <button
               onClick={() => setIsPasswordModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
@@ -254,6 +267,16 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                           className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-slate-400 mb-2 block">Employee ID</label>
+                      <input
+                        type="text"
+                        value={editFormData.employee_id}
+                        onChange={(e) => setEditFormData({ ...editFormData, employee_id: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
                     </div>
 
                     <div>
@@ -344,6 +367,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                     <div>
                         <h1 className="text-3xl font-bold text-white">{employee.fullName}</h1>
                         <p className="text-lg text-blue-400 font-medium">{employee.position}</p>
+                        {employee.employee_id && (
+                          <p className="text-sm text-slate-500 mt-1">ID: {employee.employee_id}</p>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">
@@ -527,6 +553,12 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         onClose={() => setIsPasswordModalOpen(false)}
         employeeId={employee.id}
         employeeName={employee.fullName}
+      />
+      {/* Schedule Calendar Modal */}
+      <WorkScheduleCalendar
+        userId={employee.id}
+        isOpen={isScheduleModalOpen}
+        onClose={() => setIsScheduleModalOpen(false)}
       />
     </div>
   );
