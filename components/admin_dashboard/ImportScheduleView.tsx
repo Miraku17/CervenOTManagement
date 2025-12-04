@@ -1,71 +1,119 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { FileUp, Upload, FileSpreadsheet, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
 
 const ImportScheduleView: React.FC = () => {
+  const fileInputRef = useRef<HTMLInputElement>(null); // Declare ref for file input
   const [file, setFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
-  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUploadMessage(null); // Clear previous messages
-    if (e.target.files && e.target.files[0]) {
-      // Basic validation for CSV type
-      if (e.target.files[0].type === 'text/csv' || e.target.files[0].name.endsWith('.csv')) {
-        setFile(e.target.files[0]);
+  const [isDryRunMode, setIsDryRunMode] = useState(false); // New state for dry run
+    const [uploadResult, setUploadResult] = useState<{
+      type: 'success' | 'error' | 'partial';
+      text: string;
+      details?: string[];
+      isDryRun?: boolean; // Add isDryRun to type for frontend display logic
+    } | null>(null);
+  
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      setUploadResult(null);
+      if (e.target.files && e.target.files[0]) {
+        if (e.target.files[0].type === 'text/csv' || e.target.files[0].name.endsWith('.csv')) {
+          setFile(e.target.files[0]);
+        } else {
+          setUploadResult({ type: 'error', text: 'Please upload a valid CSV file.' });
+          setFile(null);
+          if (fileInputRef.current) { // Reset input value on error
+            fileInputRef.current.value = '';
+          }
+        }
       } else {
-        setUploadMessage({ type: 'error', text: 'Please upload a valid CSV file.' });
         setFile(null);
+        if (fileInputRef.current) { // Reset input value if no file is selected
+          fileInputRef.current.value = '';
+        }
       }
-    } else {
-      setFile(null);
-    }
-  };
-
-  const handleImport = async () => {
-    if (!file) {
-        setUploadMessage({ type: 'error', text: 'Please select a file to upload.' });
-        return;
-    }
-    
-    setImporting(true);
-    setUploadMessage({ type: 'info', text: 'Uploading and processing file...' });
-
-    try {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            const csvText = event.target?.result as string;
-            
-            const response = await fetch('/api/admin/upload-schedule', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'text/csv',
-                },
-                body: csvText,
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                setUploadMessage({ type: 'success', text: result.message || 'Schedule imported successfully!' });
-                setFile(null);
-            } else {
-                setUploadMessage({ type: 'error', text: result.error || 'Failed to import schedule.' });
-            }
-        };
-        reader.onerror = () => {
-            setUploadMessage({ type: 'error', text: 'Failed to read file.' });
-            setImporting(false);
-        };
-        reader.readAsText(file);
-
-    } catch (error: any) {
-      console.error('Import error:', error);
-      setUploadMessage({ type: 'error', text: error.message || 'An unexpected error occurred during import.' });
-    } finally {
-      setImporting(false);
-    }
-  };
-
+    };
+  
+    const handleDownloadTemplate = () => {
+      const csvHeader = "employee_id,month,shift_start,shift_end,rest_days\n";
+      const blob = new Blob([csvHeader], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', 'schedule_template.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+  
+    const handleImport = async () => {
+      if (!file) {
+          setUploadResult({ type: 'error', text: 'Please select a file to upload.' });
+          return;
+      }
+      
+      setImporting(true);
+      setUploadResult({ type: 'partial', text: 'Uploading and processing file...' }); // Use partial style for info
+  
+      try {
+          const reader = new FileReader();
+          reader.onload = async (event) => {
+              const csvText = event.target?.result as string;
+              
+              let apiUrl = '/api/admin/upload-schedule';
+              if (isDryRunMode) {
+                  apiUrl += '?dryRun=true';
+              }
+  
+              const response = await fetch(apiUrl, { // Use apiUrl here
+                  method: 'POST',
+                  headers: { 'Content-Type': 'text/csv' },
+                  body: csvText,
+              });
+  
+              const result = await response.json();
+  
+              let messageText = result.message || 'Schedule import operation completed.';
+              if (result.isDryRun) {
+                  messageText = `Dry Run: ${messageText} No changes were saved to the database.`;
+              }
+  
+              if (response.ok) {
+                  if (result.errors && result.errors.length > 0) {
+                      setUploadResult({ 
+                          type: 'partial', 
+                          text: `${messageText} ${result.stats.processed_rows} of ${result.stats.total_rows} rows processed successfully.`,
+                          details: result.errors,
+                          isDryRun: result.isDryRun // Pass dryRun status to state
+                      });
+                  } else {
+                      setUploadResult({ 
+                          type: 'success', 
+                          text: messageText,
+                          isDryRun: result.isDryRun // Pass dryRun status to state
+                      });
+                      if (!result.isDryRun) { // Only clear file if it was a real import
+                          setFile(null);
+                          if (fileInputRef.current) { // Reset input value
+                            fileInputRef.current.value = '';
+                          }
+                      }
+                  }
+              } else {
+                  setUploadResult({ type: 'error', text: result.error || 'Failed to import schedule.' });
+              }
+          };
+          reader.onerror = () => {
+              setUploadResult({ type: 'error', text: 'Failed to read file.' });
+              setImporting(false);
+          };
+          reader.readAsText(file);
+  
+      } catch (error: any) {
+        console.error('Import error:', error);
+        setUploadResult({ type: 'error', text: error.message || 'An unexpected error occurred during import.' });
+      } finally {
+        setImporting(false);
+      }
+    };
   return (
     <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
@@ -77,6 +125,12 @@ const ImportScheduleView: React.FC = () => {
           <p className="text-slate-400 mt-1">
             Upload a CSV file to import employee schedules.
           </p>
+          <button
+            onClick={handleDownloadTemplate}
+            className="text-sm text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1 mt-2"
+          >
+            <FileSpreadsheet size={16} /> Download CSV Template
+          </button>
         </div>
       </div>
 
@@ -88,6 +142,7 @@ const ImportScheduleView: React.FC = () => {
             accept=".csv"
             onChange={handleFileChange}
             className="hidden"
+            ref={fileInputRef} // Attach ref here
           />
           
           {!file ? (
@@ -110,7 +165,12 @@ const ImportScheduleView: React.FC = () => {
                 <p className="text-slate-400 text-sm mt-1">{(file.size / 1024).toFixed(2)} KB</p>
               </div>
               <button 
-                onClick={() => setFile(null)}
+                onClick={() => {
+                    setFile(null);
+                    if (fileInputRef.current) { // Reset input value when removing file
+                        fileInputRef.current.value = '';
+                    }
+                }}
                 className="text-sm text-red-400 hover:text-red-300 transition-colors"
               >
                 Remove file
@@ -120,16 +180,29 @@ const ImportScheduleView: React.FC = () => {
         </div>
 
         <div className="mt-6">
-          {uploadMessage && (
-            <div className={`p-4 rounded-xl flex items-center gap-3 text-sm mb-6 ${
-                uploadMessage.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' :
-                uploadMessage.type === 'error' ? 'bg-red-500/10 border border-red-500/20 text-red-400' :
-                'bg-blue-500/10 border border-blue-500/20 text-blue-400'
+          {uploadResult && (
+            <div className={`p-4 rounded-xl mb-6 ${
+                uploadResult.type === 'success' ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400' :
+                uploadResult.type === 'error' ? 'bg-red-500/10 border border-red-500/20 text-red-400' :
+                'bg-amber-500/10 border border-amber-500/20 text-amber-400'
             }`}>
-                {uploadMessage.type === 'success' && <CheckCircle size={20} />}
-                {uploadMessage.type === 'error' && <XCircle size={20} />}
-                {uploadMessage.type === 'info' && <AlertCircle size={20} />}
-                <p>{uploadMessage.text}</p>
+                <div className="flex items-center gap-3 mb-2">
+                    {uploadResult.type === 'success' && <CheckCircle size={20} />}
+                    {uploadResult.type === 'error' && <XCircle size={20} />}
+                    {uploadResult.type === 'partial' && <AlertCircle size={20} />}
+                    <p className="font-medium">{uploadResult.text}</p>
+                </div>
+                
+                {uploadResult.details && uploadResult.details.length > 0 && (
+                    <div className="mt-3 pl-8">
+                        <p className="text-sm font-semibold opacity-80 mb-2">Errors found:</p>
+                        <ul className="list-disc space-y-1 text-sm opacity-80 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                            {uploadResult.details.map((err, idx) => (
+                                <li key={idx}>{err}</li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
             </div>
           )}
 
@@ -146,6 +219,17 @@ const ImportScheduleView: React.FC = () => {
             </div>
           </div>
 
+          <div className="flex items-center gap-2 mb-4">
+            <input
+              type="checkbox"
+              id="dryRunCheckbox"
+              checked={isDryRunMode}
+              onChange={(e) => setIsDryRunMode(e.target.checked)}
+              className="form-checkbox h-4 w-4 text-blue-600 transition duration-150 ease-in-out bg-slate-700 border-slate-600 rounded"
+            />
+            <label htmlFor="dryRunCheckbox" className="text-sm text-slate-300">Run as Dry Run (validate only, no database changes)</label>
+          </div>
+
           <button
             onClick={handleImport}
             disabled={importing || !file}
@@ -159,7 +243,7 @@ const ImportScheduleView: React.FC = () => {
             ) : (
               <FileUp size={20} />
             )}
-            <span>{importing ? 'Importing...' : 'Import Schedule'}</span>
+            <span>{importing ? 'Processing...' : (isDryRunMode ? 'Run Dry Run' : 'Import Schedule')}</span>
           </button>
         </div>
       </div>
