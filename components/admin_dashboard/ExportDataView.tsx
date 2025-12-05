@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Employee } from '@/types';
 import { Search, User, X, FileDown } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 interface ExportDataViewProps {
   employees: Employee[];
@@ -38,10 +39,92 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     employee.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const convertToCSV = (data: any[]) => {
-    if (!data || data.length === 0) return '';
+  const convertToExcel = (data: any[]) => {
+    if (!data || data.length === 0) return null;
 
-    const headers = [
+    // Get unique dates and sort them
+    const uniqueDates = Array.from(new Set(data.map(row => row.date))).sort();
+
+    // Group data by employee for DTR Summary
+    const employeeData = new Map<string, {
+      name: string;
+      email: string;
+      dateHours: Map<string, number>;
+      totalHours: number;
+    }>();
+
+    // Process each attendance record
+    for (const row of data) {
+      const firstName = row.profiles?.first_name || '';
+      const lastName = row.profiles?.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      const email = row.profiles?.email || '';
+      const date = row.date;
+
+      const timeInDate = row.time_in ? new Date(row.time_in) : null;
+      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
+
+      let totalHours = 0;
+      if (timeInDate && timeOutDate) {
+        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
+        const totalMinutes = Math.floor(diffMs / 60000);
+        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
+      }
+
+      const employeeKey = `${fullName}_${email}`;
+      if (!employeeData.has(employeeKey)) {
+        employeeData.set(employeeKey, {
+          name: fullName,
+          email: email,
+          dateHours: new Map(),
+          totalHours: 0
+        });
+      }
+
+      const empData = employeeData.get(employeeKey)!;
+      empData.dateHours.set(date, totalHours);
+      empData.totalHours += totalHours;
+    }
+
+    // ==================== SHEET 1: DTR SUMMARY ====================
+    const dtrData: any[][] = [];
+
+    // Add headers
+    dtrData.push(['Employee Name', 'Email', ...uniqueDates, 'Total Regular Hours', 'Overtime Hours']);
+
+    // Sort employees by name and add rows
+    const sortedEmployees = Array.from(employeeData.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    );
+
+    for (const emp of sortedEmployees) {
+      // Calculate total overtime hours (hours beyond 8 per day)
+      let totalOvertimeHours = 0;
+      uniqueDates.forEach(date => {
+        const hours = emp.dateHours.get(date);
+        if (hours !== undefined && hours > 8) {
+          totalOvertimeHours += (hours - 8);
+        }
+      });
+
+      const row = [
+        emp.name,
+        emp.email,
+        ...uniqueDates.map(date => {
+          const hours = emp.dateHours.get(date);
+          return hours !== undefined ? hours.toFixed(2) : '';
+        }),
+        emp.totalHours.toFixed(2),
+        totalOvertimeHours.toFixed(2)
+      ];
+      dtrData.push(row);
+    }
+
+    // ==================== SHEET 2: DETAILED RECORDS ====================
+    const detailedData: any[][] = [];
+
+    // Add headers
+    detailedData.push([
       'Date',
       'Employee Name',
       'Email',
@@ -49,6 +132,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       'Time Out',
       'Total Minutes',
       'Total Hours',
+      'Overtime Hours',
       'Clock In Address',
       'Clock Out Address',
       'Has Overtime Request',
@@ -58,15 +142,15 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       'Overtime Requested At',
       'Overtime Approved/Rejected At',
       'Overtime Reviewer'
-    ];
-    const csvRows = [headers.join(',')];
+    ]);
 
+    // Add detailed records
     for (const row of data) {
-      const date = row.date;
       const firstName = row.profiles?.first_name || '';
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
       const email = row.profiles?.email || '';
+      const date = row.date;
 
       const timeInDate = row.time_in ? new Date(row.time_in) : null;
       const timeOutDate = row.time_out ? new Date(row.time_out) : null;
@@ -76,23 +160,21 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
 
       let totalMinutes = 0;
       let totalHours = 0;
-
       if (timeInDate && timeOutDate) {
         const diffMs = timeOutDate.getTime() - timeInDate.getTime();
         totalMinutes = Math.floor(diffMs / 60000);
         totalHours = parseFloat((totalMinutes / 60).toFixed(2));
       }
 
-      // Escape quotes in addresses and handle potentially missing location data
-      const addressIn = row.clock_in_address ? `"${row.clock_in_address.replace(/"/g, '""')}"` : 'N/A';
-      const addressOut = row.clock_out_address ? `"${row.clock_out_address.replace(/"/g, '""')}"` : 'N/A';
+      // Calculate overtime hours (hours beyond 8)
+      const overtimeHours = totalHours > 8 ? Number((totalHours - 8).toFixed(2)) : 0;
 
-      // Handle overtime request data
+      const addressIn = row.clock_in_address || 'N/A';
+      const addressOut = row.clock_out_address || 'N/A';
+
       const hasOvertimeRequest = row.overtimeRequest ? 'Yes' : 'No';
       const overtimeStatus = row.overtimeRequest?.status || 'N/A';
-      const overtimeComment = row.overtimeRequest?.comment
-        ? `"${row.overtimeRequest.comment.replace(/"/g, '""')}"`
-        : 'N/A';
+      const overtimeComment = row.overtimeRequest?.comment || 'N/A';
       const overtimeApprovedHours = row.overtimeRequest?.approved_hours || 'N/A';
       const overtimeRequestedAt = row.overtimeRequest?.requested_at
         ? new Date(row.overtimeRequest.requested_at).toLocaleString()
@@ -101,17 +183,18 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         ? new Date(row.overtimeRequest.approved_at).toLocaleString()
         : 'N/A';
       const overtimeReviewer = row.overtimeRequest?.reviewer
-        ? `"${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}"`
+        ? `${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}`
         : 'N/A';
 
-      const values = [
+      detailedData.push([
         date,
-        `"${fullName}"`, // Quote names to handle commas
+        fullName,
         email,
         timeIn,
         timeOut,
         totalMinutes,
         totalHours,
+        overtimeHours,
         addressIn,
         addressOut,
         hasOvertimeRequest,
@@ -121,11 +204,18 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         overtimeRequestedAt,
         overtimeApprovedAt,
         overtimeReviewer
-      ];
-      csvRows.push(values.join(','));
+      ]);
     }
 
-    return csvRows.join('\n');
+    // Create workbook and add sheets
+    const workbook = XLSX.utils.book_new();
+    const dtrSheet = XLSX.utils.aoa_to_sheet(dtrData);
+    const detailedSheet = XLSX.utils.aoa_to_sheet(detailedData);
+
+    XLSX.utils.book_append_sheet(workbook, dtrSheet, 'DTR Summary');
+    XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Records');
+
+    return workbook;
   };
 
   const fetchAndDownload = async (
@@ -157,16 +247,23 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         return;
       }
 
-      const csvString = convertToCSV(result.data);
-      const blob = new Blob([csvString], { type: 'text/csv' });
+      const workbook = convertToExcel(result.data);
+      if (!workbook) {
+        alert('Failed to generate Excel file.');
+        return;
+      }
+
+      // Write workbook to binary string
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
-      const filename = userId 
-        ? `attendance_${employeeName?.replace(/\s+/g, '_')}_${start}_${end}.csv` 
-        : `attendance_all_${start}_${end}.csv`;
-        
+
+      const filename = userId
+        ? `attendance_${employeeName?.replace(/\s+/g, '_')}_${start}_${end}.xlsx`
+        : `attendance_all_${start}_${end}.xlsx`;
+
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -277,7 +374,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
             ) : (
               <>
                 <FileDown size={20} />
-                Export All to CSV
+                Export All to Excel
               </>
             )}
           </button>
@@ -369,7 +466,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
             ) : (
               <>
                 <FileDown size={20} />
-                Export Individual CSV
+                Export Individual Excel
               </>
             )}
           </button>

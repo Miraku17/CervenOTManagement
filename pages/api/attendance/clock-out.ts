@@ -53,9 +53,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (updateError) throw updateError;
 
+    // Calculate total hours worked
+    const timeIn = new Date(existingAttendance.time_in);
+    const timeOut = new Date(now);
+    const totalMilliseconds = timeOut.getTime() - timeIn.getTime();
+    const totalHours = totalMilliseconds / (1000 * 60 * 60); // Convert to hours
+
     // Insert into overtime table if user submitted an overtime comment
     let overtime = null;
     if (overtimeComment) {
+      // Calculate approved overtime hours if total hours > 8
+      let approvedHours = null;
+      if (totalHours > 8) {
+        approvedHours = Number((totalHours - 8).toFixed(2));
+      }
+
       const { data: overtimeData, error: overtimeError } = await supabase
         .from('overtime')
         .insert([
@@ -64,6 +76,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             requested_by: userId,
             comment: overtimeComment,
             status: 'pending',
+            approved_hours: approvedHours,
             requested_at: now.toISOString(),
             created_at: now.toISOString(),
             updated_at: now.toISOString()
