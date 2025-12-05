@@ -12,7 +12,8 @@ import {
   X,
   FileText,
   Calendar,
-  FileUp
+  FileUp,
+  Ticket
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -197,6 +198,12 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'IMPORT_SCHEDULE'}
             onClick={() => handleNavigate('IMPORT_SCHEDULE')}
           />
+          <SidebarItem
+            icon={<Ticket size={20} />}
+            label="Ticketing"
+            isActive={false} // Always false as it navigates away
+            onClick={() => router.push('/dashboard/ticketing')}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -278,6 +285,12 @@ const AdminDashboard: React.FC = () => {
                 label="Import Schedule"
                 isActive={currentView === 'IMPORT_SCHEDULE'}
                 onClick={() => handleNavigate('IMPORT_SCHEDULE')}
+              />
+              <SidebarItem
+                icon={<Ticket size={24} />}
+                label="Ticketing"
+                isActive={false}
+                onClick={() => router.push('/dashboard/ticketing')}
               />
            </nav>
 

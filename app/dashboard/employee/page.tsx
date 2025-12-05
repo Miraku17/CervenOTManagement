@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
@@ -9,7 +9,7 @@ import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHis
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon } from 'lucide-react';
+import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, ChevronDown, Ticket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -96,6 +96,22 @@ const EmployeeDashboard: React.FC = () => {
   const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+  const [isServicesOpen, setIsServicesOpen] = useState(false);
+  const servicesDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(event.target as Node)) {
+        setIsServicesOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLeaveSuccess = () => {
     showToast('success', 'Leave request submitted successfully!');
@@ -650,20 +666,53 @@ const EmployeeDashboard: React.FC = () => {
             </div>
             
             <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                >
-                  <CalendarIcon className="w-4 h-4" />
-                  <span>Work Schedule</span>
-                </button>
-                <button
-                  onClick={() => setIsFileLeaveModalOpen(true)}
-                  className="hidden md:flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                >
-                  <CalendarDays className="w-4 h-4" />
-                  <span>File a Leave</span>
-                </button>
+                {/* Services Dropdown */}
+                <div className="relative hidden md:block" ref={servicesDropdownRef}>
+                  <button
+                    onClick={() => setIsServicesOpen(!isServicesOpen)}
+                    className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <FileText className="w-4 h-4" />
+                    <span>Services</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isServicesOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isServicesOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-xl py-1 z-50">
+                      <button
+                        onClick={() => {
+                          setIsScheduleModalOpen(true);
+                          setIsServicesOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left"
+                      >
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>Work Schedule</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFileLeaveModalOpen(true);
+                          setIsServicesOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left"
+                      >
+                        <CalendarDays className="w-4 h-4" />
+                        <span>File a Leave</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          router.push('/dashboard/ticketing');
+                          setIsServicesOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left border-t border-slate-800"
+                      >
+                        <Ticket className="w-4 h-4" />
+                        <span>Ticketing System</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {isAdmin && (
                   <button
                     onClick={() => router.push('/dashboard/admin')}

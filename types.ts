@@ -77,3 +77,13 @@ export interface Position {
   id: number;
   name: string;
 }
+
+export interface Store {
+  id: string;
+  store_name: string;
+  store_code: string;
+  contact_no: string;
+  address: string;
+  managers: string[]; // Changed to string array
+  created_at: string;
+}
