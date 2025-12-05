@@ -227,7 +227,7 @@ const OvertimeRequestsView: React.FC = () => {
               <tr>
                 <th className="px-6 py-4">Employee</th>
                 <th className="px-6 py-4">Date & Time</th>
-                <th className="px-6 py-4">Duration</th>
+                <th className="px-6 py-4">Overtime Hours</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 w-1/3">Comment</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -268,7 +268,7 @@ const OvertimeRequestsView: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-slate-300">
-                      {(request.attendance.total_minutes / 60).toFixed(2)} hrs
+                      {request.approved_hours !== null ? `${request.approved_hours.toFixed(2)} hrs` : 'N/A'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col items-start gap-1.5">

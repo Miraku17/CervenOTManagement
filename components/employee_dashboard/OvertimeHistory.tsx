@@ -179,7 +179,7 @@ const OvertimeHistory: React.FC = () => {
                       </div>
                       {request.approved_hours && (
                         <div className="text-xs text-emerald-400 mt-1 ml-1">
-                          {request.approved_hours} hrs approved
+                          {request.approved_hours} hrs {request.status}
                         </div>
                       )}
                     </td>

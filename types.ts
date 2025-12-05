@@ -42,6 +42,7 @@ export interface Employee {
   joinDate: string;
   avatarUrl: string;
   status: 'Active' | 'On Leave' | 'Terminated' | 'Invited';
+  role?: string; // Add role here
 }
 
 export interface AttendanceRecord {
