@@ -170,6 +170,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         contact_number: editFormData.contact_number,
         address: editFormData.address,
         position: updatedPosition?.name || employee.position,
+        role: editFormData.role,
       };
 
       // Call the parent's update handler
