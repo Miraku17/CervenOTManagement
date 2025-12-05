@@ -10,7 +10,8 @@ interface ExportDataViewProps {
 const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  
+  const [exportType, setExportType] = useState<'attendance' | 'overtime'>('attendance');
+
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -218,6 +219,91 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     return workbook;
   };
 
+  const convertOvertimeToExcel = (data: any[]) => {
+    if (!data || data.length === 0) return null;
+
+    const overtimeData: any[][] = [];
+
+    // Add headers
+    overtimeData.push([
+      'Date',
+      'Employee Name',
+      'Email',
+      'Time In',
+      'Time Out',
+      'Total Hours Worked',
+      'Overtime Hours',
+      'Overtime Comment',
+      'Overtime Status',
+      'Overtime Requested At',
+      'Overtime Approved Hours',
+      'Overtime Approved/Rejected At',
+      'Overtime Reviewer'
+    ]);
+
+    // Filter data to only include records with overtime requests
+    const overtimeRecords = data.filter(row => row.overtimeRequest);
+
+    // Add overtime records
+    for (const row of overtimeRecords) {
+      const firstName = row.profiles?.first_name || '';
+      const lastName = row.profiles?.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim();
+      const email = row.profiles?.email || '';
+      const date = row.date;
+
+      const timeInDate = row.time_in ? new Date(row.time_in) : null;
+      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
+
+      const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
+      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
+
+      let totalHours = 0;
+      if (timeInDate && timeOutDate) {
+        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
+        const totalMinutes = Math.floor(diffMs / 60000);
+        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
+      }
+
+      const overtimeHours = totalHours > 8 ? Number((totalHours - 8).toFixed(2)) : 0;
+      const overtimeComment = row.overtimeRequest?.comment || 'N/A';
+      const overtimeStatus = row.overtimeRequest?.status || 'N/A';
+      const overtimeApprovedHours = row.overtimeRequest?.approved_hours || 'N/A';
+      const overtimeRequestedAt = row.overtimeRequest?.requested_at
+        ? new Date(row.overtimeRequest.requested_at).toLocaleString()
+        : 'N/A';
+      const overtimeApprovedAt = row.overtimeRequest?.approved_at
+        ? new Date(row.overtimeRequest.approved_at).toLocaleString()
+        : 'N/A';
+      const overtimeReviewer = row.overtimeRequest?.reviewer
+        ? `${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}`
+        : 'N/A';
+
+      overtimeData.push([
+        date,
+        fullName,
+        email,
+        timeIn,
+        timeOut,
+        totalHours,
+        overtimeHours,
+        overtimeComment,
+        overtimeStatus,
+        overtimeRequestedAt,
+        overtimeApprovedHours,
+        overtimeApprovedAt,
+        overtimeReviewer
+      ]);
+    }
+
+    // Create workbook with single sheet for overtime
+    const workbook = XLSX.utils.book_new();
+    const overtimeSheet = XLSX.utils.aoa_to_sheet(overtimeData);
+    XLSX.utils.book_append_sheet(workbook, overtimeSheet, 'Overtime Requests');
+
+    return workbook;
+  };
+
   const fetchAndDownload = async (
     start: string, 
     end: string, 
@@ -247,7 +333,11 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         return;
       }
 
-      const workbook = convertToExcel(result.data);
+      // Use appropriate conversion function based on export type
+      const workbook = exportType === 'overtime'
+        ? convertOvertimeToExcel(result.data)
+        : convertToExcel(result.data);
+
       if (!workbook) {
         alert('Failed to generate Excel file.');
         return;
@@ -260,9 +350,10 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const a = document.createElement('a');
       a.href = url;
 
+      const filePrefix = exportType === 'overtime' ? 'overtime' : 'attendance';
       const filename = userId
-        ? `attendance_${employeeName?.replace(/\s+/g, '_')}_${start}_${end}.xlsx`
-        : `attendance_all_${start}_${end}.xlsx`;
+        ? `${filePrefix}_${employeeName?.replace(/\s+/g, '_')}_${start}_${end}.xlsx`
+        : `${filePrefix}_all_${start}_${end}.xlsx`;
 
       a.download = filename;
       document.body.appendChild(a);
@@ -348,6 +439,41 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
               onChange={(e) => setEndDate(e.target.value)}
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+        </div>
+
+        {/* Export Type Selection */}
+        <div className="mt-6 pt-6 border-t border-slate-700/50">
+          <label className="block text-sm font-medium text-slate-400 mb-3">Export Type</label>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <label className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 cursor-pointer hover:bg-slate-800/50 transition-colors flex-1">
+              <input
+                type="radio"
+                name="exportType"
+                value="attendance"
+                checked={exportType === 'attendance'}
+                onChange={(e) => setExportType(e.target.value as 'attendance' | 'overtime')}
+                className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500 focus:ring-2"
+              />
+              <div className="flex-1">
+                <div className="text-white font-medium">Full Attendance with Overtime</div>
+                <div className="text-xs text-slate-500 mt-0.5">DTR summary and detailed records with overtime data</div>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 bg-slate-900 border border-slate-700 rounded-lg px-4 py-3 cursor-pointer hover:bg-slate-800/50 transition-colors flex-1">
+              <input
+                type="radio"
+                name="exportType"
+                value="overtime"
+                checked={exportType === 'overtime'}
+                onChange={(e) => setExportType(e.target.value as 'attendance' | 'overtime')}
+                className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500 focus:ring-2"
+              />
+              <div className="flex-1">
+                <div className="text-white font-medium">Overtime Requests Only</div>
+                <div className="text-xs text-slate-500 mt-0.5">Records with overtime requests and approval details</div>
+              </div>
+            </label>
           </div>
         </div>
       </div>
