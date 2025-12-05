@@ -11,12 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { employeeId, firstName, lastName, email, contact_number, address, positionId, employee_id: newEmployeeId } = req.body;
-
-  if (!employeeId) {
-    return res.status(400).json({ error: 'Employee ID is required.' });
-  }
-
+  const { employeeId, firstName, lastName, email, contact_number, address, positionId, employee_id: newEmployeeId, role } = req.body;
   // Build update object with only provided fields
   const updateData: any = {};
 
@@ -29,6 +24,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   // Only update positionId if it's provided and not an empty string
   if (positionId !== undefined && positionId !== '') {
     updateData.position_id = positionId;
+  }
+  if (role !== undefined && role !== '') {
+    updateData.role = role;
   }
 
   if (Object.keys(updateData).length === 0) {
@@ -50,10 +48,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // If email is being updated, update it in Supabase Auth as well
-    if (email !== undefined) {
+    if (email !== undefined || role !== undefined) {
+      const authUpdateData: { email?: string; user_metadata?: { role: string } } = {};
+      if (email !== undefined) {
+        authUpdateData.email = email;
+      }
+      if (role !== undefined) {
+        authUpdateData.user_metadata = { role: role };
+      }
+
       const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(
         employeeId,
-        { email: email }
+        authUpdateData
       );
 
       if (authError) {

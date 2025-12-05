@@ -74,7 +74,7 @@ const AdminDashboard: React.FC = () => {
   const fetchEmployees = async () => {
     const { data, error } = await supabase
       .from('profiles')
-      .select('*, positions(name)');
+      .select('*, positions(name), role');
 
     if (data) {
       const fetchedEmployees: Employee[] = data.map((profile: any) => ({
@@ -89,6 +89,7 @@ const AdminDashboard: React.FC = () => {
         joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
         avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${profile.first_name}+${profile.last_name}`, // Static avatar
         status: 'Active', // Default status for now
+        role: profile.role,
       }));
       setEmployees(fetchedEmployees);
     }

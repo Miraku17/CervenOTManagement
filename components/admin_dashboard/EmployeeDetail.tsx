@@ -30,6 +30,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
     contact_number: '',
     address: '',
     positionId: '',
+    role: '',
   });
 
   // New state for password modal and schedule modal
@@ -68,6 +69,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         contact_number: employee.contact_number || '',
         address: employee.address || '',
         positionId: currentPosition ? String(currentPosition.id) : '',
+        role: employee.role || '',
       });
     }
   }, [isEditMode, employee, positions]);
@@ -148,6 +150,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
           contact_number: editFormData.contact_number.trim(),
           address: editFormData.address.trim(),
           positionId: editFormData.positionId || undefined,
+          role: editFormData.role,
         }),
       });
 
@@ -290,6 +293,18 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         {positions.map((pos) => (
                           <option key={pos.id} value={pos.id}>{pos.name}</option>
                         ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-sm text-slate-400 mb-2 block">Role</label>
+                      <select
+                        value={editFormData.role}
+                        onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      >
+                        <option value="employee">Employee</option>
+                        <option value="admin">Admin</option>
                       </select>
                     </div>
 
