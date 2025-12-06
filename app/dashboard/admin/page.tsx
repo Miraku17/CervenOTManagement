@@ -169,12 +169,6 @@ const AdminDashboard: React.FC = () => {
             onClick={() => handleNavigate('EMPLOYEES')}
           />
           <SidebarItem
-            icon={<Settings size={20} />}
-            label="Export"
-            isActive={currentView === 'EXPORT'}
-            onClick={() => handleNavigate('EXPORT')}
-          />
-          <SidebarItem
             icon={<Users size={20} />}
             label="Edit Time"
             isActive={currentView === 'EDIT_TIME'}
@@ -202,7 +196,13 @@ const AdminDashboard: React.FC = () => {
             icon={<Ticket size={20} />}
             label="Ticketing"
             isActive={false} // Always false as it navigates away
-            onClick={() => router.push('/dashboard/ticketing')}
+            onClick={() => router.push('/dashboard/ticketing/stores')}
+          />
+            <SidebarItem
+            icon={<Settings size={20} />}
+            label="Reports"
+            isActive={currentView === 'EXPORT'}
+            onClick={() => handleNavigate('EXPORT')}
           />
         </nav>
 
