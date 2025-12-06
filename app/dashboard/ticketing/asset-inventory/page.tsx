@@ -1,15 +1,169 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, Search, Filter, Download, Monitor, Laptop, Server, AlertTriangle, Tag } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Plus, Search, Filter, Download, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
+
+interface Asset {
+  id: string;
+  serial_number: string | null;
+  created_at: string;
+  updated_at: string;
+  categories: { id: string; name: string } | null;
+  brands: { id: string; name: string } | null;
+  models: { id: string; name: string } | null;
+}
 
 export default function AssetInventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editItem, setEditItem] = useState<Asset | null>(null);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ show: false, type: 'success', message: '' });
+
+  // Helper function to show toast
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ show: true, type, message });
+    setTimeout(() => {
+      setToast({ show: false, type, message: '' });
+    }, 3000);
+  };
+
+  // Fetch assets on component mount
+  useEffect(() => {
+    fetchAssets();
+  }, []);
+
+  const fetchAssets = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/assets/get');
+      const data = await response.json();
+
+      if (response.ok) {
+        setAssets(data.items || []);
+      } else {
+        showToast('error', 'Failed to fetch assets');
+      }
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+      showToast('error', 'Failed to fetch assets');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEdit = (asset: Asset) => {
+    setEditItem(asset);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    setIsDeleting(true);
+    try {
+      const response = await fetch('/api/assets/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        showToast('success', 'Asset deleted successfully');
+        fetchAssets();
+        setDeleteId(null);
+      } else {
+        showToast('error', data.error || 'Failed to delete asset');
+      }
+    } catch (error) {
+      console.error('Error deleting asset:', error);
+      showToast('error', 'Failed to delete asset');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setEditItem(null);
+  };
+
+  // Filter assets based on search term
+  const filteredAssets = assets.filter((asset) => {
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      asset.categories?.name.toLowerCase().includes(searchLower) ||
+      asset.brands?.name.toLowerCase().includes(searchLower) ||
+      asset.models?.name.toLowerCase().includes(searchLower) ||
+      asset.serial_number?.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="space-y-6">
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className={`fixed top-4 right-4 z-60 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
+          toast.type === 'success'
+            ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+            : 'bg-red-500/10 border border-red-500/20 text-red-400'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle size={20} />
+          ) : (
+            <AlertTriangle size={20} />
+          )}
+          <p className="font-medium">{toast.message}</p>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {deleteId && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+          <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-md border border-slate-700">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-white mb-2">Delete Asset</h3>
+              <p className="text-slate-400 mb-6">
+                Are you sure you want to delete this asset? This action cannot be undone.
+              </p>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => setDeleteId(null)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteId)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <span>Delete</span>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Asset Inventory</h1>
@@ -62,7 +216,7 @@ export default function AssetInventoryPage() {
               <div className="flex items-start justify-between">
                   <div>
                       <p className="text-slate-400 text-sm mb-1">Total Assets</p>
-                      <h3 className="text-2xl font-bold text-white">342</h3>
+                      <h3 className="text-2xl font-bold text-white">{loading ? '-' : assets.length}</h3>
                   </div>
                   <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
                       <Server size={24} />
@@ -72,8 +226,10 @@ export default function AssetInventoryPage() {
            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <div className="flex items-start justify-between">
                   <div>
-                      <p className="text-slate-400 text-sm mb-1">Assigned Assets</p>
-                      <h3 className="text-2xl font-bold text-white">285</h3>
+                      <p className="text-slate-400 text-sm mb-1">With Serial Number</p>
+                      <h3 className="text-2xl font-bold text-white">
+                        {loading ? '-' : assets.filter(a => a.serial_number).length}
+                      </h3>
                   </div>
                   <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
                       <Tag size={24} />
@@ -83,17 +239,19 @@ export default function AssetInventoryPage() {
            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <div className="flex items-start justify-between">
                   <div>
-                      <p className="text-slate-400 text-sm mb-1">Maintenance Due</p>
-                      <h3 className="text-2xl font-bold text-white">8</h3>
+                      <p className="text-slate-400 text-sm mb-1">Categories</p>
+                      <h3 className="text-2xl font-bold text-white">
+                        {loading ? '-' : new Set(assets.map(a => a.categories?.id).filter(Boolean)).size}
+                      </h3>
                   </div>
                   <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400">
-                      <AlertTriangle size={24} />
+                      <Monitor size={24} />
                   </div>
               </div>
           </div>
       </div>
 
-      {/* Inventory Table Placeholder */}
+      {/* Inventory Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -107,35 +265,65 @@ export default function AssetInventoryPage() {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
-                    {/* Placeholder Rows */}
-                    {[1, 2, 3, 4, 5].map((item) => (
-                        <tr key={item} className="hover:bg-slate-800/50 transition-colors group">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Loading assets...</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : filteredAssets.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                          {searchTerm ? 'No assets found matching your search.' : 'No assets yet. Click "Add Asset" to create one.'}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAssets.map((asset) => (
+                        <tr key={asset.id} className="hover:bg-slate-800/50 transition-colors group">
                             <td className="p-4 text-slate-300 font-medium">
                                 <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
-                                  {item % 2 === 0 ? 'Laptop' : 'Monitor'}
+                                  {asset.categories?.name || 'N/A'}
                                 </span>
                             </td>
-                            <td className="p-4 text-slate-400">{item % 2 === 0 ? 'Apple' : 'Dell'}</td>
+                            <td className="p-4 text-slate-400">{asset.brands?.name || 'N/A'}</td>
                             <td className="p-4 text-slate-400">
-                                {item % 2 === 0 ? `MacBook Pro M${item}` : `UltraSharp U${item}24`}
+                                {asset.models?.name || '-'}
                             </td>
-                            <td className="p-4 text-slate-400 font-mono text-sm">SN78234{item}99X</td>
+                            <td className="p-4 text-slate-400 font-mono text-sm">{asset.serial_number || '-'}</td>
                             <td className="p-4 text-right">
-                                <button className="text-blue-400 hover:text-blue-300 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">View</button>
+                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => handleEdit(asset)}
+                                  className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                  title="Edit asset"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteId(asset.id)}
+                                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                  title="Delete asset"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </td>
                         </tr>
-                    ))}
+                      ))
+                    )}
                 </tbody>
             </table>
         </div>
-         <div className="p-4 border-t border-slate-800 flex justify-center">
-            <button className="text-slate-500 hover:text-white text-sm transition-colors">View All Assets</button>
-         </div>
       </div>
 
       <AssetInventoryModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleCloseModal}
+        onSuccess={fetchAssets}
+        editItem={editItem}
       />
     </div>
   );
