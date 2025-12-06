@@ -14,6 +14,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
     const { data, error } = await supabaseAdmin
       .from('stores')
       .insert([
