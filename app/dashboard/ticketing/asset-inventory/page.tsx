@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Download, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
+import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface Asset {
   id: string;
@@ -98,6 +100,104 @@ export default function AssetInventoryPage() {
     setEditItem(null);
   };
 
+  const handlePrint = async () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Sort assets alphabetically by category name
+    const sortedAssets = [...filteredAssets].sort((a, b) => {
+      const nameA = a.categories?.name || '';
+      const nameB = b.categories?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    try {
+      // Add logo
+      const logoImg = new Image();
+      logoImg.src = '/logo.png';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
+      const logoWidth = 80;
+      const logoHeight = 20;
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Continue without logo if it fails
+    }
+
+    // Add header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Asset Inventory Report', pageWidth / 2, 38, { align: 'center' });
+
+    // Add date and count
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    doc.text(`Generated: ${today}`, 14, 46);
+    doc.text(`Total Assets: ${sortedAssets.length}`, pageWidth - 14, 46, { align: 'right' });
+
+    // Prepare table data
+    const tableColumn = [
+      'Category',
+      'Brand',
+      'Model',
+      'Serial Number',
+      'Created At',
+    ];
+
+    const tableRows = sortedAssets.map((asset) => [
+      asset.categories?.name || 'N/A',
+      asset.brands?.name || 'N/A',
+      asset.models?.name || 'N/A',
+      asset.serial_number || 'N/A',
+      new Date(asset.created_at).toLocaleDateString(),
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 54,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [15, 23, 42], // Slate 900
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252], // Light gray
+      },
+    });
+
+    // Add page numbers
+    const pageCount = doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Open print dialog
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  };
+
   // Filter assets based on search term
   const filteredAssets = assets.filter((asset) => {
     const searchLower = searchTerm.toLowerCase();
@@ -178,10 +278,11 @@ export default function AssetInventoryPage() {
               <span>Add Asset</span>
             </button>
             <button
+                onClick={handlePrint}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
               >
-                <Download size={20} />
-                <span>Export</span>
+                <Printer size={20} />
+                <span>Print Report</span>
               </button>
         </div>
       </div>
@@ -294,7 +395,7 @@ export default function AssetInventoryPage() {
                             </td>
                             <td className="p-4 text-slate-400 font-mono text-sm">{asset.serial_number || '-'}</td>
                             <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <div className="flex items-center justify-end gap-2">
                                 <button
                                   onClick={() => handleEdit(asset)}
                                   className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"

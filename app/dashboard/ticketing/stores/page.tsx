@@ -35,8 +35,42 @@ export default function StoresPage() {
     }
   };
 
-  const handlePrintAllStoresPDF = () => {
+  const handlePrintAllStoresPDF = async () => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    try {
+      // Add logo
+      const logoImg = new Image();
+      logoImg.src = '/logo.png';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
+      const logoWidth = 80;
+      const logoHeight = 20;
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Continue without logo if it fails
+    }
+
+    // Add header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('All Stores Data', pageWidth / 2, 38, { align: 'center' });
+
+    // Add date and count
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    doc.text(`Generated: ${today}`, 14, 46);
+    doc.text(`Total Stores: ${stores.length}`, pageWidth - 14, 46, { align: 'right' });
 
     const tableColumn = [
       "Store Name",
@@ -61,12 +95,11 @@ export default function StoresPage() {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 20,
+      startY: 54,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [15, 23, 42] }, // Slate 900
     });
 
-    doc.text("All Stores Data", 14, 15);
     doc.save("all_stores_data.pdf");
   };
 
