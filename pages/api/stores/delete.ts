@@ -18,6 +18,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Database connection not available');
     }
 
+    // Delete managers first (if cascade delete is not set up)
+    const { error: managersError } = await supabaseAdmin
+      .from('store_managers')
+      .delete()
+      .eq('store_id', id);
+
+    if (managersError) {
+      console.error('Error deleting managers:', managersError);
+      // Continue anyway as the store deletion might cascade
+    }
+
+    // Delete the store
     const { error } = await supabaseAdmin
       .from('stores')
       .delete()

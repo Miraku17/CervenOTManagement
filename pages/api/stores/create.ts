@@ -18,7 +18,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Database connection not available');
     }
 
-    const { data, error } = await supabaseAdmin
+    // Create the store without managers
+    const { data: store, error: storeError } = await supabaseAdmin
       .from('stores')
       .insert([
         {
@@ -26,17 +27,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           store_code,
           contact_no,
           address,
-          managers,
         },
       ])
       .select()
       .single();
 
-    if (error) {
-      throw error;
+    if (storeError) {
+      throw storeError;
     }
 
-    return res.status(201).json({ store: data });
+    // Insert managers into store_managers table if provided
+    console.log('Managers received:', managers);
+    console.log('Store ID:', store.id);
+
+    if (managers && Array.isArray(managers) && managers.length > 0) {
+      const managerRecords = managers.map((manager_name: string) => ({
+        store_id: store.id,
+        manager_name: manager_name.trim(),
+      }));
+
+      console.log('Manager records to insert:', managerRecords);
+
+      const { data: insertedManagers, error: managersError } = await supabaseAdmin
+        .from('store_managers')
+        .insert(managerRecords)
+        .select();
+
+      if (managersError) {
+        console.error('Error inserting managers:', managersError);
+        console.error('Full error details:', JSON.stringify(managersError, null, 2));
+        // Throw the error so user knows managers weren't saved
+        throw new Error(`Failed to save managers: ${managersError.message}`);
+      }
+
+      console.log('Managers inserted successfully:', insertedManagers);
+    } else {
+      console.log('No managers to insert');
+    }
+
+    return res.status(201).json({ store });
   } catch (error: any) {
     console.error('Error creating store:', error);
     return res.status(500).json({ error: error.message || 'Failed to create store' });
