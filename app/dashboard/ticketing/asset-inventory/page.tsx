@@ -2,9 +2,11 @@
 
 import React, { useState } from 'react';
 import { Plus, Search, Filter, Download, Monitor, Laptop, Server, AlertTriangle, Tag } from 'lucide-react';
+import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
 
 export default function AssetInventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -15,6 +17,7 @@ export default function AssetInventoryPage() {
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
             <button
+              onClick={() => setIsModalOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
             >
               <Plus size={20} />
@@ -96,12 +99,10 @@ export default function AssetInventoryPage() {
             <table className="w-full text-left border-collapse">
                 <thead>
                     <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-semibold">Asset Name</th>
-                        <th className="p-4 font-semibold">Asset Tag</th>
+                        <th className="p-4 font-semibold">Category</th>
+                        <th className="p-4 font-semibold">Brand</th>
+                        <th className="p-4 font-semibold">Model</th>
                         <th className="p-4 font-semibold">Serial Number</th>
-                        <th className="p-4 font-semibold">Type</th>
-                        <th className="p-4 font-semibold">Status</th>
-                        <th className="p-4 font-semibold">Assigned To</th>
                         <th className="p-4 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
@@ -110,33 +111,15 @@ export default function AssetInventoryPage() {
                     {[1, 2, 3, 4, 5].map((item) => (
                         <tr key={item} className="hover:bg-slate-800/50 transition-colors group">
                             <td className="p-4 text-slate-300 font-medium">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500">
-                                        {item % 2 === 0 ? <Laptop size={20} /> : <Monitor size={20} />}
-                                    </div>
-                                    <div>
-                                        <div>MacBook Pro M{item}</div>
-                                        <div className="text-xs text-slate-500">Purchased: 2024</div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td className="p-4 text-slate-400 font-mono text-sm">AST-2024-{item}00{item}</td>
-                            <td className="p-4 text-slate-500 font-mono text-xs">SN78234{item}99X</td>
-                            <td className="p-4 text-slate-400">
-                                {item % 2 === 0 ? 'Laptop' : 'Monitor'}
-                            </td>
-                            <td className="p-4">
-                                <span className={`px-2 py-1 rounded-full text-xs border ${
-                                    item === 3 
-                                    ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
-                                    : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                                }`}>
-                                    {item === 3 ? 'Maintenance' : 'Deployed'}
+                                <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
+                                  {item % 2 === 0 ? 'Laptop' : 'Monitor'}
                                 </span>
                             </td>
-                            <td className="p-4 text-slate-400 text-sm">
-                                {item === 3 ? 'IT Department' : 'John Doe'}
+                            <td className="p-4 text-slate-400">{item % 2 === 0 ? 'Apple' : 'Dell'}</td>
+                            <td className="p-4 text-slate-400">
+                                {item % 2 === 0 ? `MacBook Pro M${item}` : `UltraSharp U${item}24`}
                             </td>
+                            <td className="p-4 text-slate-400 font-mono text-sm">SN78234{item}99X</td>
                             <td className="p-4 text-right">
                                 <button className="text-blue-400 hover:text-blue-300 text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">View</button>
                             </td>
@@ -149,6 +132,11 @@ export default function AssetInventoryPage() {
             <button className="text-slate-500 hover:text-white text-sm transition-colors">View All Assets</button>
          </div>
       </div>
+
+      <AssetInventoryModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+      />
     </div>
   );
 }
