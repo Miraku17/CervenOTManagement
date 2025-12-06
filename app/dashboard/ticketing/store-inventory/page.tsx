@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Download, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle } from 'lucide-react';
+import { Plus, Search, Filter, Download, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
 import StoreInventoryModal from '@/components/ticketing/StoreInventoryModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface InventoryItem {
   id: string;
@@ -161,6 +163,117 @@ export default function StoreInventoryPage() {
     setEditItem(null); // Clear edit item when modal closes
   };
 
+  const handlePrint = async () => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Sort inventory alphabetically by brand name
+    const sortedItems = [...filteredItems].sort((a, b) => {
+      const nameA = a.brands?.name || '';
+      const nameB = b.brands?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    try {
+      // Add logo
+      const logoImg = new Image();
+      logoImg.src = '/logo.png';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
+      const logoWidth = 80;
+      const logoHeight = 20;
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      // Continue without logo if it fails
+    }
+
+    // Add header
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Store Inventory Report', pageWidth / 2, 38, { align: 'center' });
+
+    // Add date and count
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    doc.text(`Generated: ${today}`, 14, 46);
+    doc.text(`Total Items: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
+
+    // Prepare table data
+    const tableColumn = [
+      'Item Details',
+      'Serial Number',
+      'Category',
+      'Brand',
+      'Model',
+      'Store',
+      'Station',
+    ];
+
+    const tableRows = sortedItems.map((item) => [
+      `${item.brands?.name || 'N/A'}\n${item.categories?.name || 'N/A'}`,
+      item.serial_number || 'N/A',
+      item.categories?.name || 'N/A',
+      item.brands?.name || 'N/A',
+      item.models?.name || 'N/A',
+      `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
+      item.stations?.name || 'N/A',
+    ]);
+
+    // Add table
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 54,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [15, 23, 42], // Slate 900
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252], // Light gray
+      },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 25 },
+        3: { cellWidth: 25 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 30 },
+        6: { cellWidth: 20 },
+      },
+    });
+
+    // Add page numbers
+    const pageCount = doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(9);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    // Open print dialog
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  };
+
   // Get unique values for filters
   const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.categories?.name).filter(Boolean))) as string[];
   const uniqueStores = Array.from(new Set(inventoryItems.map(item => item.stores?.store_name).filter(Boolean))) as string[];
@@ -235,17 +348,18 @@ export default function StoreInventoryPage() {
         <div className="flex flex-col sm:flex-row gap-3">
             <button
               className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-              onClick={() => setIsModalOpen(true)} // Open the modal on click
+              onClick={() => setIsModalOpen(true)}
             >
               <Plus size={20} />
               <span>Add Item</span>
             </button>
             <button
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
-              >
-                <Download size={20} />
-                <span>Export</span>
-              </button>
+              onClick={handlePrint}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
+            >
+              <Printer size={20} />
+              <span>Print Report</span>
+            </button>
         </div>
       </div>
 
