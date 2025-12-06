@@ -1,19 +1,49 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 
 export default function TicketingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { logout, isLoggingOut } = useAuth();
+  const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoadingRole, setIsLoadingRole] = useState(true);
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          return;
+        }
+
+        setIsAdmin(profile?.role === 'admin');
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      } finally {
+        setIsLoadingRole(false);
+      }
+    };
+
+    checkUserRole();
+  }, [user?.id]);
 
   const handleNavigate = (path: string) => {
     router.push(path);
@@ -32,49 +62,63 @@ export default function TicketingLayout({
       </div>
 
       <nav className="flex-1 px-4 space-y-2 py-4">
-        <button
-          onClick={() => handleNavigate('/dashboard/admin')}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white"
-        >
-          <LayoutDashboard size={20} />
-          <span className="font-medium">Back to Admin</span>
-        </button>
+        {isAdmin ? (
+          <button
+            onClick={() => handleNavigate('/dashboard/admin')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white"
+          >
+            <LayoutDashboard size={20} />
+            <span className="font-medium">Back to Admin</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => handleNavigate('/dashboard/employee')}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white"
+          >
+            <ArrowLeft size={20} />
+            <span className="font-medium">Back to Dashboard</span>
+          </button>
+        )}
 
-        <button
-          onClick={() => handleNavigate('/dashboard/ticketing/stores')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-            pathname === '/dashboard/ticketing/stores'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <Store size={20} />
-          <span className="font-medium">Stores</span>
-        </button>
+        {isAdmin && (
+          <>
+            <button
+              onClick={() => handleNavigate('/dashboard/ticketing/stores')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                pathname === '/dashboard/ticketing/stores'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Store size={20} />
+              <span className="font-medium">Stores</span>
+            </button>
 
-        <button
-          onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-            pathname === '/dashboard/ticketing/store-inventory'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <Package size={20} />
-          <span className="font-medium">Store Inventory</span>
-        </button>
+            <button
+              onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                pathname === '/dashboard/ticketing/store-inventory'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Package size={20} />
+              <span className="font-medium">Store Inventory</span>
+            </button>
 
-        <button
-          onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-            pathname === '/dashboard/ticketing/asset-inventory'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <Monitor size={20} />
-          <span className="font-medium">Asset Inventory</span>
-        </button>
+            <button
+              onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                pathname === '/dashboard/ticketing/asset-inventory'
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <Monitor size={20} />
+              <span className="font-medium">Asset Inventory</span>
+            </button>
+          </>
+        )}
 
         <button
           onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
@@ -110,6 +154,22 @@ export default function TicketingLayout({
       </div>
     </>
   );
+
+  // Show loading state while fetching user info
+  if (authLoading || isLoadingRole) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <img
+            src="/cerventech.png"
+            alt="Cerventech Logo"
+            className="w-20 h-20 rounded-full object-cover shadow-lg border-2 border-gray-300 animate-spin"
+          />
+          <p className="text-slate-400 text-lg">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden">

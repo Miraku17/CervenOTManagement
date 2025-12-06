@@ -66,6 +66,19 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
 
+    // Ticketing access control - employees can only access tickets
+    if (pathname.startsWith('/dashboard/ticketing') && userRole !== 'admin') {
+      const restrictedTicketingPaths = [
+        '/dashboard/ticketing/stores',
+        '/dashboard/ticketing/store-inventory',
+        '/dashboard/ticketing/asset-inventory'
+      ];
+
+      if (restrictedTicketingPaths.some(path => pathname.startsWith(path))) {
+        return NextResponse.redirect(new URL('/dashboard/ticketing/tickets', request.url));
+      }
+    }
+
     // Redirect generic /dashboard root to employee dashboard
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
       return NextResponse.redirect(new URL('/dashboard/employee', request.url));

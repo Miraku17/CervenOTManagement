@@ -9,7 +9,7 @@ import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHis
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X } from 'lucide-react';
+import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -97,6 +97,21 @@ const EmployeeDashboard: React.FC = () => {
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isActionsMenuOpen, setIsActionsMenuOpen] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target as Node)) {
+        setIsActionsMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const handleLeaveSuccess = () => {
     showToast('success', 'Leave request submitted successfully!');
@@ -663,20 +678,53 @@ const EmployeeDashboard: React.FC = () => {
             
             {/* Right side: Desktop Navigation Buttons (hidden on mobile) */}
             <div className="hidden md:flex items-center gap-4">
-                <button
-                  onClick={() => setIsScheduleModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                >
-                  <CalendarIcon className="w-4 h-4" />
-                  <span>Work Schedule</span>
-                </button>
-                <button
-                  onClick={() => setIsFileLeaveModalOpen(true)}
-                  className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                >
-                  <CalendarDays className="w-4 h-4" />
-                  <span>File a Leave</span>
-                </button>
+                {/* Actions Dropdown */}
+                <div className="relative" ref={actionsMenuRef}>
+                  <button
+                    onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
+                    className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                  >
+                    <Menu className="w-4 h-4" />
+                    <span>Menu</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${isActionsMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isActionsMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-50">
+                      <button
+                        onClick={() => {
+                          setIsScheduleModalOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                      >
+                        <CalendarIcon className="w-4 h-4" />
+                        <span>Work Schedule</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFileLeaveModalOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                      >
+                        <CalendarDays className="w-4 h-4" />
+                        <span>File a Leave</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          router.push('/dashboard/ticketing');
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                      >
+                        <Ticket className="w-4 h-4" />
+                        <span>Ticketing</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {isAdmin && (
                   <button
                     onClick={() => router.push('/dashboard/admin')}
@@ -731,6 +779,17 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <CalendarDays size={20} />
                 <span className="font-medium">File a Leave</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  router.push('/dashboard/ticketing');
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+              >
+                <Ticket size={20} />
+                <span className="font-medium">Ticketing</span>
               </button>
 
               {isAdmin && (
