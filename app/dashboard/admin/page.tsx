@@ -12,7 +12,8 @@ import {
   X,
   FileText,
   Calendar,
-  FileUp
+  FileUp,
+  Ticket
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -168,12 +169,6 @@ const AdminDashboard: React.FC = () => {
             onClick={() => handleNavigate('EMPLOYEES')}
           />
           <SidebarItem
-            icon={<Settings size={20} />}
-            label="Export"
-            isActive={currentView === 'EXPORT'}
-            onClick={() => handleNavigate('EXPORT')}
-          />
-          <SidebarItem
             icon={<Users size={20} />}
             label="Edit Time"
             isActive={currentView === 'EDIT_TIME'}
@@ -196,6 +191,18 @@ const AdminDashboard: React.FC = () => {
             label="Import Schedule"
             isActive={currentView === 'IMPORT_SCHEDULE'}
             onClick={() => handleNavigate('IMPORT_SCHEDULE')}
+          />
+          <SidebarItem
+            icon={<Ticket size={20} />}
+            label="Ticketing"
+            isActive={false} // Always false as it navigates away
+            onClick={() => router.push('/dashboard/ticketing/stores')}
+          />
+            <SidebarItem
+            icon={<Settings size={20} />}
+            label="Reports"
+            isActive={currentView === 'EXPORT'}
+            onClick={() => handleNavigate('EXPORT')}
           />
         </nav>
 
@@ -278,6 +285,12 @@ const AdminDashboard: React.FC = () => {
                 label="Import Schedule"
                 isActive={currentView === 'IMPORT_SCHEDULE'}
                 onClick={() => handleNavigate('IMPORT_SCHEDULE')}
+              />
+              <SidebarItem
+                icon={<Ticket size={24} />}
+                label="Ticketing"
+                isActive={false}
+                onClick={() => router.push('/dashboard/ticketing')}
               />
            </nav>
 

@@ -1,0 +1,51 @@
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { supabase } from '@/services/supabase';
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  const { tableName, value } = req.body;
+
+  if (!tableName || !value) {
+    return res.status(400).json({ error: 'Table name and value are required' });
+  }
+
+  // Validate table name to prevent SQL injection
+  const validTables = ['categories', 'brands', 'models', 'stations'];
+  if (!validTables.includes(tableName)) {
+    return res.status(400).json({ error: 'Invalid table name' });
+  }
+
+  try {
+    // First, try to find existing record
+    const { data: existing, error: findError } = await supabase
+      .from(tableName)
+      .select('id, name')
+      .eq('name', value)
+      .maybeSingle();
+
+    if (findError) throw findError;
+
+    if (existing) {
+      // Return existing ID
+      return res.status(200).json({ id: existing.id });
+    }
+
+    // Create new record
+    const { data: newRecord, error: insertError } = await supabase
+      .from(tableName)
+      .insert([{ name: value }])
+      .select('id')
+      .single();
+
+    if (insertError) throw insertError;
+
+    return res.status(200).json({ id: newRecord.id });
+  } catch (error: any) {
+    console.error('Error in get-or-create:', error);
+    return res.status(500).json({ error: error.message || 'Failed to get or create record' });
+  }
+}
