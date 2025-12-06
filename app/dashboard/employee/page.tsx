@@ -9,7 +9,7 @@ import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHis
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, ChevronDown, Ticket } from 'lucide-react';
+import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -96,22 +96,7 @@ const EmployeeDashboard: React.FC = () => {
   const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [isServicesOpen, setIsServicesOpen] = useState(false);
-  const servicesDropdownRef = useRef<HTMLDivElement>(null);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (servicesDropdownRef.current && !servicesDropdownRef.current.contains(event.target as Node)) {
-        setIsServicesOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleLeaveSuccess = () => {
     showToast('success', 'Leave request submitted successfully!');
@@ -655,68 +640,47 @@ const EmployeeDashboard: React.FC = () => {
       <nav className="sticky top-0 z-50 bg-gradient-to-r from-slate-950/80 via-blue-950/80 to-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
+            {/* Left side: Mobile Menu Toggle (on mobile) + Logo/Title */}
             <div className="flex items-center gap-2">
-              {/* Cerventech Logo */}
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-                <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-contain rounded-full border-2 border-gray-300" />
+              <div className="md:hidden"> {/* Mobile Menu Toggle - visible only on small screens */}
+                <button
+                  onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                  className="p-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                </button>
               </div>
-              <span className="text-xl font-bold tracking-tight text-white">
-                Cerventech Inc.
-              </span>
+              {/* Cerventech Logo and Name - always visible */}
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
+                  <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-contain rounded-full border-2 border-gray-300" />
+                </div>
+                <span className="text-xl font-bold tracking-tight text-white">
+                  Cerventech Inc.
+                </span>
+              </div>
             </div>
             
-            <div className="flex items-center gap-4">
-                {/* Services Dropdown */}
-                <div className="relative hidden md:block" ref={servicesDropdownRef}>
-                  <button
-                    onClick={() => setIsServicesOpen(!isServicesOpen)}
-                    className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>Services</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${isServicesOpen ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {isServicesOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-800 rounded-xl shadow-xl py-1 z-50">
-                      <button
-                        onClick={() => {
-                          setIsScheduleModalOpen(true);
-                          setIsServicesOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left"
-                      >
-                        <CalendarIcon className="w-4 h-4" />
-                        <span>Work Schedule</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          setIsFileLeaveModalOpen(true);
-                          setIsServicesOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left"
-                      >
-                        <CalendarDays className="w-4 h-4" />
-                        <span>File a Leave</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          router.push('/dashboard/ticketing');
-                          setIsServicesOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-slate-400 hover:text-white hover:bg-slate-800 transition-colors text-left border-t border-slate-800"
-                      >
-                        <Ticket className="w-4 h-4" />
-                        <span>Ticketing System</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
+            {/* Right side: Desktop Navigation Buttons (hidden on mobile) */}
+            <div className="hidden md:flex items-center gap-4">
+                <button
+                  onClick={() => setIsScheduleModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                >
+                  <CalendarIcon className="w-4 h-4" />
+                  <span>Work Schedule</span>
+                </button>
+                <button
+                  onClick={() => setIsFileLeaveModalOpen(true)}
+                  className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  <span>File a Leave</span>
+                </button>
                 {isAdmin && (
                   <button
                     onClick={() => router.push('/dashboard/admin')}
-                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium border-r border-slate-700 mr-2"
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium border-r border-slate-700 mr-2"
                   >
                     <Shield className="w-4 h-4" />
                     <span>Admin Dashboard</span>
@@ -742,6 +706,71 @@ const EmployeeDashboard: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Mobile Dropdown Menu - visible only when isMobileMenuOpen is true and on small screens */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur-md">
+            <div className="px-4 pt-2 pb-4 space-y-2">
+              <button
+                onClick={() => {
+                  setIsScheduleModalOpen(true);
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+              >
+                <CalendarIcon size={20} />
+                <span className="font-medium">Work Schedule</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setIsFileLeaveModalOpen(true);
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+              >
+                <CalendarDays size={20} />
+                <span className="font-medium">File a Leave</span>
+              </button>
+
+              {isAdmin && (
+                <button
+                  onClick={() => {
+                    router.push('/dashboard/admin');
+                    setIsMobileMenuOpen(false); // Close menu after clicking
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl transition-colors"
+                >
+                  <Shield size={20} />
+                  <span className="font-medium">Admin Dashboard</span>
+                </button>
+              )}
+
+              <div className="pt-2 mt-2 border-t border-slate-800">
+                <button
+                  onClick={() => {
+                    logout();
+                    setIsMobileMenuOpen(false); // Close menu after clicking
+                  }}
+                  disabled={isLoggingOut}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                >
+                  {isLoggingOut ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="font-medium">Logging out...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LogOut size={20} />
+                      <span className="font-medium">Log Out</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Main Content */}

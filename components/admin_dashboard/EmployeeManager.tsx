@@ -48,39 +48,120 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     );
   }, [employees, searchTerm]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = async () => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Sort employees alphabetically by fullName
+    const sortedEmployees = [...employees].sort((a, b) =>
+      a.fullName.localeCompare(b.fullName)
+    );
+
+    // Add logo (centered at top)
+    try {
+      const logoImg = new Image();
+      logoImg.src = '/logo.png';
+      await new Promise((resolve, reject) => {
+        logoImg.onload = resolve;
+        logoImg.onerror = reject;
+      });
+
+      // Center the logo - using wider dimensions to match the logo aspect ratio
+      const logoWidth = 80;
+      const logoHeight = 20;
+      const logoX = (pageWidth - logoWidth) / 2;
+      doc.addImage(logoImg, 'WEBP', logoX, 10, logoWidth, logoHeight);
+    } catch (error) {
+      console.error('Failed to load logo:', error);
+    }
+
+    // Add document title below logo
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text("Employee Directory", pageWidth / 2, 38, { align: 'center' });
+
+    // Add date and count
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 100, 100);
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    doc.text(`Generated: ${today}`, 14, 46);
+    doc.text(`Total Employees: ${sortedEmployees.length}`, pageWidth - 14, 46, { align: 'right' });
+
+    // Add separator line
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 52, pageWidth - 14, 52);
 
     const tableColumn = [
+      "Employee ID",
       "Full Name",
       "Email",
       "Position",
       "Status",
-      "Join Date",
       "Contact",
       "Address",
     ];
 
-    const tableRows = employees.map((emp) => [
+    const tableRows = sortedEmployees.map((emp) => [
+      emp.employee_id || 'N/A',
       emp.fullName,
       emp.email,
       emp.position,
       emp.status,
-      emp.joinDate,
-      emp.contact_number,
-      emp.address,
+      emp.contact_number || 'N/A',
+      emp.address || 'N/A',
     ]);
 
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 20,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] }, // Slate 900
+      startY: 58,
+      styles: {
+        fontSize: 8,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [15, 23, 42], // Slate 900
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        halign: 'left',
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252], // Slate 50
+      },
+      columnStyles: {
+        0: { cellWidth: 20 }, // Employee ID
+        1: { cellWidth: 35 }, // Full Name
+        2: { cellWidth: 40 }, // Email
+        3: { cellWidth: 30 }, // Position
+        4: { cellWidth: 18 }, // Status
+        5: { cellWidth: 25 }, // Contact
+        6: { cellWidth: 'auto' }, // Address
+      },
+      margin: { left: 14, right: 14 },
     });
 
-    doc.text("All Employees Data", 14, 15);
-    doc.save("employees_data.pdf");
+    // Add footer with page numbers
+    const pageCount = doc.internal.pages.length - 1;
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(
+        `Page ${i} of ${pageCount}`,
+        pageWidth / 2,
+        doc.internal.pageSize.getHeight() - 10,
+        { align: 'center' }
+      );
+    }
+
+    const filename = `CervenTech_Employees_${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(filename);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, employee: Employee) => {

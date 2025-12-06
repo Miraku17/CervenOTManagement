@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search } from 'lucide-react';
+import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { differenceInDays, parseISO } from 'date-fns';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface LeaveRequest {
   id: string;
@@ -47,6 +49,9 @@ const LeaveRequestsView: React.FC = () => {
     employeeName: '',
   });
   const [reviewerComment, setReviewerComment] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -124,6 +129,153 @@ const LeaveRequestsView: React.FC = () => {
 
   const handleApprove = (id: string) => openConfirmation(id, 'approve');
   const handleReject = (id: string) => openConfirmation(id, 'reject');
+
+  const handleExportPDF = async () => {
+    if (!startDate || !endDate) {
+      setError('Please select both start and end dates for export');
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // Filter requests by date range
+      const filteredByDate = requests.filter(req => {
+        const reqDate = new Date(req.created_at);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999); // Include the entire end date
+        return reqDate >= start && reqDate <= end;
+      });
+
+      // Sort by employee name
+      const sortedRequests = [...filteredByDate].sort((a, b) => {
+        const nameA = `${a.employee.first_name} ${a.employee.last_name}`;
+        const nameB = `${b.employee.first_name} ${b.employee.last_name}`;
+        return nameA.localeCompare(nameB);
+      });
+
+      // Add logo
+      try {
+        const logoImg = new Image();
+        logoImg.src = '/logo.png';
+        await new Promise((resolve, reject) => {
+          logoImg.onload = resolve;
+          logoImg.onerror = reject;
+        });
+
+        const logoWidth = 80;
+        const logoHeight = 20;
+        const logoX = (pageWidth - logoWidth) / 2;
+        doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
+      } catch (error) {
+        console.error('Failed to load logo:', error);
+      }
+
+      // Add document title
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text("Leave Requests Report", pageWidth / 2, 38, { align: 'center' });
+
+      // Add date range and count
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(100, 100, 100);
+      const dateRange = `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`;
+      doc.text(`Period: ${dateRange}`, 14, 46);
+      doc.text(`Total Requests: ${sortedRequests.length}`, pageWidth - 14, 46, { align: 'right' });
+
+      // Add separator line
+      doc.setDrawColor(200, 200, 200);
+      doc.line(14, 52, pageWidth - 14, 52);
+
+      // Prepare table data
+      const tableColumn = [
+        "Employee",
+        "Leave Type",
+        "Start Date",
+        "End Date",
+        "Days",
+        "Status",
+        "Reviewer"
+      ];
+
+      const tableRows = sortedRequests.map((req) => {
+        const employeeName = `${req.employee.first_name} ${req.employee.last_name}`;
+        const duration = calculateDuration(req.start_date, req.end_date);
+        const reviewer = req.reviewer
+          ? `${req.reviewer.first_name} ${req.reviewer.last_name}`
+          : 'N/A';
+
+        return [
+          employeeName,
+          req.leave_type,
+          new Date(req.start_date).toLocaleDateString(),
+          new Date(req.end_date).toLocaleDateString(),
+          `${duration} day${duration !== 1 ? 's' : ''}`,
+          req.status.charAt(0).toUpperCase() + req.status.slice(1),
+          reviewer
+        ];
+      });
+
+      autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: 58,
+        styles: {
+          fontSize: 8,
+          cellPadding: 3,
+        },
+        headStyles: {
+          fillColor: [15, 23, 42],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+          halign: 'left',
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: {
+          0: { cellWidth: 35 }, // Employee
+          1: { cellWidth: 25 }, // Leave Type
+          2: { cellWidth: 25 }, // Start Date
+          3: { cellWidth: 25 }, // End Date
+          4: { cellWidth: 18 }, // Days
+          5: { cellWidth: 22 }, // Status
+          6: { cellWidth: 'auto' }, // Reviewer
+        },
+        margin: { left: 14, right: 14 },
+      });
+
+      // Add footer with page numbers
+      const pageCount = doc.internal.pages.length - 1;
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(
+          `Page ${i} of ${pageCount}`,
+          pageWidth / 2,
+          doc.internal.pageSize.getHeight() - 10,
+          { align: 'center' }
+        );
+      }
+
+      const filename = `Leave_Requests_${startDate}_to_${endDate}.pdf`;
+      doc.save(filename);
+
+    } catch (error: any) {
+      console.error('Export failed:', error);
+      setError('Failed to export PDF. Please try again.');
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -207,7 +359,7 @@ const LeaveRequestsView: React.FC = () => {
           <h2 className="text-2xl font-bold text-white">Leave Requests</h2>
           <p className="text-slate-400 mt-1">Manage employee leave applications</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
@@ -235,6 +387,53 @@ const LeaveRequestsView: React.FC = () => {
               </button>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Export Section */}
+      <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50">
+        <div className="flex items-center gap-3 mb-4">
+          <FileDown className="w-5 h-5 text-blue-500" />
+          <h3 className="text-lg font-semibold text-white">Export Leave Requests Report</h3>
+        </div>
+        <div className="flex flex-col lg:flex-row gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-slate-400 mb-2">Start Date</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-slate-400 mb-2">End Date</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+            />
+          </div>
+          <button
+            onClick={handleExportPDF}
+            disabled={isExporting}
+            className={`px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 shadow-lg ${
+              isExporting ? 'opacity-50 cursor-not-allowed' : ''
+            }`}
+          >
+            {isExporting ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <FileDown size={18} />
+                Export PDF
+              </>
+            )}
+          </button>
         </div>
       </div>
 
