@@ -21,6 +21,11 @@ interface Employee {
   email: string;
 }
 
+interface Station {
+  id: string;
+  name: string;
+}
+
 interface AddTicketModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -37,6 +42,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
@@ -50,7 +56,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
   const [formData, setFormData] = useState({
     store_id: '',
-    station: '',
+    station_id: '',
     mod_id: '',
     rcc_reference_number: '',
     request_type: '',
@@ -65,7 +71,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const currentDate = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'MMMM dd, yyyy');
   const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'hh:mm a');
 
-  // Fetch stores and employees
+  // Fetch stores, employees and stations
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -81,6 +87,13 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         const employeesData = await employeesResponse.json();
         if (employeesResponse.ok) {
           setEmployees(employeesData.employees || []);
+        }
+
+        // Fetch stations
+        const stationsResponse = await fetch('/api/stations/get');
+        const stationsData = await stationsResponse.json();
+        if (stationsResponse.ok) {
+          setStations(stationsData.stations || []);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -163,7 +176,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setStoreCode(store.store_code);
     setStoreSearchTerm(store.store_name);
     setShowStoreDropdown(false);
-    setFormData({ ...formData, store_id: store.id, mod_id: '' });
+    setFormData({ ...formData, store_id: store.id, mod_id: '', station_id: '' });
   };
 
   const handleClearStoreSelection = () => {
@@ -172,7 +185,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setStoreCode('');
     setStoreSearchTerm('');
     setShowStoreDropdown(false);
-    setFormData({ ...formData, store_id: '', mod_id: '' });
+    setFormData({ ...formData, store_id: '', mod_id: '', station_id: '' });
     setManagers([]);
   };
 
@@ -221,9 +234,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     };
   }, [showStoreDropdown, showEmployeeDropdown]);
 
-  // Station options (you can customize this based on your needs)
-  const stationOptions = ['Station 1', 'Station 2', 'Station 3', 'Station 4', 'Station 5'];
-
   // Severity options
   const severityOptions = [
     { value: 'Low', label: 'Low', color: 'text-blue-400' },
@@ -248,7 +258,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         body: JSON.stringify({
           ...formData,
           date_reported: new Date().toISOString(),
-          status: 'Open',
+          status: 'open',
           reported_by: currentUserId,
         }),
       });
@@ -262,7 +272,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       // Reset form
       setFormData({
         store_id: '',
-        station: '',
+        station_id: '',
         mod_id: '',
         rcc_reference_number: '',
         request_type: '',
@@ -444,15 +454,15 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                 <div className="relative">
                   <select
                     required
-                    value={formData.station}
-                    onChange={(e) => setFormData({ ...formData, station: e.target.value })}
+                    value={formData.station_id}
+                    onChange={(e) => setFormData({ ...formData, station_id: e.target.value })}
                     className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!selectedStore}
                   >
                     <option value="">Select Station</option>
-                    {stationOptions.map((station) => (
-                      <option key={station} value={station}>
-                        {station}
+                    {stations.map((station) => (
+                      <option key={station.id} value={station.id}>
+                        {station.name}
                       </option>
                     ))}
                   </select>
