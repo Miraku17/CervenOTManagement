@@ -33,6 +33,8 @@ export interface DayStats {
 export interface Employee {
   id: string;
   employee_id: string;
+  firstName?: string;
+  lastName?: string;
   fullName: string;
   email: string;
   contact_number: string;

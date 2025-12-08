@@ -56,9 +56,17 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   // Initialize edit form when entering edit mode
   useEffect(() => {
     if (isEditMode && employee && positions.length > 0) {
-      const nameParts = employee.fullName.split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
+      let firstName = '';
+      let lastName = '';
+
+      if (employee.firstName && employee.lastName) {
+        firstName = employee.firstName;
+        lastName = employee.lastName;
+      } else {
+        const nameParts = employee.fullName.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
 
       // Try to find the current position
       const currentPosition = positions.find(p => p.name === employee.position);
@@ -166,6 +174,8 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       const updatedPosition = positions.find(p => String(p.id) === String(editFormData.positionId));
       const updatedEmployee: Employee = {
         ...employee,
+        firstName: editFormData.firstName,
+        lastName: editFormData.lastName,
         fullName: `${editFormData.firstName} ${editFormData.lastName}`,
         employee_id: editFormData.employee_id,
         email: editFormData.email,
