@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, store_name, store_code, contact_no, address, managers } = req.body;
+  const { id, store_name, store_code, store_type, contact_no, city, location, group, managers } = req.body;
 
   if (!id) {
     return res.status(400).json({ error: 'Store ID is required.' });
@@ -24,8 +24,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .update({
         store_name,
         store_code,
+        store_type,
         contact_no,
-        address,
+        city,
+        location,
+        group,
       })
       .eq('id', id)
       .select()

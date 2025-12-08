@@ -15,8 +15,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
   const [formData, setFormData] = useState({
     store_name: '',
     store_code: '',
+    store_type: '',
     contact_no: '',
-    address: '',
+    city: '',
+    location: '',
+    group: '',
     managers: '',
   });
   const [loading, setLoading] = useState(false);
@@ -31,8 +34,11 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
       setFormData({
         store_name: store.store_name,
         store_code: store.store_code,
+        store_type: store.store_type || '',
         contact_no: store.contact_no || '',
-        address: store.address || '',
+        city: store.city || '',
+        location: store.location || '',
+        group: store.group || '',
         managers: Array.isArray(store.managers) ? store.managers.join(', ') : store.managers || '',
       });
       setIsEditing(false);
@@ -205,6 +211,17 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1.5">Store Type</label>
+                <input
+                    type="text"
+                    value={formData.store_type}
+                    onChange={(e) => setFormData({ ...formData, store_type: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    placeholder="e.g. Retail, Warehouse"
+                />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Contact Number</label>
@@ -215,20 +232,42 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                             value={formData.contact_no}
                             onChange={(e) => setFormData({ ...formData, contact_no: e.target.value })}
                             className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                            placeholder="e.g. 09123456789"
                         />
                      </div>
                   </div>
                    <div>
-                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Address</label>
-                     <div className="relative">
-                        <MapPin className="absolute left-3 top-3 text-slate-500 w-4 h-4" />
-                        <textarea
-                            value={formData.address}
-                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                            className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none h-[46px] min-h-[46px] leading-tight py-3"
-                            rows={1}
-                        />
-                     </div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">City</label>
+                    <input
+                        type="text"
+                        value={formData.city}
+                        onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        placeholder="e.g. Cebu"
+                    />
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Location</label>
+                    <input
+                        type="text"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        placeholder="e.g. Downtown"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Group</label>
+                    <input
+                        type="text"
+                        value={formData.group}
+                        onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        placeholder="e.g. East Region"
+                    />
                   </div>
               </div>
             </form>
@@ -238,19 +277,47 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-6">
                         <div>
-                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Contact Information</h3>
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Store Details</h3>
                             <div className="space-y-4">
                                 <div className="flex items-start gap-3">
-                                    <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <StoreIcon className="text-blue-500 mt-1 shrink-0" size={18} />
                                     <div>
-                                        <p className="text-slate-300 leading-relaxed">{store.address || 'No address provided'}</p>
-                                        {/* <p className="text-xs text-slate-500 mt-1">Primary Location</p> */}
+                                        <p className="text-xs text-slate-500 mb-1">Store Type</p>
+                                        <p className="text-slate-300">{store.store_type || 'Not specified'}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <Phone className="text-blue-500 shrink-0" size={18} />
                                     <div>
+                                        <p className="text-xs text-slate-500 mb-1">Contact Number</p>
                                         <p className="text-slate-300">{store.contact_no || 'No contact number'}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Location Details</h3>
+                            <div className="space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">City</p>
+                                        <p className="text-slate-300">{store.city || 'Not specified'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">Location</p>
+                                        <p className="text-slate-300">{store.location || 'Not specified'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">Group</p>
+                                        <p className="text-slate-300">{store.group || 'Not specified'}</p>
                                     </div>
                                 </div>
                             </div>

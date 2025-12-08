@@ -75,8 +75,11 @@ export default function StoresPage() {
     const tableColumn = [
       "Store Name",
       "Store Code",
+      "Store Type",
       "Contact No",
-      "Address",
+      "City",
+      "Location",
+      "Group",
       "Managers",
       "Created At",
     ];
@@ -84,8 +87,11 @@ export default function StoresPage() {
     const tableRows = stores.map((store) => [
       store.store_name,
       store.store_code,
+      store.store_type || 'N/A',
       store.contact_no || 'N/A',
-      store.address || 'N/A',
+      store.city || 'N/A',
+      store.location || 'N/A',
+      store.group || 'N/A',
       Array.isArray(store.managers) && store.managers.length > 0
         ? store.managers.join(', ')
         : 'N/A',
@@ -115,7 +121,9 @@ export default function StoresPage() {
   const filteredStores = stores.filter(store =>
     store.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     store.store_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.address?.toLowerCase().includes(searchTerm.toLowerCase())
+    store.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    store.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    store.group?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -148,7 +156,7 @@ export default function StoresPage() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
         <input
           type="text"
-          placeholder="Search stores by name, code, or address..."
+          placeholder="Search stores by name, code, city, location, or group..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full bg-slate-900 border border-slate-800 text-slate-200 pl-10 pr-4 py-3 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
@@ -190,29 +198,52 @@ export default function StoresPage() {
               </div>
 
               <div className="space-y-4 flex-1">
-                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-950/50 border border-slate-800/50 group-hover:border-slate-800 transition-colors">
-                  <MapPin size={16} className="text-slate-500 mt-0.5 shrink-0" />
-                  <span className="text-sm text-slate-300 line-clamp-2 leading-relaxed">
-                    {store.address || 'No address provided'}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-1 gap-3 px-1">
-                    <div className="flex items-center gap-3">
-                        <Phone size={16} className="text-slate-500 shrink-0" />
-                        <span className="text-sm text-slate-400">{store.contact_no || 'No contact'}</span>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-start gap-2">
+                    <StoreIcon size={14} className="text-slate-500 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">Type</span>
+                      <span className="text-sm text-slate-300">{store.store_type || 'N/A'}</span>
                     </div>
-                    
-                    <div className="flex items-start gap-3">
-                        <User size={16} className="text-slate-500 shrink-0 mt-0.5" />
-                        <div className="flex flex-col">
-                            <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Managed By</span>
-                            <span className="text-sm text-slate-300">
-                                {Array.isArray(store.managers) && store.managers.length > 0 
-                                ? store.managers.join(', ') 
-                                : 'Not Assigned'}
-                            </span>
-                        </div>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <Phone size={14} className="text-slate-500 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider block">Contact</span>
+                      <span className="text-sm text-slate-300">{store.contact_no || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-slate-950/50 border border-slate-800/50 group-hover:border-slate-800 transition-colors">
+                  <div className="grid grid-cols-1 gap-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">City:</span>
+                      <span className="text-sm text-slate-300">{store.city || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Location:</span>
+                      <span className="text-sm text-slate-300">{store.location || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MapPin size={14} className="text-slate-500 shrink-0" />
+                      <span className="text-xs text-slate-500 uppercase font-bold tracking-wider">Group:</span>
+                      <span className="text-sm text-slate-300">{store.group || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 px-1">
+                    <User size={16} className="text-slate-500 shrink-0 mt-0.5" />
+                    <div className="flex flex-col">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-0.5">Managed By</span>
+                        <span className="text-sm text-slate-300">
+                            {Array.isArray(store.managers) && store.managers.length > 0
+                            ? store.managers.join(', ')
+                            : 'Not Assigned'}
+                        </span>
                     </div>
                 </div>
               </div>

@@ -11,8 +11,11 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
   const [formData, setFormData] = useState({
     store_name: '',
     store_code: '',
+    store_type: '',
     contact_no: '',
-    address: '',
+    city: '',
+    location: '',
+    group: '',
     managers: '',
   });
   const [loading, setLoading] = useState(false);
@@ -51,8 +54,11 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
       setFormData({
         store_name: '',
         store_code: '',
+        store_type: '',
         contact_no: '',
-        address: '',
+        city: '',
+        location: '',
+        group: '',
         managers: '',
       });
       onSuccess();
@@ -112,6 +118,19 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
 
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">
+                Store Type
+              </label>
+              <input
+                type="text"
+                value={formData.store_type}
+                onChange={(e) => setFormData({ ...formData, store_type: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. Retail, Warehouse"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
                 Contact Number
               </label>
               <input
@@ -119,19 +138,46 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
                 value={formData.contact_no}
                 onChange={(e) => setFormData({ ...formData, contact_no: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="e.g. +1234567890"
+                placeholder="e.g. 09123456789"
               />
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">
-                Address
+                City
               </label>
-              <textarea
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none h-24"
-                placeholder="Store address..."
+              <input
+                type="text"
+                value={formData.city}
+                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. Cebu"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Location
+              </label>
+              <input
+                type="text"
+                value={formData.location}
+                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. Downtown"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Group
+              </label>
+              <input
+                type="text"
+                value={formData.group}
+                onChange={(e) => setFormData({ ...formData, group: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. East Region"
               />
             </div>
 
