@@ -56,6 +56,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const newEmployee: Partial<Employee> = {
       id: userId,
+      firstName,
+      lastName,
       fullName: `${firstName} ${lastName}`,
       email,
       contact_number: contact_number || null,
