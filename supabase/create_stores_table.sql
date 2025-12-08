@@ -2,8 +2,11 @@ create table if not exists public.stores (
   id uuid default gen_random_uuid() primary key,
   store_name text not null,
   store_code text not null unique,
+  store_type text,
   contact_no text,
-  address text,
+  city text,
+  location text,
+  "group" text,
   managers text[],
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );

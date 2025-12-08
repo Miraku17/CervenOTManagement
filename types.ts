@@ -82,8 +82,11 @@ export interface Store {
   id: string;
   store_name: string;
   store_code: string;
+  store_type: string;
   contact_no: string;
-  address: string;
+  city: string;
+  location: string;
+  group: string;
   managers: string[]; // Changed to string array
   created_at: string;
 }

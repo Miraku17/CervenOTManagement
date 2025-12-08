@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Phone, MapPin, Calendar, Clock, Briefcase, Loader2, Edit2, Save, X, Key, CalendarDays } from 'lucide-react';
 import { Employee, AttendanceRecord, Position } from '@/types';
 import { format, parseISO, getDay } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
 import UpdatePasswordModal from './UpdatePasswordModal';
 import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
@@ -13,6 +14,7 @@ interface EmployeeDetailProps {
 }
 
 const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpdate }) => {
+  const PHILIPPINE_TZ = 'Asia/Manila';
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendance, setAttendance] = useState<AttendanceRecord | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -438,7 +440,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative">
             <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
                 <Clock className="text-blue-400" size={20} />
-                Attendance Log: <span className="text-blue-300">{format(parseISO(selectedDate), 'MMMM dd, yyyy')}</span>
+                Attendance Log: <span className="text-blue-300">{formatInTimeZone(parseISO(selectedDate), PHILIPPINE_TZ, 'MMMM dd, yyyy')}</span>
             </h3>
 
             {isLoading ? (
@@ -515,25 +517,13 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         <div className="space-y-2 text-xs">
                           <div className="flex items-center gap-2 text-slate-400">
                             <Calendar size={14} />
-                            <span>Requested: {new Date(attendance.overtimeRequest.requestedAt).toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })}</span>
+                            <span>Requested: {formatInTimeZone(new Date(attendance.overtimeRequest.requestedAt), PHILIPPINE_TZ, 'MMM dd, yyyy hh:mm a')}</span>
                           </div>
 
                           {attendance.overtimeRequest.approvedAt && (
                             <div className="flex items-center gap-2 text-slate-400">
                               <Calendar size={14} />
-                              <span>{attendance.overtimeRequest.status === 'approved' ? 'Approved' : 'Rejected'}: {new Date(attendance.overtimeRequest.approvedAt).toLocaleString('en-US', {
-                                month: 'short',
-                                day: 'numeric',
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              })}</span>
+                              <span>{attendance.overtimeRequest.status === 'approved' ? 'Approved' : 'Rejected'}: {formatInTimeZone(new Date(attendance.overtimeRequest.approvedAt), PHILIPPINE_TZ, 'MMM dd, yyyy hh:mm a')}</span>
                             </div>
                           )}
 

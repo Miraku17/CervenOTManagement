@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -69,21 +70,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       reviewerProfile = reviewer;
     }
 
-    // Format the response
+    // Format the response with Philippine timezone
+    const PHILIPPINE_TZ = 'Asia/Manila';
     const formattedAttendance = {
       id: data.id,
       userId: data.user_id,
       date: data.date,
-      timeIn: data.time_in ? new Date(data.time_in).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }) : null,
-      timeOut: data.time_out ? new Date(data.time_out).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      }) : null,
+      timeIn: data.time_in ? formatInTimeZone(new Date(data.time_in), PHILIPPINE_TZ, 'hh:mm a') : null,
+      timeOut: data.time_out ? formatInTimeZone(new Date(data.time_out), PHILIPPINE_TZ, 'hh:mm a') : null,
       totalHours: data.total_minutes ? (data.total_minutes / 60).toFixed(2) : null,
       totalMinutes: data.total_minutes,
       status: data.time_out ? 'Present' : 'In Progress',
