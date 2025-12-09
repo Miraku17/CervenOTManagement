@@ -1,14 +1,19 @@
-import React, { useMemo, useState, useEffect} from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { WorkLog } from '@/types';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History, Loader2 } from 'lucide-react';
 
 interface CalendarViewProps {
   logs: WorkLog[];
+  userId?: string;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  
+  // Store monthly summaries: date string -> total_minutes_final
+  const [monthlySummaries, setMonthlySummaries] = useState<Record<string, number>>({});
+  const [isLoadingMonth, setIsLoadingMonth] = useState(false);
 
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -17,6 +22,44 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Fetch monthly summaries when view changes
+  useEffect(() => {
+    const fetchMonthlySummaries = async () => {
+      if (!userId) return;
+
+      setIsLoadingMonth(true);
+      
+      // Calculate start and end date of the view month
+      // Start: 1st day of month
+      const startDateObj = new Date(viewYear, viewMonth, 1);
+      const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
+      
+      // End: Last day of month
+      const endDateObj = new Date(viewYear, viewMonth + 1, 0);
+      const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
+
+      try {
+        const response = await fetch(`/api/attendance/daily-summary?userId=${userId}&startDate=${startDate}&endDate=${endDate}`);
+        
+        if (response.ok) {
+           const data = await response.json();
+           const summaries = data.summaries || [];
+           const map: Record<string, number> = {};
+           summaries.forEach((s: any) => {
+               map[s.work_date] = s.total_minutes_final;
+           });
+           setMonthlySummaries(prev => ({...prev, ...map}));
+        }
+      } catch (e) {
+        console.error("Failed to fetch monthly summaries", e);
+      } finally {
+        setIsLoadingMonth(false);
+      }
+    };
+
+    fetchMonthlySummaries();
+  }, [viewMonth, viewYear, userId]);
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sunday
@@ -35,6 +78,21 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
 
   const getDailyTotalSeconds = (date: string) => {
       return (logsByDate[date] || []).reduce((acc, log) => acc + log.durationSeconds, 0);
+  };
+
+  const getDisplayHoursForDate = (date: string) => {
+      // Check if we have a summary from API
+      if (monthlySummaries[date] !== undefined) {
+          return (monthlySummaries[date] / 60).toFixed(1);
+      }
+      // Fallback to logs calculation
+      const totalSeconds = getDailyTotalSeconds(date);
+      return (totalSeconds / 3600).toFixed(1);
+  };
+  
+  const hasWorkForDate = (date: string) => {
+       if (monthlySummaries[date] !== undefined && monthlySummaries[date] > 0) return true;
+       return getDailyTotalSeconds(date) > 0;
   };
 
   const monthName = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long' });
@@ -71,9 +129,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
 
     for (let d = 1; d <= daysInMonth; d++) {
         const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const totalSeconds = getDailyTotalSeconds(dateStr);
-        const hours = (totalSeconds / 3600).toFixed(1);
-        const hasWork = totalSeconds > 0;
+        
+        const hours = getDisplayHoursForDate(dateStr);
+        const hasWork = hasWorkForDate(dateStr);
+        
         const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
         const isSelected = selectedDate === dateStr;
 
@@ -121,6 +180,17 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
       return `${h}h ${m}m`;
   };
 
+  // For the modal display
+  const displayTotalHoursModal = useMemo(() => {
+    if (!selectedDate) return "0.00";
+    
+    if (monthlySummaries[selectedDate] !== undefined) {
+      return (monthlySummaries[selectedDate] / 60).toFixed(2);
+    }
+    
+    return (getDailyTotalSeconds(selectedDate) / 3600).toFixed(2);
+  }, [monthlySummaries, selectedDate, logsByDate]);
+
   return (
     <>
         <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-4 md:p-6 shadow-xl">
@@ -128,6 +198,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
                 <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
                     <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
                     Work Calendar
+                    {isLoadingMonth && <Loader2 className="w-4 h-4 animate-spin text-slate-500 ml-2" />}
                 </h3>
                 <div className="flex items-center gap-3 sm:gap-4 text-slate-400 text-xs sm:text-sm w-full sm:w-auto justify-between sm:justify-start">
                    <span className="font-medium">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
@@ -264,8 +335,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs }) => {
 
                     <div className="p-3 sm:p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
                         <span className="text-slate-400 text-xs sm:text-sm font-medium">Total Hours</span>
-                        <span className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
-                             {(getDailyTotalSeconds(selectedDate) / 3600).toFixed(2)} <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>
+                         {/* Using data from monthly fetch, no loading spinner needed here as it should be ready if date is selectable */}
+                         <span className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
+                                {displayTotalHoursModal} <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>
                         </span>
                     </div>
                 </div>

@@ -17,27 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
-    // Check if user already clocked in today
-    const { data: existingAttendance, error: checkError } = await supabase
-      .from('attendance')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('date', today)
-      .is('time_out', null)
-      .single();
-
-    if (checkError && checkError.code !== 'PGRST116') {
-      throw checkError;
-    }
-
-    if (existingAttendance) {
-      return res.status(400).json({
-        error: 'Already clocked in',
-        attendance: existingAttendance
-      });
-    }
-
-    // Create new attendance record
+    // Create new attendance record (allows multiple clock-ins per day)
     const { data: attendance, error: insertError } = await supabase
       .from('attendance')
       .insert({
@@ -75,14 +55,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } catch (error: any) {
     console.error('Clock-in error:', error);
 
-    // Handle specific database errors
-    if (error.code === '23505' || error.message?.includes('duplicate key')) {
-      return res.status(400).json({
-        error: 'You have already clocked in today'
-      });
-    }
-
-    // Generic error
     return res.status(500).json({
       error: 'Failed to clock in. Please try again.'
     });

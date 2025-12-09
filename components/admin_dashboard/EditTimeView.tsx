@@ -8,7 +8,7 @@ interface EditTimeViewProps {
   employees: Employee[];
 }
 
-interface AttendanceData {
+interface SessionData {
   id: string;
   time_in: string;
   time_out: string | null;
@@ -17,6 +17,13 @@ interface AttendanceData {
     comment: string | null;
     status: 'pending' | 'approved' | 'rejected';
   } | null;
+}
+
+interface AttendanceData {
+  sessions: SessionData[];
+  totalHours: string | null;
+  status: string;
+  sessionCount: number;
 }
 
 const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
@@ -30,17 +37,19 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
   );
   const [attendance, setAttendance] = useState<AttendanceData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingSessionId, setSavingSessionId] = useState<string | null>(null);
   const [message, setMessage] = useState<{
     type: "success" | "error";
     text: string;
   } | null>(null);
 
-  // Edited values
-  const [editedTimeIn, setEditedTimeIn] = useState("");
-  const [editedTimeOut, setEditedTimeOut] = useState("");
-  const [editedOvertimeComment, setEditedOvertimeComment] = useState("");
-  const [editedOvertimeStatus, setEditedOvertimeStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
+  // Edited values stored per session ID
+  const [editedSessions, setEditedSessions] = useState<Map<string, {
+    timeIn: string;
+    timeOut: string;
+    overtimeComment: string;
+    overtimeStatus: 'pending' | 'approved' | 'rejected';
+  }>>(new Map());
 
   // Filter employees based on search
   const filteredEmployees = employees.filter(
@@ -76,59 +85,54 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     setMessage(null);
 
     try {
-      const response = await fetch(
-        `/api/attendance/user-details?userId=${selectedEmployee.id}&date=${selectedDate}`
+      // Get raw data with Philippines Time conversion from database
+      const rawResponse = await fetch(
+        `/api/attendance/get-raw?userId=${selectedEmployee.id}&date=${selectedDate}`
       );
-      const data = await response.json();
+      const rawData = await rawResponse.json();
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch attendance");
-      }
+      console.log("Raw Data:", rawData);
 
-      if (data.attendance) {
-        // Get raw data with Philippines Time conversion from database
-        const rawResponse = await fetch(
-          `/api/attendance/get-raw?userId=${selectedEmployee.id}&date=${selectedDate}`
-        );
-        const rawData = await rawResponse.json();
+      if (rawData.sessions && rawData.sessions.length > 0) {
+        setAttendance({
+          sessions: rawData.sessions,
+          totalHours: rawData.totalHours,
+          status: rawData.status,
+          sessionCount: rawData.sessionCount
+        });
 
-        console.log("Raw Data:", rawData);
-
-        if (rawData.attendance) {
-          setAttendance({
-            id: rawData.attendance.id,
-            time_in: rawData.attendance.time_in,
-            time_out: rawData.attendance.time_out,
-            overtimeRequest: rawData.attendance.overtimeRequest || null,
+        // Initialize edited sessions map
+        const newEditedSessions = new Map();
+        rawData.sessions.forEach((session: SessionData) => {
+          newEditedSessions.set(session.id, {
+            timeIn: formatDatetimeLocal(session.time_in),
+            timeOut: formatDatetimeLocal(session.time_out),
+            overtimeComment: session.overtimeRequest?.comment || "",
+            overtimeStatus: session.overtimeRequest?.status || 'pending'
           });
-
-          // Use formatted times from API (Supabase already applies +0800 timezone)
-          setEditedTimeIn(formatDatetimeLocal(rawData.attendance.time_in));
-          setEditedTimeOut(formatDatetimeLocal(rawData.attendance.time_out));
-
-          setEditedOvertimeComment(rawData.attendance.overtimeRequest?.comment || "");
-          setEditedOvertimeStatus(rawData.attendance.overtimeRequest?.status || 'pending');
-        }
+        });
+        setEditedSessions(newEditedSessions);
       } else {
         setAttendance(null);
-        setEditedTimeIn("");
-        setEditedTimeOut("");
-        setEditedOvertimeComment("");
-        setEditedOvertimeStatus('pending');
+        setEditedSessions(new Map());
       }
     } catch (error: any) {
       console.error("Error fetching attendance:", error);
       setMessage({ type: "error", text: error.message });
       setAttendance(null);
+      setEditedSessions(new Map());
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (sessionId: string, session: SessionData) => {
     if (!selectedEmployee || !attendance) return;
 
-    setIsSaving(true);
+    const editedData = editedSessions.get(sessionId);
+    if (!editedData) return;
+
+    setSavingSessionId(sessionId);
     setMessage(null);
 
     try {
@@ -136,12 +140,12 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          attendanceId: attendance.id,
-          timeIn: editedTimeIn,
-          timeOut: editedTimeOut || null,
-          overtimeComment: editedOvertimeComment || null,
-          overtimeStatus: editedOvertimeStatus,
-          overtimeRequestId: attendance.overtimeRequest?.id || null,
+          attendanceId: sessionId,
+          timeIn: editedData.timeIn,
+          timeOut: editedData.timeOut || null,
+          overtimeComment: editedData.overtimeComment || null,
+          overtimeStatus: editedData.overtimeStatus,
+          overtimeRequestId: session.overtimeRequest?.id || null,
           adminId: user?.id || null,
         }),
       });
@@ -152,14 +156,28 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
         throw new Error(data.error || "Failed to update attendance");
       }
 
-      setMessage({ type: "success", text: "Attendance updated successfully!" });
+      setMessage({ type: "success", text: "Session updated successfully!" });
       fetchAttendance(); // Refresh data
     } catch (error: any) {
       console.error("Error updating attendance:", error);
       setMessage({ type: "error", text: error.message });
     } finally {
-      setIsSaving(false);
+      setSavingSessionId(null);
     }
+  };
+
+  const updateSessionField = (sessionId: string, field: string, value: any) => {
+    setEditedSessions(prev => {
+      const newMap = new Map(prev);
+      const session = newMap.get(sessionId) || {
+        timeIn: "",
+        timeOut: "",
+        overtimeComment: "",
+        overtimeStatus: 'pending' as const
+      };
+      newMap.set(sessionId, { ...session, [field]: value });
+      return newMap;
+    });
   };
 
   return (
@@ -277,121 +295,160 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                     {selectedEmployee.fullName} •{" "}
                     {format(new Date(selectedDate), "MMMM dd, yyyy")}
                   </p>
+                  <div className="flex gap-4 mt-3 text-sm">
+                    <span className="text-slate-300">
+                      <span className="text-slate-500">Total Hours:</span> {attendance.totalHours || '--'} hrs
+                    </span>
+                    <span className="text-slate-300">
+                      <span className="text-slate-500">Sessions:</span> {attendance.sessionCount}
+                    </span>
+                    <span className={`font-medium ${
+                      attendance.status === 'In Progress' ? 'text-blue-400' : 'text-emerald-400'
+                    }`}>
+                      {attendance.status}
+                    </span>
+                  </div>
                 </div>
 
-                {/* Check if time out is not done */}
-                {!attendance.time_out ? (
-                  <div className="p-6 bg-amber-500/10 border border-amber-500/20 rounded-xl text-center">
-                    <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-3" />
-                    <p className="text-lg font-semibold text-amber-300 mb-2">
-                      Time in and out not done
-                    </p>
-                    <p className="text-sm text-amber-400/80">
-                      This employee has not clocked out yet. You can only edit
-                      completed attendance records.
-                    </p>
+                {message && (
+                  <div
+                    className={`p-4 rounded-xl border ${
+                      message.type === "success"
+                        ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                        : "bg-rose-500/10 border-rose-500/20 text-rose-400"
+                    }`}
+                  >
+                    {message.text}
                   </div>
-                ) : (
-                  <>
-                    {message && (
-                      <div
-                        className={`p-4 rounded-xl border ${
-                          message.type === "success"
-                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                            : "bg-rose-500/10 border-rose-500/20 text-rose-400"
-                        }`}
-                      >
-                        {message.text}
-                      </div>
-                    )}
-
-                    <div className="space-y-4">
-                      {/* Time In */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Time In
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={editedTimeIn}
-                          onChange={(e) => setEditedTimeIn(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none [color-scheme:dark]"
-                        />
-                      </div>
-
-                      {/* Time Out */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Time Out
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={editedTimeOut}
-                          onChange={(e) => setEditedTimeOut(e.target.value)}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none [color-scheme:dark]"
-                        />
-                      </div>
-
-                      {/* Overtime Status */}
-                      {attendance.overtimeRequest && (
-                        <div>
-                          <label className="block text-sm font-medium text-slate-300 mb-2">
-                            Overtime Status
-                          </label>
-                          <select
-                            value={editedOvertimeStatus}
-                            onChange={(e) => setEditedOvertimeStatus(e.target.value as 'pending' | 'approved' | 'rejected')}
-                            className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="approved">Approved</option>
-                            <option value="rejected">Rejected</option>
-                          </select>
-                        </div>
-                      )}
-
-                      {/* Overtime Comment */}
-                      <div>
-                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                          Overtime Comment
-                        </label>
-                        <textarea
-                          value={editedOvertimeComment}
-                          onChange={(e) =>
-                            setEditedOvertimeComment(e.target.value)
-                          }
-                          placeholder="Add overtime comment..."
-                          rows={3}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none"
-                        />
-                        {!attendance.overtimeRequest && editedOvertimeComment && (
-                          <p className="text-xs text-slate-500 mt-1">
-                            Adding a comment will create a new overtime request
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Save Button */}
-                      <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
-                      >
-                        {isSaving ? (
-                          <>
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Save className="w-5 h-5" />
-                            Save Changes
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </>
                 )}
+
+                {/* Sessions List */}
+                <div className="space-y-4">
+                  {attendance.sessions.map((session, index) => {
+                    const editedData = editedSessions.get(session.id);
+                    if (!editedData) return null;
+
+                    const isSaving = savingSessionId === session.id;
+                    const hasTimeOut = !!session.time_out;
+
+                    return (
+                      <div key={session.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
+                          <h3 className="text-lg font-semibold text-white">Session {index + 1}</h3>
+                          <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                            hasTimeOut
+                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                          }`}>
+                            {hasTimeOut ? 'Completed' : 'Active'}
+                          </span>
+                        </div>
+
+                        {!hasTimeOut && (
+                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
+                            <div className="flex items-start gap-2">
+                              <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                              <div>
+                                <p className="text-sm font-medium text-amber-300">Session not completed</p>
+                                <p className="text-xs text-amber-400/80 mt-1">
+                                  This session has not been clocked out yet. You can only edit completed sessions.
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="space-y-4">
+                          {/* Time In */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Time In
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={editedData.timeIn}
+                              onChange={(e) => updateSessionField(session.id, 'timeIn', e.target.value)}
+                              disabled={!hasTimeOut}
+                              className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none [color-scheme:dark] disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                          </div>
+
+                          {/* Time Out */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Time Out
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={editedData.timeOut}
+                              onChange={(e) => updateSessionField(session.id, 'timeOut', e.target.value)}
+                              disabled={!hasTimeOut}
+                              className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none [color-scheme:dark] disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                          </div>
+
+                          {/* Overtime Status */}
+                          {session.overtimeRequest && (
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Overtime Status
+                              </label>
+                              <select
+                                value={editedData.overtimeStatus}
+                                onChange={(e) => updateSessionField(session.id, 'overtimeStatus', e.target.value)}
+                                disabled={!hasTimeOut}
+                                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                              </select>
+                            </div>
+                          )}
+
+                          {/* Overtime Comment */}
+                          <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                              Overtime Comment
+                            </label>
+                            <textarea
+                              value={editedData.overtimeComment}
+                              onChange={(e) => updateSessionField(session.id, 'overtimeComment', e.target.value)}
+                              disabled={!hasTimeOut}
+                              placeholder="Add overtime comment..."
+                              rows={3}
+                              className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            {!session.overtimeRequest && editedData.overtimeComment && (
+                              <p className="text-xs text-slate-500 mt-1">
+                                Adding a comment will create a new overtime request
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Save Button */}
+                          <button
+                            onClick={() => handleSave(session.id, session)}
+                            disabled={!hasTimeOut || isSaving}
+                            className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                          >
+                            {isSaving ? (
+                              <>
+                                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <Save className="w-5 h-5" />
+                                Save Session {index + 1}
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
