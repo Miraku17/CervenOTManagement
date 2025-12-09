@@ -14,18 +14,14 @@ interface DashboardStats {
   weeklyHours: number;
 }
 
-interface RecentActivity {
+interface ActivityLog {
   id: string;
-  employeeName: string;
-  email: string;
-  date: string;
   timeIn: string;
   timeOut: string | null;
   clockInAddress: string | null;
   clockOutAddress: string | null;
   duration: string | null;
   status: string;
-  avatarSeed: string;
   overtimeRequest?: {
     comment: string | null;
     status: 'pending' | 'approved' | 'rejected';
@@ -34,6 +30,18 @@ interface RecentActivity {
       last_name: string;
     } | null;
   } | null;
+}
+
+interface RecentActivity {
+  id: string;
+  employeeName: string;
+  email: string;
+  date: string;
+  totalDuration: string | null;
+  status: string;
+  sessionCount: number;
+  avatarSeed: string;
+  logs: ActivityLog[];
 }
 
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
@@ -51,7 +59,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
       // Fetch all data in parallel
       const [statsRes, activityRes] = await Promise.all([
         fetch('/api/dashboard/stats'),
-        fetch('/api/dashboard/recent-activity?limit=10')
+        fetch('/api/dashboard/recent-activity?limit=20')
       ]);
 
       const statsData = await statsRes.json();
@@ -118,7 +126,8 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
             <>
               {recentActivity.map((activity) => (
                 <div key={activity.id} className="bg-slate-950 border border-slate-800 rounded-xl p-4 hover:border-slate-700 transition-all">
-                  <div className="flex items-start gap-3 mb-3">
+                  {/* Header */}
+                  <div className="flex items-start gap-3 mb-3 pb-3 border-b border-slate-800">
                     <img
                       src={`https://api.dicebear.com/7.x/initials/svg?seed=${activity.avatarSeed}`}
                       alt={activity.employeeName}
@@ -127,81 +136,79 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="text-sm font-semibold text-white truncate">{activity.employeeName}</p>
-                        {activity.overtimeRequest && (
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            activity.overtimeRequest.status === 'approved'
-                              ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
-                              : activity.overtimeRequest.status === 'rejected'
-                              ? 'bg-red-500/10 border border-red-500/20 text-red-400'
-                              : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
-                          }`}>
-                            OT: {activity.overtimeRequest.status}
-                          </span>
-                        )}
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${
+                          activity.status === 'Active'
+                            ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20'
+                            : 'text-blue-400 bg-blue-400/10 border border-blue-400/20'
+                        }`}>
+                          {activity.status}
+                        </span>
                       </div>
                       <p className="text-xs text-slate-400">{activity.email}</p>
+                      <div className="flex items-center gap-3 mt-2 text-xs">
+                        <span className="text-slate-500">{activity.date}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-emerald-400 font-medium">{activity.totalDuration || '-'}</span>
+                        <span className="text-slate-600">•</span>
+                        <span className="text-slate-500">{activity.sessionCount} session{activity.sessionCount > 1 ? 's' : ''}</span>
+                      </div>
                     </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap ${
-                      activity.status === 'Active'
-                        ? 'text-emerald-400 bg-emerald-400/10 border border-emerald-400/20'
-                        : 'text-blue-400 bg-blue-400/10 border border-blue-400/20'
-                    }`}>
-                      {activity.status}
-                    </span>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800">
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Date</p>
-                      <p className="text-xs text-slate-300">{activity.date}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Duration</p>
-                      <p className="text-xs text-emerald-400 font-medium">{activity.duration || '-'}</p>
-                    </div>
-                    <div className="col-span-2 grid grid-cols-2 gap-2">
-                       <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time In</p>
-                          <p className="text-xs text-slate-300">{activity.timeIn}</p>
-                          <p className="text-[10px] text-slate-400 mt-1 truncate" title={activity.clockInAddress || 'No address provided'}>
-                            {activity.clockInAddress || 'No address provided'}
-                          </p>
-                       </div>
-                       <div>
-                          <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Time Out</p>
-                          <p className="text-xs text-slate-300">{activity.timeOut || '-'}</p>
-                          {activity.timeOut && (
-                            <p className="text-[10px] text-slate-400 mt-1 truncate" title={activity.clockOutAddress || 'No address provided'}>
-                              {activity.clockOutAddress || 'No address provided'}
-                            </p>
+                  {/* Clock In/Out Logs */}
+                  <div className="space-y-3">
+                    {activity.logs.map((log, index) => (
+                      <div key={log.id} className="bg-slate-900/50 border border-slate-800/50 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-xs font-medium text-slate-400">Session {index + 1}</span>
+                          {log.overtimeRequest && (
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              log.overtimeRequest.status === 'approved'
+                                ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                                : log.overtimeRequest.status === 'rejected'
+                                ? 'bg-red-500/10 border border-red-500/20 text-red-400'
+                                : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
+                            }`}>
+                              OT: {log.overtimeRequest.status}
+                            </span>
                           )}
-                       </div>
-                    </div>
+                          {log.duration && (
+                            <span className="text-xs text-emerald-400 font-medium ml-auto">{log.duration}</span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Clock In</p>
+                            <p className="text-slate-300 font-medium">{log.timeIn}</p>
+                            <p className="text-[10px] text-slate-400 mt-1 truncate" title={log.clockInAddress || 'No address'}>
+                              {log.clockInAddress || 'No address'}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] text-slate-500 uppercase font-medium mb-1">Clock Out</p>
+                            <p className="text-slate-300 font-medium">{log.timeOut || '-'}</p>
+                            {log.timeOut && (
+                              <p className="text-[10px] text-slate-400 mt-1 truncate" title={log.clockOutAddress || 'No address'}>
+                                {log.clockOutAddress || 'No address'}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {log.overtimeRequest && log.overtimeRequest.comment && (
+                          <div className="mt-2 pt-2 border-t border-slate-800/50">
+                            <div className="flex items-start gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 mt-0.5 shrink-0">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                              </svg>
+                              <p className="text-[10px] text-slate-400 italic line-clamp-1">"{log.overtimeRequest.comment}"</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                  
-                  {activity.overtimeRequest && (
-                    <div className="mt-3 pt-3 border-t border-slate-800/50">
-                      {activity.overtimeRequest.comment && (
-                        <div className="flex items-start gap-2 mb-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 mt-0.5 shrink-0">
-                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                          </svg>
-                          <p className="text-xs text-slate-400 italic line-clamp-2">"{activity.overtimeRequest.comment}"</p>
-                        </div>
-                      )}
-                      {activity.overtimeRequest.reviewer && (
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-                            <circle cx="9" cy="7" r="4"/>
-                            <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
-                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                          </svg>
-                          <span>Reviewed by {activity.overtimeRequest.reviewer.first_name} {activity.overtimeRequest.reviewer.last_name}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               ))}
             </>

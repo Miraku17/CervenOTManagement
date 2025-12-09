@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -18,51 +19,85 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { data, error } = await supabase
+    // Fetch all attendance records for the specific user and date
+    const { data: attendanceRecords, error } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
       .eq('date', date)
-      .single();
+      .order('time_in', { ascending: true });
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error;
     }
 
-    if (!data) {
+    // If no records found
+    if (!attendanceRecords || attendanceRecords.length === 0) {
       return res.status(200).json({
-        attendance: null,
-        message: 'No attendance record found'
+        sessions: [],
+        totalHours: null,
+        status: 'No Record',
+        sessionCount: 0,
+        message: 'No attendance record found for this date'
       });
     }
 
-    // Fetch overtime request if exists
+    // Fetch overtime requests for all attendance records
+    const attendanceIds = attendanceRecords.map(a => a.id);
     const { data: overtimeData } = await supabase
       .from('overtime')
-      .select('id, comment, status')
-      .eq('attendance_id', data.id)
-      .single();
+      .select('id, attendance_id, comment, status')
+      .in('attendance_id', attendanceIds);
 
-    // Format times for datetime-local input (Supabase already applies +0800 timezone)
+    // Create overtime map
+    const overtimeMap = new Map(
+      overtimeData?.map(ot => [
+        ot.attendance_id,
+        {
+          id: ot.id,
+          comment: ot.comment,
+          status: ot.status
+        }
+      ]) || []
+    );
+
+    // Format times for datetime-local input in Philippine timezone
+    const PHILIPPINE_TZ = 'Asia/Manila';
     const formatForInput = (isoTime: string | null) => {
       if (!isoTime) return null;
-      // Just convert to format YYYY-MM-DDTHH:mm (Supabase already has correct timezone)
-      return isoTime.slice(0, 16);
+      // Convert UTC to Philippine time and format for datetime-local input
+      return formatInTimeZone(new Date(isoTime), PHILIPPINE_TZ, "yyyy-MM-dd'T'HH:mm");
     };
 
-    const formattedData = {
-      ...data,
-      time_in_formatted: formatForInput(data.time_in),
-      time_out_formatted: formatForInput(data.time_out),
-      overtimeRequest: overtimeData ? {
-        id: overtimeData.id,
-        comment: overtimeData.comment,
-        status: overtimeData.status
-      } : null
-    };
+    let totalMinutes = 0;
+    let hasActiveSession = false;
+
+    const formattedSessions = attendanceRecords.map(record => {
+      const overtime = overtimeMap.get(record.id);
+      const isActive = !record.time_out;
+
+      if (isActive) {
+        hasActiveSession = true;
+      }
+
+      if (record.total_minutes) {
+        totalMinutes += record.total_minutes;
+      }
+
+      return {
+        id: record.id,
+        time_in: formatForInput(record.time_in),
+        time_out: formatForInput(record.time_out),
+        total_minutes: record.total_minutes,
+        overtimeRequest: overtime || null
+      };
+    });
 
     return res.status(200).json({
-      attendance: formattedData
+      sessions: formattedSessions,
+      totalHours: totalMinutes > 0 ? (totalMinutes / 60).toFixed(2) : null,
+      status: hasActiveSession ? 'In Progress' : 'Completed',
+      sessionCount: formattedSessions.length
     });
 
   } catch (error: any) {
