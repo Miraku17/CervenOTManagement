@@ -419,7 +419,10 @@ export default function AssetInventoryPage() {
                                   <Edit2 size={16} />
                                 </button>
                                 <button
-                                  onClick={() => setDeleteId(asset.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setDeleteId(asset.id);
+                                  }}
                                   className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
                                   title="Delete asset"
                                 >
