@@ -42,6 +42,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // Fetch daily summary if available
+    const { data: dailySummary } = await supabase
+      .from('attendance_daily_summary')
+      .select('total_minutes_final')
+      .eq('user_id', userId)
+      .eq('work_date', date)
+      .single();
+
     // Fetch overtime requests for all attendance records
     const attendanceIds = attendanceRecords.map(a => a.id);
     const { data: overtimeData } = await supabase
@@ -92,6 +100,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         overtimeRequest: overtime || null
       };
     });
+
+    // Use daily summary final minutes if available
+    if (dailySummary && typeof dailySummary.total_minutes_final === 'number') {
+        totalMinutes = dailySummary.total_minutes_final;
+    }
 
     return res.status(200).json({
       sessions: formattedSessions,

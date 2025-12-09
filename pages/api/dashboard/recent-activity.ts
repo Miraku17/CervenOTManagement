@@ -15,6 +15,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     startDate.setDate(startDate.getDate() - 7);
     const startDateStr = startDate.toISOString().split('T')[0];
 
+    // Fetch daily summaries for the same period first to have them ready
+    const { data: dailySummaries } = await supabase
+      .from('attendance_daily_summary')
+      .select('user_id, work_date, total_minutes_final')
+      .gte('work_date', startDateStr);
+
+    const summaryMap = new Map();
+    dailySummaries?.forEach(ds => {
+        summaryMap.set(`${ds.user_id}_${ds.work_date}`, ds.total_minutes_final);
+    });
+
     // Get recent attendance with user profiles
     const { data: recentActivity, error } = await supabase
       .from('attendance')
@@ -138,14 +149,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Calculate total duration for the day
       let totalMinutes = 0;
-      group.logs.forEach((log: any) => {
-        if (log.duration) {
-          const parts = log.duration.split(' ');
-          const hours = parseInt(parts[0]) || 0;
-          const minutes = parseInt(parts[1]) || 0;
-          totalMinutes += hours * 60 + minutes;
-        }
-      });
+      const summaryKey = `${group.user_id}_${group.date}`;
+      const finalMinutes = summaryMap.get(summaryKey);
+
+      if (typeof finalMinutes === 'number') {
+        // Use the final minutes from the daily summary table if available
+        totalMinutes = finalMinutes;
+      } else {
+        // Fallback: Sum up duration of individual logs
+        group.logs.forEach((log: any) => {
+          if (log.duration) {
+            const parts = log.duration.split(' ');
+            const hours = parseInt(parts[0]) || 0;
+            const minutes = parseInt(parts[1]) || 0;
+            totalMinutes += hours * 60 + minutes;
+          }
+        });
+      }
 
       const totalHours = Math.floor(totalMinutes / 60);
       const remainingMinutes = totalMinutes % 60;
