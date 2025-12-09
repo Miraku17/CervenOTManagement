@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Filter, Download, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
 import StoreInventoryModal from '@/components/ticketing/StoreInventoryModal';
+import StoreInventoryDetailModal from '@/components/ticketing/StoreInventoryDetailModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -10,6 +11,8 @@ import autoTable from 'jspdf-autotable';
 interface InventoryItem {
   id: string;
   serial_number: string | null;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   created_at: string;
   updated_at: string;
   stores: {
@@ -56,6 +59,10 @@ export default function StoreInventoryPage() {
   const [deleteItem, setDeleteItem] = useState<InventoryItem | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Detail Modal State
+  const [detailItem, setDetailItem] = useState<InventoryItem | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Toast notification state
   const [toast, setToast] = useState<{
@@ -616,7 +623,14 @@ export default function StoreInventoryPage() {
                       </tr>
                     ) : (
                       filteredItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-slate-800/50 transition-colors group">
+                        <tr
+                          key={item.id}
+                          onClick={() => {
+                            setDetailItem(item);
+                            setIsDetailModalOpen(true);
+                          }}
+                          className="hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                        >
                             <td className="p-4 text-slate-300 font-medium">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500">
@@ -648,14 +662,20 @@ export default function StoreInventoryPage() {
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => handleEdit(item)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEdit(item);
+                                  }}
                                   className="p-2 hover:bg-blue-500/10 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
                                   title="Edit item"
                                 >
                                   <Edit2 size={16} />
                                 </button>
                                 <button
-                                  onClick={() => handleDelete(item)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDelete(item);
+                                  }}
                                   className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
                                   title="Delete item"
                                 >
@@ -684,6 +704,13 @@ export default function StoreInventoryPage() {
         onClose={handleModalClose}
         onSuccess={handleSuccess}
         editItem={editItem}
+      />
+
+      {/* Store Inventory Detail Modal */}
+      <StoreInventoryDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        item={detailItem}
       />
 
       {/* Delete Confirmation Modal */}

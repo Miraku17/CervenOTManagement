@@ -91,4 +91,7 @@ export interface Store {
   group: string;
   managers: string[]; // Changed to string array
   created_at: string;
+  mobile_number?: string;
+  store_address?: string;
+  status?: string;
 }

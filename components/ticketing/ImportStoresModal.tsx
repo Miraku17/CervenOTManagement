@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { X, Upload, FileSpreadsheet, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 
 interface ImportStoresModalProps {
   isOpen: boolean;
@@ -7,9 +7,20 @@ interface ImportStoresModalProps {
   onSuccess: () => void;
 }
 
+interface ImportResult {
+  imported: number;
+  skipped: number;
+  total: number;
+  errors?: string[];
+}
+
 const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<string>('');
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -45,20 +56,85 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
     setIsDragging(false);
   };
 
-  const handleImport = () => {
+  const handleImport = async () => {
     if (!selectedFile) {
       alert('Please select a file first');
       return;
     }
 
-    // TODO: Implement import functionality
-    console.log('Import file:', selectedFile.name);
-    alert('Import functionality will be implemented soon!');
+    setIsLoading(true);
+    setError(null);
+    setImportResult(null);
+    setLoadingStage('Reading file...');
+
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+
+      reader.onload = async (e) => {
+        try {
+          setLoadingStage('Uploading file...');
+          const base64 = e.target?.result as string;
+          const fileData = base64.split(',')[1]; // Remove data:application/...;base64, prefix
+
+          setLoadingStage('Processing data...');
+
+          // Send to API
+          const response = await fetch('/api/stores/import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fileData }),
+          });
+
+          setLoadingStage('Importing stores...');
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || data.details || 'Failed to import stores');
+          }
+
+          setLoadingStage('Finalizing...');
+          setImportResult(data);
+
+          // If successful, refresh the stores list after a short delay
+          setTimeout(() => {
+            onSuccess();
+          }, 1500);
+
+        } catch (err: any) {
+          console.error('Import error:', err);
+          setError(err.message || 'Failed to import stores');
+        } finally {
+          setIsLoading(false);
+          setLoadingStage('');
+        }
+      };
+
+      reader.onerror = () => {
+        setError('Failed to read file');
+        setIsLoading(false);
+        setLoadingStage('');
+      };
+
+      reader.readAsDataURL(selectedFile);
+
+    } catch (err: any) {
+      console.error('Import error:', err);
+      setError(err.message || 'Failed to import stores');
+      setIsLoading(false);
+      setLoadingStage('');
+    }
   };
 
   const handleClose = () => {
     setSelectedFile(null);
     setIsDragging(false);
+    setIsLoading(false);
+    setLoadingStage('');
+    setImportResult(null);
+    setError(null);
     onClose();
   };
 
@@ -168,16 +244,72 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
             )}
           </div>
 
-          {/* Success Message (Placeholder for future) */}
-          {/* <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 size={20} className="text-green-400" />
-              <div className="text-sm text-green-200">
-                <p className="font-medium">Import Successful!</p>
-                <p className="text-green-300/80">Successfully imported X stores</p>
+          {/* Loading Progress Bar */}
+          {isLoading && loadingStage && (
+            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Loader2 size={20} className="text-blue-400 animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <p className="font-medium text-blue-200 text-sm">{loadingStage}</p>
+                    <p className="text-xs text-blue-300/60 mt-0.5">Please wait while we process your file...</p>
+                  </div>
+                </div>
+                {/* Animated Progress Bar */}
+                <div className="w-full bg-slate-800/50 rounded-full h-2 overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full animate-pulse"
+                       style={{
+                         width: loadingStage.includes('Reading') ? '25%' :
+                                loadingStage.includes('Uploading') ? '50%' :
+                                loadingStage.includes('Processing') ? '75%' :
+                                loadingStage.includes('Importing') ? '90%' : '100%',
+                         transition: 'width 0.5s ease-in-out'
+                       }}>
+                  </div>
+                </div>
               </div>
             </div>
-          </div> */}
+          )}
+
+          {/* Success Message */}
+          {importResult && (
+            <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <CheckCircle2 size={20} className="text-green-400 shrink-0 mt-0.5" />
+                <div className="text-sm text-green-200 flex-1">
+                  <p className="font-medium mb-1">Import Completed!</p>
+                  <div className="space-y-1 text-green-300/80">
+                    <p>Successfully imported: <span className="font-semibold">{importResult.imported}</span> stores</p>
+                    <p>Skipped (no store code): <span className="font-semibold">{importResult.skipped}</span> rows</p>
+                    <p>Total rows processed: <span className="font-semibold">{importResult.total}</span></p>
+                  </div>
+                  {importResult.errors && importResult.errors.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-green-500/20">
+                      <p className="font-medium text-yellow-400 mb-1">Warnings:</p>
+                      <ul className="list-disc list-inside space-y-0.5 text-xs text-yellow-300/80 max-h-32 overflow-y-auto">
+                        {importResult.errors.map((err, idx) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
+                <div className="text-sm text-red-200">
+                  <p className="font-medium mb-1">Import Failed</p>
+                  <p className="text-red-300/80">{error}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
 
@@ -185,17 +317,27 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
         <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
           <button
             onClick={handleClose}
-            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+            disabled={isLoading}
+            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Cancel
+            {importResult ? 'Close' : 'Cancel'}
           </button>
           <button
             onClick={handleImport}
-            disabled={!selectedFile}
+            disabled={!selectedFile || isLoading}
             className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            <Upload size={18} />
-            Import Stores
+            {isLoading ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <Upload size={18} />
+                Import Stores
+              </>
+            )}
           </button>
         </div>
       </div>

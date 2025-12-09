@@ -80,6 +80,18 @@ export default function TicketingLayout({
           </button>
         )}
 
+        <button
+          onClick={() => handleNavigate('/dashboard/ticketing/overview')}
+          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+            pathname === '/dashboard/ticketing/overview'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+          }`}
+        >
+          <LayoutDashboard size={20} />
+          <span className="font-medium">Overview</span>
+        </button>
+
         {isAdmin && (
           <>
             <button
@@ -119,6 +131,8 @@ export default function TicketingLayout({
             </button>
           </>
         )}
+
+
 
         <button
           onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
