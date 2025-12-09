@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -9,7 +10,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const {
     store_id,
-    station,
+    station_id,
     mod_id,
     rcc_reference_number,
     request_type,
@@ -18,13 +19,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     problem_category,
     sev,
     date_reported,
+    time_reported,
     status,
     reported_by,
     serviced_by,
   } = req.body;
 
   // Validation
-  if (!store_id || !station || !mod_id || !rcc_reference_number || !request_type || !device || !request_detail || !problem_category || !sev) {
+  if (!store_id || !station_id || !mod_id || !rcc_reference_number || !request_type || !device || !request_detail || !problem_category || !sev) {
     return res.status(400).json({ error: 'All required fields must be filled' });
   }
 
@@ -33,13 +35,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       throw new Error('Database connection not available');
     }
 
+    const PHILIPPINE_TZ = 'Asia/Manila';
+    const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'HH:mm');
+
     // Create the ticket
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('tickets')
       .insert([
         {
           store_id,
-          station,
+          station_id,
           mod_id,
           rcc_reference_number: rcc_reference_number || null,
           request_type,
@@ -48,7 +53,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           problem_category,
           sev,
           date_reported: date_reported || new Date().toISOString(),
-          status: status || 'Open',
+          time_reported: time_reported || currentTime,
+          status: status || 'open',
           reported_by: reported_by || null,
           serviced_by: serviced_by || null,
         },
