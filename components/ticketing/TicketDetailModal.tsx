@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Tool, Box, Activity, Timer } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Ticket {
