@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Store as StoreIcon, MapPin, Phone, User, ArrowRight, FileDown } from 'lucide-react';
+import { Plus, Search, Store as StoreIcon, MapPin, Phone, User, ArrowRight, FileDown, Upload } from 'lucide-react';
 import { Store } from '@/types';
 import StoreModal from '@/components/ticketing/StoreModal';
 import StoreDetailModal from '@/components/ticketing/StoreDetailModal';
+import ImportStoresModal from '@/components/ticketing/ImportStoresModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -17,6 +18,9 @@ export default function StoresPage() {
   // Detail Modal State
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+
+  // Import Modal State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
   const fetchStores = async () => {
     setLoading(true);
@@ -140,6 +144,13 @@ export default function StoresPage() {
             >
               <Plus size={20} />
               <span>Add Store</span>
+            </button>
+            <button
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-colors shadow-lg shadow-green-900/20"
+            >
+              <Upload size={20} />
+              <span>Import XLSX</span>
             </button>
             <button
                 onClick={handlePrintAllStoresPDF}
@@ -270,6 +281,12 @@ export default function StoresPage() {
       <StoreModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        onSuccess={fetchStores}
+      />
+
+      <ImportStoresModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
         onSuccess={fetchStores}
       />
 
