@@ -17,6 +17,8 @@ interface AutocompleteOption {
 interface InventoryItem {
   id: string;
   serial_number: string | null;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   stores: {
     id: string;
     store_name: string;
@@ -73,6 +75,9 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   const [serialNumber, setSerialNumber] = useState('');
+
+  const [underWarranty, setUnderWarranty] = useState<boolean>(false);
+  const [warrantyDate, setWarrantyDate] = useState('');
 
   const [station, setStation] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
@@ -147,6 +152,10 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       // Set serial number
       setSerialNumber(editItem.serial_number || '');
 
+      // Set warranty fields
+      setUnderWarranty(editItem.under_warranty || false);
+      setWarrantyDate(editItem.warranty_date || '');
+
       // Set station
       if (editItem.stations) {
         setStation(editItem.stations.name);
@@ -165,6 +174,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
       setStation('');
       setSelectedStationId(null);
     }
@@ -283,6 +294,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         brand_id: brandId,
         model_id: modelId,
         serial_number: serialNumber || null,
+        under_warranty: underWarranty,
+        warranty_date: warrantyDate || null,
         station_id: stationId,
       };
 
@@ -317,6 +330,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
       setStation('');
       setSelectedStationId(null);
 
@@ -588,6 +603,33 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               placeholder="e.g., SN123456789"
             />
           </div>
+
+          {/* Under Warranty */}
+          <div>
+            <label htmlFor="underWarranty" className="block text-sm font-medium text-slate-300 mb-1">Under Warranty</label>
+            <select
+              id="underWarranty"
+              value={underWarranty ? 'yes' : 'no'}
+              onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+
+          {/* Warranty Date */}
+          <div>
+            <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
+            <input
+              type="date"
+              id="warrantyDate"
+              value={warrantyDate}
+              onChange={(e) => setWarrantyDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
           {/* Station Autocomplete */}
           <div ref={stationRef} className="relative">
             <label htmlFor="station" className="block text-sm font-medium text-slate-300 mb-1">Station</label>

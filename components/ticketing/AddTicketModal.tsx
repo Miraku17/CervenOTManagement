@@ -41,6 +41,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
   const [managers, setManagers] = useState<Manager[]>([]);
+  const [managerOnDuty, setManagerOnDuty] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -152,6 +153,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     const fetchManagers = async () => {
       if (!selectedStore) {
         setManagers([]);
+        setManagerOnDuty('');
         return;
       }
 
@@ -159,11 +161,23 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         const response = await fetch(`/api/stores/managers?store_id=${selectedStore.id}`);
         const data = await response.json();
         if (response.ok) {
-          setManagers(data.managers || []);
+          const fetchedManagers = data.managers || [];
+          setManagers(fetchedManagers);
+
+          // Automatically set the first manager as MOD
+          if (fetchedManagers.length > 0) {
+            const firstManager = fetchedManagers[0];
+            setManagerOnDuty(firstManager.manager_name);
+            setFormData(prev => ({ ...prev, mod_id: firstManager.id }));
+          } else {
+            setManagerOnDuty('No manager assigned');
+            setFormData(prev => ({ ...prev, mod_id: '' }));
+          }
         }
       } catch (err) {
         console.error('Error fetching managers:', err);
         setManagers([]);
+        setManagerOnDuty('');
       }
     };
 
@@ -187,6 +201,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setShowStoreDropdown(false);
     setFormData({ ...formData, store_id: '', mod_id: '', station_id: '' });
     setManagers([]);
+    setManagerOnDuty('');
   };
 
   const filteredStores = stores.filter(store =>
@@ -362,6 +377,85 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
             </div>
 
             {/* Editable fields */}
+            {/* RCC Reference Number and Serviced By */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  RCC Reference Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.rcc_reference_number}
+                  onChange={(e) => setFormData({ ...formData, rcc_reference_number: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                  placeholder="e.g. RCC-2024-001"
+                />
+              </div>
+
+              {/* Serviced By - Employee Selector */}
+              <div ref={employeeDropdownRef} className="relative">
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  Serviced By
+                  {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.name})</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={employeeSearchTerm}
+                    onChange={(e) => {
+                      setEmployeeSearchTerm(e.target.value);
+                      setShowEmployeeDropdown(true);
+                    }}
+                    onFocus={() => setShowEmployeeDropdown(true)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-20 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Search for an employee..."
+                  />
+                  {selectedEmployee && (
+                    <button
+                      type="button"
+                      onClick={handleClearEmployeeSelection}
+                      className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                      title="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                </div>
+
+                {/* Employee Dropdown Menu */}
+                {showEmployeeDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredEmployees.length > 0 ? (
+                      filteredEmployees.map((employee) => (
+                        <button
+                          key={employee.id}
+                          type="button"
+                          onClick={() => handleEmployeeSelect(employee)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <div className="text-sm font-medium text-white">{employee.name}</div>
+                              <div className="text-xs text-slate-400 mt-0.5">
+                                {employee.employee_id && `ID: ${employee.employee_id} • `}
+                                {employee.email}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        No employees found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Store Selector with Dropdown */}
             <div ref={storeDropdownRef} className="relative">
               <label className="block text-sm font-medium text-slate-400 mb-1">
@@ -424,7 +518,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
             {/* Display Selected Store Info (Read-only) */}
             {selectedStore && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-1">Store Name</label>
                   <input
@@ -443,71 +537,38 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Manager on Duty</label>
+                  <input
+                    type="text"
+                    value={managerOnDuty}
+                    readOnly
+                    className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
+                  />
+                </div>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Station <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    required
-                    value={formData.station_id}
-                    onChange={(e) => setFormData({ ...formData, station_id: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!selectedStore}
-                  >
-                    <option value="">Select Station</option>
-                    {stations.map((station) => (
-                      <option key={station.id} value={station.id}>
-                        {station.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Manager on Duty (MOD) <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <select
-                    required
-                    value={formData.mod_id}
-                    onChange={(e) => setFormData({ ...formData, mod_id: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!selectedStore}
-                  >
-                    <option value="">Select Manager</option>
-                    {managers.map((manager) => (
-                      <option key={manager.id} value={manager.id}>
-                        {manager.manager_name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
-                  RCC Reference Number <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Station <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
                   required
-                  value={formData.rcc_reference_number}
-                  onChange={(e) => setFormData({ ...formData, rcc_reference_number: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. RCC-2024-001"
-                />
+                  value={formData.station_id}
+                  onChange={(e) => setFormData({ ...formData, station_id: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!selectedStore}
+                >
+                  <option value="">Select Station</option>
+                  {stations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
               </div>
             </div>
 
@@ -590,68 +651,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                 className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none h-32"
                 placeholder="Please describe the issue or request in detail..."
               />
-            </div>
-
-            {/* Serviced By - Employee Selector */}
-            <div ref={employeeDropdownRef} className="relative">
-              <label className="block text-sm font-medium text-slate-400 mb-1">
-                Serviced By
-                {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.name})</span>}
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={employeeSearchTerm}
-                  onChange={(e) => {
-                    setEmployeeSearchTerm(e.target.value);
-                    setShowEmployeeDropdown(true);
-                  }}
-                  onFocus={() => setShowEmployeeDropdown(true)}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-20 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="Search for an employee..."
-                />
-                {selectedEmployee && (
-                  <button
-                    type="button"
-                    onClick={handleClearEmployeeSelection}
-                    className="absolute right-10 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
-                    title="Clear selection"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-              </div>
-
-              {/* Employee Dropdown Menu */}
-              {showEmployeeDropdown && (
-                <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                  {filteredEmployees.length > 0 ? (
-                    filteredEmployees.map((employee) => (
-                      <button
-                        key={employee.id}
-                        type="button"
-                        onClick={() => handleEmployeeSelect(employee)}
-                        className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <div className="text-sm font-medium text-white">{employee.name}</div>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              {employee.employee_id && `ID: ${employee.employee_id} • `}
-                              {employee.email}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
-                      No employees found
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </form>
         </div>

@@ -13,9 +13,12 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
     store_code: '',
     store_type: '',
     contact_no: '',
+    mobile_number: '',
+    store_address: '',
     city: '',
     location: '',
     group: '',
+    status: 'active',
     managers: '',
   });
   const [loading, setLoading] = useState(false);
@@ -56,9 +59,12 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
         store_code: '',
         store_type: '',
         contact_no: '',
+        mobile_number: '',
+        store_address: '',
         city: '',
         location: '',
         group: '',
+        status: 'active',
         managers: '',
       });
       onSuccess();
@@ -144,6 +150,32 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
 
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">
+                Mobile Number
+              </label>
+              <input
+                type="text"
+                value={formData.mobile_number}
+                onChange={(e) => setFormData({ ...formData, mobile_number: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. 09987654321"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Store Address
+              </label>
+              <textarea
+                value={formData.store_address}
+                onChange={(e) => setFormData({ ...formData, store_address: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. 123 Main Street, Building A"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
                 City
               </label>
               <input
@@ -181,6 +213,19 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Status
+              </label>
+              <input
+                type="text"
+                value={formData.status}
+                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                placeholder="e.g. Active, Inactive"
+              />
+            </div>
+
              <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">
                 Managers
@@ -190,7 +235,7 @@ const StoreModal: React.FC<StoreModalProps> = ({ isOpen, onClose, onSuccess }) =
                 value={formData.managers}
                 onChange={(e) => setFormData({ ...formData, managers: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                placeholder="e.g. John Doe, Jane Smith"
+                placeholder="e.g. John Doe"
               />
             </div>
           </form>

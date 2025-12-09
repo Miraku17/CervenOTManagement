@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
@@ -58,6 +58,9 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -85,6 +88,49 @@ export default function TicketsPage() {
 
   const handleSuccess = () => {
     fetchTickets();
+  };
+
+  const handleDeleteClick = (ticketId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening the detail modal
+    setTicketToDelete(ticketId);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!ticketToDelete) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch('/api/tickets/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: ticketToDelete }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete ticket');
+      }
+
+      // Refresh tickets list
+      await fetchTickets();
+      setIsDeleteModalOpen(false);
+      setTicketToDelete(null);
+    } catch (error: any) {
+      console.error('Error deleting ticket:', error);
+      alert(error.message || 'Failed to delete ticket');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setIsDeleteModalOpen(false);
+    setTicketToDelete(null);
   };
 
   const filteredTickets = tickets.filter(ticket => {
@@ -179,65 +225,66 @@ export default function TicketsPage() {
             <p className="text-slate-500 mt-1">Try adjusting your filters or create a new ticket.</p>
           </div>
         ) : (
-          <div className="grid gap-4">
+          <div className="grid gap-3">
             {filteredTickets.map((ticket) => (
               <div
                 key={ticket.id}
                 onClick={() => handleTicketClick(ticket)}
-                className="group bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-all cursor-pointer shadow-sm hover:shadow-md"
+                className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition-all cursor-pointer"
               >
-                <div className="flex flex-col md:flex-row gap-4 justify-between">
-                  {/* Left Section: Status & Main Info */}
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(ticket.status)} uppercase tracking-wide`}>
-                        {ticket.status}
-                      </span>
-                      <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border ${getSeverityColor(ticket.sev)}`}>
-                        <AlertTriangle size={12} />
-                        {ticket.sev}
-                      </span>
-                      <span className="text-xs text-slate-500 font-mono">
-                        #{ticket.rcc_reference_number}
-                      </span>
-                    </div>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <span className="text-sm font-mono text-slate-400">#{ticket.rcc_reference_number}</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase`}>
+                      {ticket.status}
+                    </span>
+                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${getSeverityColor(ticket.sev)}`}>
+                      <AlertTriangle size={11} />
+                      {ticket.sev}
+                    </span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeleteClick(ticket.id, e)}
+                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                    title="Delete ticket"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
 
-                    <div>
-                      <h3 className="text-lg font-bold text-white group-hover:text-blue-400 transition-colors mb-1">
-                        {ticket.request_type}
-                        <span className="text-slate-500 font-normal mx-2">•</span>
-                        <span className="text-base font-normal text-slate-300">{ticket.device}</span>
-                      </h3>
-                      <p className="text-sm text-slate-400 line-clamp-2">{ticket.request_detail}</p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-4 text-xs text-slate-500">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin size={14} className="text-slate-600" />
-                        <span className="text-slate-300">{ticket.stores?.store_name}</span>
-                        {ticket.stations?.name && (
-                          <>
-                            <span className="text-slate-600">/</span>
-                            <span>{ticket.stations.name}</span>
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Calendar size={14} className="text-slate-600" />
-                        <span>{format(new Date(ticket.date_reported), 'MMM d, yyyy')}</span>
-                        <Clock size={14} className="text-slate-600 ml-1" />
-                        <span>{ticket.time_reported}</span>
-                      </div>
-                    </div>
+                {/* Body */}
+                <div className="px-4 py-3 space-y-3">
+                  {/* Main Info */}
+                  <div>
+                    <h3 className="text-base font-semibold text-white group-hover:text-blue-400 transition-colors mb-1">
+                      {ticket.request_type} - {ticket.device}
+                    </h3>
+                    <p className="text-sm text-slate-400 line-clamp-1">{ticket.request_detail}</p>
                   </div>
 
-                  {/* Right Section: Metadata & Arrow */}
-                  <div className="flex items-center justify-between md:justify-end md:w-48 gap-4 border-t md:border-t-0 md:border-l border-slate-800 pt-3 md:pt-0 md:pl-4 mt-1 md:mt-0">
-                    <div className="flex flex-col gap-1 text-right">
-                      <div className="text-xs text-slate-500">Problem Category</div>
-                      <div className="text-sm text-slate-300 font-medium">{ticket.problem_category}</div>
+                  {/* Metadata Grid */}
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <MapPin size={13} className="text-slate-600 flex-shrink-0" />
+                      <span className="truncate">{ticket.stores?.store_name}</span>
                     </div>
-                    <ChevronRight className="text-slate-600 group-hover:text-white transition-colors" size={20} />
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Calendar size={13} className="text-slate-600 flex-shrink-0" />
+                      <span>{format(new Date(ticket.date_reported), 'MMM d, yyyy')}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <User size={13} className="text-slate-600 flex-shrink-0" />
+                      <span className="truncate">
+                        {ticket.serviced_by_user
+                          ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
+                          : 'Unassigned'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-slate-400">
+                      <Clock size={13} className="text-slate-600 flex-shrink-0" />
+                      <span>{ticket.time_reported}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -257,6 +304,67 @@ export default function TicketsPage() {
         onClose={() => setIsDetailModalOpen(false)}
         ticket={selectedTicket}
       />
+
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Delete Ticket</h2>
+              </div>
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                <p className="text-slate-200">
+                  Are you sure you want to delete this ticket? This action cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
+              <button
+                onClick={handleCancelDelete}
+                disabled={isDeleting}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={18} />
+                    Delete
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

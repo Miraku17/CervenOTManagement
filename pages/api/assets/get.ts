@@ -14,6 +14,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select(`
         id,
         serial_number,
+        under_warranty,
+        warranty_date,
         created_at,
         updated_at,
         categories:category_id (

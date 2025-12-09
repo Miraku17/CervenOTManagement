@@ -11,6 +11,8 @@ interface AutocompleteOption {
 interface Asset {
   id: string;
   serial_number: string | null;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
@@ -41,6 +43,9 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   const [serialNumber, setSerialNumber] = useState('');
+
+  const [underWarranty, setUnderWarranty] = useState<boolean>(false);
+  const [warrantyDate, setWarrantyDate] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -86,6 +91,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
         setSelectedModelId(editItem.models.id);
       }
       setSerialNumber(editItem.serial_number || '');
+      setUnderWarranty(editItem.under_warranty || false);
+      setWarrantyDate(editItem.warranty_date || '');
     } else if (isOpen && !editItem) {
       // Reset form when opening for new item
       setCategory('');
@@ -95,6 +102,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
     }
   }, [isOpen, editItem]);
 
@@ -176,6 +185,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           brand_id: brandId,
           model_id: modelId,
           serial_number: serialNumber || null,
+          under_warranty: underWarranty,
+          warranty_date: warrantyDate || null,
         }),
       });
 
@@ -193,6 +204,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
 
       // Refresh autocomplete data to include newly added values
       await fetchAutocompleteData();
@@ -373,6 +386,32 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
               onChange={(e) => setSerialNumber(e.target.value)}
               className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="e.g., SN123456789"
+            />
+          </div>
+
+          {/* Under Warranty */}
+          <div>
+            <label htmlFor="underWarranty" className="block text-sm font-medium text-slate-300 mb-1">Under Warranty</label>
+            <select
+              id="underWarranty"
+              value={underWarranty ? 'yes' : 'no'}
+              onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="no">No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+
+          {/* Warranty Date */}
+          <div>
+            <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
+            <input
+              type="date"
+              id="warrantyDate"
+              value={warrantyDate}
+              onChange={(e) => setWarrantyDate(e.target.value)}
+              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
 
