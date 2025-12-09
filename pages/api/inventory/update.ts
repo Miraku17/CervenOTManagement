@@ -7,7 +7,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, store_id, category_id, brand_id, model_id, serial_number, station_id } = req.body;
+  const { id, store_id, category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, station_id } = req.body;
 
   if (!id || !store_id || !category_id || !brand_id) {
     return res.status(400).json({ error: 'ID, store, category, and brand are required' });
@@ -22,6 +22,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         brand_id,
         model_id: model_id || null,
         serial_number: serial_number || null,
+        under_warranty: under_warranty !== undefined ? under_warranty : false,
+        warranty_date: warranty_date || null,
         station_id: station_id || null,
         updated_at: new Date().toISOString(),
       })

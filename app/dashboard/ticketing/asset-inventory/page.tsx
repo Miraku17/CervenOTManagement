@@ -11,6 +11,8 @@ interface Asset {
   serial_number: string | null;
   created_at: string;
   updated_at: string;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
@@ -19,9 +21,11 @@ interface Asset {
 export default function AssetInventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [editItem, setEditItem] = useState<Asset | null>(null);
+  const [selectedAssetForDetail, setSelectedAssetForDetail] = useState<Asset | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -64,9 +68,20 @@ export default function AssetInventoryPage() {
     }
   };
 
-  const handleEdit = (asset: Asset) => {
+  const handleEdit = (asset: Asset, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening the detail modal
     setEditItem(asset);
     setIsModalOpen(true);
+  };
+
+  const handleViewDetails = (asset: Asset) => {
+    setSelectedAssetForDetail(asset);
+    setIsDetailModalOpen(true);
+  }
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedAssetForDetail(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -383,7 +398,7 @@ export default function AssetInventoryPage() {
                       </tr>
                     ) : (
                       filteredAssets.map((asset) => (
-                        <tr key={asset.id} className="hover:bg-slate-800/50 transition-colors group">
+                        <tr key={asset.id} onClick={() => handleViewDetails(asset)} className="hover:bg-slate-800/50 transition-colors group">
                             <td className="p-4 text-slate-300 font-medium">
                                 <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
                                   {asset.categories?.name || 'N/A'}
@@ -397,7 +412,7 @@ export default function AssetInventoryPage() {
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => handleEdit(asset)}
+                                  onClick={(e) => handleEdit(asset, e)}
                                   className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
                                   title="Edit asset"
                                 >
@@ -425,6 +440,13 @@ export default function AssetInventoryPage() {
         onClose={handleCloseModal}
         onSuccess={fetchAssets}
         editItem={editItem}
+      />
+
+      <AssetInventoryModal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        editItem={selectedAssetForDetail}
+        isViewingDetail={true}
       />
     </div>
   );
