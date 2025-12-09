@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface AutocompleteOption {
   id: string;
@@ -16,6 +17,8 @@ interface Asset {
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AssetInventoryModalProps {
@@ -23,9 +26,10 @@ interface AssetInventoryModalProps {
   onClose: () => void;
   onSuccess?: () => void;
   editItem?: Asset | null;
+  isViewingDetail?: boolean;
 }
 
-const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClose, onSuccess, editItem }) => {
+const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClose, onSuccess, editItem, isViewingDetail = false }) => {
   // Autocomplete fields
   const [category, setCategory] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -70,30 +74,39 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
 
   // Fetch autocomplete data when modal opens
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isViewingDetail) { // Only fetch if not in view mode
       fetchAutocompleteData();
     }
-  }, [isOpen]);
+  }, [isOpen, isViewingDetail]);
 
-  // Populate form when editing
+  // Populate form when editing or viewing
   useEffect(() => {
     if (isOpen && editItem) {
       if (editItem.categories) {
         setCategory(editItem.categories.name);
         setSelectedCategoryId(editItem.categories.id);
+      } else {
+        setCategory('');
+        setSelectedCategoryId(null);
       }
       if (editItem.brands) {
         setBrand(editItem.brands.name);
         setSelectedBrandId(editItem.brands.id);
+      } else {
+        setBrand('');
+        setSelectedBrandId(null);
       }
       if (editItem.models) {
         setModel(editItem.models.name);
         setSelectedModelId(editItem.models.id);
+      } else {
+        setModel('');
+        setSelectedModelId(null);
       }
       setSerialNumber(editItem.serial_number || '');
       setUnderWarranty(editItem.under_warranty || false);
       setWarrantyDate(editItem.warranty_date || '');
-    } else if (isOpen && !editItem) {
+    } else if (isOpen && !editItem && !isViewingDetail) {
       // Reset form when opening for new item
       setCategory('');
       setSelectedCategoryId(null);
@@ -105,7 +118,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setUnderWarranty(false);
       setWarrantyDate('');
     }
-  }, [isOpen, editItem]);
+  }, [isOpen, editItem, isViewingDetail]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -249,7 +262,9 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
 
       <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700">
         <div className="flex justify-between items-center p-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">{editItem ? 'Edit Asset' : 'Add New Asset'}</h2>
+          <h2 className="text-xl font-bold text-white">
+            {isViewingDetail ? 'Asset Details' : (editItem ? 'Edit Asset' : 'Add New Asset')}
+          </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             <X size={24} />
           </button>
@@ -258,20 +273,24 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           {/* Category Autocomplete */}
           <div ref={categoryRef} className="relative">
             <label htmlFor="category" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
-            <input
-              type="text"
-              id="category"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                setSelectedCategoryId(null);
-              }}
-              onFocus={() => setShowCategoryDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select category..."
-              required
-            />
-            {showCategoryDropdown && (
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.categories?.name || 'N/A'}</p>
+            ) : (
+              <input
+                type="text"
+                id="category"
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSelectedCategoryId(null);
+                }}
+                onFocus={() => setShowCategoryDropdown(true)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Type or select category..."
+                required
+              />
+            )}
+            {showCategoryDropdown && !isViewingDetail && (
               <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {categories
                   .filter(c => !category || c.name.toLowerCase().includes(category.toLowerCase()))
@@ -299,20 +318,24 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           {/* Brand Autocomplete */}
           <div ref={brandRef} className="relative">
             <label htmlFor="brand" className="block text-sm font-medium text-slate-300 mb-1">Brand</label>
-            <input
-              type="text"
-              id="brand"
-              value={brand}
-              onChange={(e) => {
-                setBrand(e.target.value);
-                setSelectedBrandId(null);
-              }}
-              onFocus={() => setShowBrandDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select brand..."
-              required
-            />
-            {showBrandDropdown && (
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.brands?.name || 'N/A'}</p>
+            ) : (
+              <input
+                type="text"
+                id="brand"
+                value={brand}
+                onChange={(e) => {
+                  setBrand(e.target.value);
+                  setSelectedBrandId(null);
+                }}
+                onFocus={() => setShowBrandDropdown(true)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Type or select brand..."
+                required
+              />
+            )}
+            {showBrandDropdown && !isViewingDetail && (
               <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {brands
                   .filter(b => !brand || b.name.toLowerCase().includes(brand.toLowerCase()))
@@ -340,19 +363,23 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           {/* Model Autocomplete */}
           <div ref={modelRef} className="relative">
             <label htmlFor="model" className="block text-sm font-medium text-slate-300 mb-1">Model</label>
-            <input
-              type="text"
-              id="model"
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                setSelectedModelId(null);
-              }}
-              onFocus={() => setShowModelDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select model..."
-            />
-            {showModelDropdown && (
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.models?.name || 'N/A'}</p>
+            ) : (
+              <input
+                type="text"
+                id="model"
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  setSelectedModelId(null);
+                }}
+                onFocus={() => setShowModelDropdown(true)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Type or select model..."
+              />
+            )}
+            {showModelDropdown && !isViewingDetail && (
               <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {models
                   .filter(m => !model || m.name.toLowerCase().includes(model.toLowerCase()))
@@ -379,66 +406,107 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
 
           <div>
             <label htmlFor="serialNumber" className="block text-sm font-medium text-slate-300 mb-1">Serial Number</label>
-            <input
-              type="text"
-              id="serialNumber"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., SN123456789"
-            />
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.serial_number || 'N/A'}</p>
+            ) : (
+              <input
+                type="text"
+                id="serialNumber"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., SN123456789"
+              />
+            )}
           </div>
 
           {/* Under Warranty */}
           <div>
             <label htmlFor="underWarranty" className="block text-sm font-medium text-slate-300 mb-1">Under Warranty</label>
-            <select
-              id="underWarranty"
-              value={underWarranty ? 'yes' : 'no'}
-              onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.under_warranty ? 'Yes' : 'No'}</p>
+            ) : (
+              <select
+                id="underWarranty"
+                value={underWarranty ? 'yes' : 'no'}
+                onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="no">No</option>
+                <option value="yes">Yes</option>
+              </select>
+            )}
           </div>
 
           {/* Warranty Date */}
           <div>
             <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
-            <input
-              type="date"
-              id="warrantyDate"
-              value={warrantyDate}
-              onChange={(e) => setWarrantyDate(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.warranty_date ? format(new Date(editItem.warranty_date), 'PPP') : 'N/A'}</p>
+            ) : (
+              <input
+                type="date"
+                id="warrantyDate"
+                value={warrantyDate}
+                onChange={(e) => setWarrantyDate(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {isSubmitting ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>{editItem ? 'Updating...' : 'Adding...'}</span>
-                </>
-              ) : (
-                <span>{editItem ? 'Update Asset' : 'Add Asset'}</span>
-              )}
-            </button>
-          </div>
+          {/* Created At */}
+          {isViewingDetail && editItem?.created_at && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Created At</label>
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.created_at), 'PPP p')}</p>
+            </div>
+          )}
+
+          {/* Updated At */}
+          {isViewingDetail && editItem?.updated_at && (
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Last Updated</label>
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.updated_at), 'PPP p')}</p>
+            </div>
+          )}
+
+          {!isViewingDetail && (
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isSubmitting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>{editItem ? 'Updating...' : 'Adding...'}</span>
+                  </>
+                ) : (
+                  <span>{editItem ? 'Update Asset' : 'Add Asset'}</span>
+                )}
+              </button>
+            </div>
+          )}
+          {isViewingDetail && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          )}
         </form>
       </div>
     </div>

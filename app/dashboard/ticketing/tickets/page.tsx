@@ -1,7 +1,6 @@
-'use client';
-
+"use client"
 import { useState, useEffect } from 'react';
-import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User } from 'lucide-react';
+import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, ArrowUpDown } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
@@ -58,6 +57,7 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -133,17 +133,23 @@ export default function TicketsPage() {
     setTicketToDelete(null);
   };
 
-  const filteredTickets = tickets.filter(ticket => {
-    const matchesSearch = 
-      ticket.rcc_reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.stores?.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || ticket.status.toLowerCase() === statusFilter.toLowerCase();
+  const filteredTickets = tickets
+    .filter(ticket => {
+      const matchesSearch = 
+        ticket.rcc_reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.stores?.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesStatus = statusFilter === 'all' || ticket.status.toLowerCase() === statusFilter.toLowerCase();
 
-    return matchesSearch && matchesStatus;
-  });
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(`${a.date_reported}T${a.time_reported}`);
+      const dateB = new Date(`${b.date_reported}T${b.time_reported}`);
+      return sortOrder === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+    });
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -195,6 +201,13 @@ export default function TicketsPage() {
           />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
+          <button
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors mr-2"
+          >
+            <ArrowUpDown size={16} />
+            <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
+          </button>
           {['all', 'open', 'pending', 'resolved', 'closed'].map((status) => (
             <button
               key={status}
@@ -212,28 +225,44 @@ export default function TicketsPage() {
       </div>
 
       {/* Tickets List */}
-      <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {loading ? (
-          <div className="text-center py-12">
-            <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-slate-400">Loading tickets...</p>
-          </div>
+          <>
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="bg-slate-900 border border-slate-800 rounded-lg p-4 animate-pulse h-[180px]">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="h-4 bg-slate-800 rounded w-20"></div>
+                  <div className="h-4 bg-slate-800 rounded w-16"></div>
+                </div>
+                <div className="space-y-3">
+                  <div className="h-5 bg-slate-800 rounded w-3/4"></div>
+                  <div className="h-4 bg-slate-800 rounded w-full"></div>
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="h-3 bg-slate-800 rounded w-full"></div>
+                    <div className="h-3 bg-slate-800 rounded w-full"></div>
+                    <div className="h-3 bg-slate-800 rounded w-full"></div>
+                    <div className="h-3 bg-slate-800 rounded w-full"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </>
         ) : filteredTickets.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed">
+          <div className="text-center py-12 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed col-span-full">
             <TicketIcon size={48} className="mx-auto text-slate-600 mb-4" />
             <h3 className="text-lg font-medium text-slate-300">No tickets found</h3>
             <p className="text-slate-500 mt-1">Try adjusting your filters or create a new ticket.</p>
           </div>
         ) : (
-          <div className="grid gap-3">
+          <>
             {filteredTickets.map((ticket) => (
               <div
                 key={ticket.id}
                 onClick={() => handleTicketClick(ticket)}
-                className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition-all cursor-pointer"
+                className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition-all cursor-pointer shadow-md shadow-slate-950/30"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+                <div className="flex items-center justify-between p-4 border-b border-slate-800">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-sm font-mono text-slate-400">#{ticket.rcc_reference_number}</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase`}>
@@ -254,7 +283,7 @@ export default function TicketsPage() {
                 </div>
 
                 {/* Body */}
-                <div className="px-4 py-3 space-y-3">
+                <div className="p-4 space-y-3">
                   {/* Main Info */}
                   <div>
                     <h3 className="text-base font-semibold text-white group-hover:text-blue-400 transition-colors mb-1">
@@ -289,7 +318,7 @@ export default function TicketsPage() {
                 </div>
               </div>
             ))}
-          </div>
+          </>
         )}
       </div>
 
