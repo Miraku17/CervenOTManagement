@@ -858,7 +858,7 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         <div>
-          <CalendarView logs={workLogs} />
+          <CalendarView logs={workLogs} userId={user?.id} />
         </div>
 
         <div>

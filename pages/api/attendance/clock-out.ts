@@ -17,24 +17,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
-    // Find today's active attendance record
+    // Find the most recent active attendance record (not just today's)
     const { data: existingAttendance, error: findError } = await supabase
       .from('attendance')
       .select('*')
       .eq('user_id', userId)
-      .eq('date', today)
       .is('time_out', null)
+      .order('time_in', { ascending: false })
+      .limit(1)
       .single();
 
     if (findError) {
       if (findError.code === 'PGRST116') {
-        return res.status(400).json({ error: 'No active clock-in found for today' });
+        return res.status(400).json({ error: 'No active clock-in found. Please clock in first.' });
       }
       throw findError;
     }
 
     if (!existingAttendance) {
-      return res.status(400).json({ error: 'No active clock-in found for today' });
+      return res.status(400).json({ error: 'No active clock-in found. Please clock in first.' });
     }
 
     // Update attendance record with clock-out data

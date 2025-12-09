@@ -19,8 +19,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Fetch attendance record for the specific user and date
-    const { data, error } = await supabase
+    // Fetch all attendance records for the specific user and date
+    const { data: attendanceRecords, error } = await supabase
       .from('attendance')
       .select(`
         id,
@@ -38,72 +38,99 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       `)
       .eq('user_id', userId)
       .eq('date', date)
-      .single();
+      .order('time_in', { ascending: true });
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw error;
     }
 
-    // If no record found
-    if (!data) {
+    // If no records found
+    if (!attendanceRecords || attendanceRecords.length === 0) {
       return res.status(200).json({
-        attendance: null,
+        sessions: [],
+        totalHours: null,
+        status: 'No Record',
         message: 'No attendance record found for this date'
       });
     }
 
-    // Fetch overtime request for this attendance record if exists
+    // Fetch overtime requests for all attendance records
+    const attendanceIds = attendanceRecords.map(a => a.id);
     const { data: overtimeData } = await supabase
       .from('overtime')
       .select('*')
-      .eq('attendance_id', data.id)
-      .single();
+      .in('attendance_id', attendanceIds);
 
-    // If overtime exists, fetch reviewer profile
-    let reviewerProfile = null;
-    if (overtimeData?.reviewer) {
-      const { data: reviewer } = await supabase
+    // Fetch reviewer profiles if any
+    const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
+    let reviewersMap = new Map();
+    if (reviewerIds.length > 0) {
+      const { data: reviewers } = await supabase
         .from('profiles')
-        .select('first_name, last_name, email')
-        .eq('id', overtimeData.reviewer)
-        .single();
-      reviewerProfile = reviewer;
+        .select('id, first_name, last_name, email')
+        .in('id', reviewerIds);
+      reviewersMap = new Map(reviewers?.map(r => [r.id, r]) || []);
     }
+
+    // Create overtime map
+    const overtimeMap = new Map(
+      overtimeData?.map(ot => [
+        ot.attendance_id,
+        {
+          id: ot.id,
+          comment: ot.comment,
+          status: ot.status,
+          requestedAt: ot.requested_at,
+          approvedAt: ot.approved_at,
+          approvedHours: ot.approved_hours,
+          reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null
+        }
+      ]) || []
+    );
 
     // Format the response with Philippine timezone
     const PHILIPPINE_TZ = 'Asia/Manila';
-    const formattedAttendance = {
-      id: data.id,
-      userId: data.user_id,
-      date: data.date,
-      timeIn: data.time_in ? formatInTimeZone(new Date(data.time_in), PHILIPPINE_TZ, 'hh:mm a') : null,
-      timeOut: data.time_out ? formatInTimeZone(new Date(data.time_out), PHILIPPINE_TZ, 'hh:mm a') : null,
-      totalHours: data.total_minutes ? (data.total_minutes / 60).toFixed(2) : null,
-      totalMinutes: data.total_minutes,
-      status: data.time_out ? 'Present' : 'In Progress',
-      clockInLocation: {
-        lat: data.clock_in_lat,
-        lng: data.clock_in_lng,
-        address: data.clock_in_address
-      },
-      clockOutLocation: data.time_out ? {
-        lat: data.clock_out_lat,
-        lng: data.clock_out_lng,
-        address: data.clock_out_address
-      } : null,
-      overtimeRequest: overtimeData ? {
-        id: overtimeData.id,
-        comment: overtimeData.comment,
-        status: overtimeData.status,
-        requestedAt: overtimeData.requested_at,
-        approvedAt: overtimeData.approved_at,
-        approvedHours: overtimeData.approved_hours,
-        reviewer: reviewerProfile,
-      } : null
-    };
+    let totalMinutes = 0;
+    let hasActiveSession = false;
+
+    const formattedSessions = attendanceRecords.map(record => {
+      const overtime = overtimeMap.get(record.id);
+      const isActive = !record.time_out;
+
+      if (isActive) {
+        hasActiveSession = true;
+      }
+
+      if (record.total_minutes) {
+        totalMinutes += record.total_minutes;
+      }
+
+      return {
+        id: record.id,
+        timeIn: record.time_in ? formatInTimeZone(new Date(record.time_in), PHILIPPINE_TZ, 'hh:mm a') : null,
+        timeOut: record.time_out ? formatInTimeZone(new Date(record.time_out), PHILIPPINE_TZ, 'hh:mm a') : null,
+        duration: record.total_minutes ? (record.total_minutes / 60).toFixed(2) : null,
+        status: record.time_out ? 'Completed' : 'Active',
+        clockInLocation: {
+          lat: record.clock_in_lat,
+          lng: record.clock_in_lng,
+          address: record.clock_in_address
+        },
+        clockOutLocation: record.time_out ? {
+          lat: record.clock_out_lat,
+          lng: record.clock_out_lng,
+          address: record.clock_out_address
+        } : null,
+        overtimeRequest: overtime || null
+      };
+    });
 
     return res.status(200).json({
-      attendance: formattedAttendance
+      date: date,
+      sessions: formattedSessions,
+      totalHours: totalMinutes > 0 ? (totalMinutes / 60).toFixed(2) : null,
+      status: hasActiveSession ? 'In Progress' : 'Completed',
+      sessionCount: formattedSessions.length
     });
 
   } catch (error: any) {
