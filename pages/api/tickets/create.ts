@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -18,6 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     problem_category,
     sev,
     date_reported,
+    time_reported,
     status,
     reported_by,
     serviced_by,
@@ -32,6 +34,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
+
+    const PHILIPPINE_TZ = 'Asia/Manila';
+    const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'HH:mm');
 
     // Create the ticket
     const { data: ticket, error: ticketError } = await supabaseAdmin
@@ -48,6 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           problem_category,
           sev,
           date_reported: date_reported || new Date().toISOString(),
+          time_reported: time_reported || currentTime,
           status: status || 'open',
           reported_by: reported_by || null,
           serviced_by: serviced_by || null,

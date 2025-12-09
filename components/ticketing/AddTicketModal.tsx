@@ -258,6 +258,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         body: JSON.stringify({
           ...formData,
           date_reported: new Date().toISOString(),
+          time_reported: currentTime,
           status: 'open',
           reported_by: currentUserId,
         }),

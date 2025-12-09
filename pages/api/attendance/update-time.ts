@@ -14,6 +14,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const { attendanceId, timeIn, timeOut, overtimeComment, overtimeStatus, overtimeRequestId, adminId } = req.body;
 
+  console.log('Update Time Request Body:', {
+    attendanceId,
+    timeIn,
+    timeOut,
+    overtimeComment,
+    overtimeStatus,
+    overtimeRequestId,
+    adminId
+  });
+
   if (!attendanceId) {
     return res.status(400).json({ error: 'Attendance ID is required' });
   }
@@ -68,6 +78,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .from('overtime')
           .update(updates)
           .eq('id', overtimeRequestId);
+
+        // Update is_overtime_approved in attendance table when overtime is approved
+        if (overtimeStatus === 'approved') {
+          console.log('Updating attendance is_overtime_approved to TRUE for attendanceId:', attendanceId);
+          const { data: attendanceUpdateData, error: attendanceUpdateError } = await supabase
+            .from('attendance')
+            .update({ is_overtime_approved: true })
+            .eq('id', attendanceId)
+            .select();
+
+          if (attendanceUpdateError) {
+            console.error('Error updating is_overtime_approved:', attendanceUpdateError);
+          } else {
+            console.log('Successfully updated is_overtime_approved:', attendanceUpdateData);
+          }
+        } else if (overtimeStatus === 'rejected') {
+          console.log('Updating attendance is_overtime_approved to FALSE for attendanceId:', attendanceId);
+          const { data: attendanceUpdateData, error: attendanceUpdateError } = await supabase
+            .from('attendance')
+            .update({ is_overtime_approved: false })
+            .eq('id', attendanceId)
+            .select();
+
+          if (attendanceUpdateError) {
+            console.error('Error updating is_overtime_approved:', attendanceUpdateError);
+          } else {
+            console.log('Successfully updated is_overtime_approved:', attendanceUpdateData);
+          }
+        }
       } else if (overtimeComment) {
         // Create new overtime request if comment is provided
         const { data: attendanceData } = await supabase
