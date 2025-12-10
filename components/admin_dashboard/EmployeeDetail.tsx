@@ -6,6 +6,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
 import UpdatePasswordModal from './UpdatePasswordModal';
 import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
+import { useUser } from '@/hooks/useUser';
 
 interface EmployeeDetailProps {
   employee: Employee;
@@ -14,6 +15,7 @@ interface EmployeeDetailProps {
 }
 
 const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpdate }) => {
+  const { user } = useUser();
   const PHILIPPINE_TZ = 'Asia/Manila';
   const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [attendanceData, setAttendanceData] = useState<any>(null);
@@ -38,6 +40,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   // New state for password modal and schedule modal
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  // Check if current user is Operations Manager
+  const isOperationsManager = user?.positions?.name === 'Operations Manager';
 
   // Fetch positions
   useEffect(() => {
@@ -208,20 +213,24 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
               <CalendarDays size={18} />
               <span>View Schedule</span>
             </button>
-            <button
-              onClick={() => setIsPasswordModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
-            >
-              <Key size={18} />
-              <span>Update Password</span>
-            </button>
-            <button
-              onClick={() => setIsEditMode(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-            >
-              <Edit2 size={18} />
-              <span>Edit Employee</span>
-            </button>
+            {isOperationsManager && (
+              <>
+                <button
+                  onClick={() => setIsPasswordModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  <Key size={18} />
+                  <span>Update Password</span>
+                </button>
+                <button
+                  onClick={() => setIsEditMode(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                >
+                  <Edit2 size={18} />
+                  <span>Edit Employee</span>
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
