@@ -52,9 +52,13 @@ export default function TicketingLayout({
     setIsMobileMenuOpen(false);
   };
 
-  // Check if user has access to stores and inventory sections
-  // Access granted ONLY if: admin AND position is "Operations Manager"
-  const hasInventoryAccess = isAdmin && userPosition === 'Operations Manager';
+  // Check if user has access to stores section
+  // Stores: ONLY admin role (no position requirement)
+  const hasStoresAccess = isAdmin;
+
+  // Check if user has access to inventory sections (store inventory & asset inventory)
+  // Inventory: admin OR employee role (basically everyone)
+  const hasInventoryAccess = isAdmin || user !== null; // Everyone who is logged in
 
   const SidebarContent = () => (
     <>
@@ -100,20 +104,22 @@ export default function TicketingLayout({
           </button>
         )}
 
+        {hasStoresAccess && (
+          <button
+            onClick={() => handleNavigate('/dashboard/ticketing/stores')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              pathname === '/dashboard/ticketing/stores'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Store size={20} />
+            <span className="font-medium">Stores</span>
+          </button>
+        )}
+
         {hasInventoryAccess && (
           <>
-            <button
-              onClick={() => handleNavigate('/dashboard/ticketing/stores')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                pathname === '/dashboard/ticketing/stores'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <Store size={20} />
-              <span className="font-medium">Stores</span>
-            </button>
-
             <button
               onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${

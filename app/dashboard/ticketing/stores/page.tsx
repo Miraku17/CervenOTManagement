@@ -21,6 +21,7 @@ export default function StoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Access control check
+  // Stores: accessible by admin role only (no position requirement)
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
@@ -28,15 +29,13 @@ export default function StoresPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, positions(name)')
+          .select('role')
           .eq('id', user.id)
           .single();
 
         const isAdmin = profile?.role === 'admin';
-        const userPosition = (profile?.positions as any)?.name || null;
-        const hasAccess = isAdmin && userPosition === 'Operations Manager';
 
-        if (!hasAccess) {
+        if (!isAdmin) {
           router.push('/dashboard/ticketing/tickets');
         }
       } catch (error) {

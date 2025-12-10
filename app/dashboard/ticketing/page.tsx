@@ -23,15 +23,13 @@ export default function TicketingPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, positions(name)')
+          .select('role')
           .eq('id', user.id)
           .single();
 
         const isAdmin = profile?.role === 'admin';
-        const userPosition = (profile?.positions as any)?.name || null;
-        const hasInventoryAccess = isAdmin && userPosition === 'Operations Manager';
 
-        if (hasInventoryAccess) {
+        if (isAdmin) {
           router.push('/dashboard/ticketing/stores');
         } else {
           router.push('/dashboard/ticketing/tickets');

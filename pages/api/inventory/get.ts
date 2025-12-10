@@ -55,4 +55,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin', requirePosition: 'Operations Manager' });
+export default withAuth(handler, { requireRole: ['admin', 'employee'] });

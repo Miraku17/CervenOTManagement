@@ -35,6 +35,7 @@ export default function AssetInventoryPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Access control check
+  // Asset Inventory: accessible by admin OR employee role (basically everyone)
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
@@ -42,13 +43,12 @@ export default function AssetInventoryPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, positions(name)')
+          .select('role')
           .eq('id', user.id)
           .single();
 
-        const isAdmin = profile?.role === 'admin';
-        const userPosition = (profile?.positions as any)?.name || null;
-        const hasAccess = isAdmin && userPosition === 'Operations Manager';
+        const userRole = profile?.role;
+        const hasAccess = userRole === 'admin' || userRole === 'employee';
 
         if (!hasAccess) {
           router.push('/dashboard/ticketing/tickets');
