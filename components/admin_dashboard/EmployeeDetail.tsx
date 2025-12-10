@@ -42,7 +42,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   // Check if current user is Operations Manager
-  const isOperationsManager = user?.positions?.name === 'Operations Manager';
+  const isOperationsManager = user?.position === 'Operations Manager';
 
   // Fetch positions
   useEffect(() => {

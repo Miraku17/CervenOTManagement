@@ -41,7 +41,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if current user is Operations Manager
-  const isOperationsManager = user?.positions?.name === 'Operations Manager';
+  const isOperationsManager = user?.position === 'Operations Manager';
 
   const filteredEmployees = useMemo(() => {
     const term = searchTerm.toLowerCase();
