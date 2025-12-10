@@ -9,17 +9,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { date } = req.query;
+  const { date, userId: queryUserId } = req.query;
 
-  // Use authenticated user's ID instead of query parameter
-  const userId = req.user?.id;
-
-  if (!userId) {
+  if (!req.user?.id) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
   if (!date || typeof date !== 'string') {
     return res.status(400).json({ error: 'Date is required' });
+  }
+
+  // Determine which user's attendance to fetch
+  let userId = req.user.id;
+
+  // If a userId is provided in query and user is admin, allow viewing other users
+  if (queryUserId && typeof queryUserId === 'string') {
+    // Check if the authenticated user is an admin (role already fetched by withAuth middleware)
+    if (req.user.role === 'admin') {
+      userId = queryUserId;
+    } else {
+      return res.status(403).json({ error: 'Unauthorized to view other users attendance' });
+    }
   }
 
   try {
