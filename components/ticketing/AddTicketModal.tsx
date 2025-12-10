@@ -16,7 +16,7 @@ interface Manager {
 
 interface Employee {
   id: string;
-  name: string;
+  fullName: string;
   employee_id: string;
   email: string;
 }
@@ -210,14 +210,14 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   );
 
   const filteredEmployees = employees.filter(emp =>
-    emp.name.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
+    emp.fullName.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
     emp.employee_id?.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
     emp.email.toLowerCase().includes(employeeSearchTerm.toLowerCase())
   );
 
   const handleEmployeeSelect = (employee: Employee) => {
     setSelectedEmployee(employee);
-    setEmployeeSearchTerm(employee.name);
+    setEmployeeSearchTerm(employee.fullName);
     setShowEmployeeDropdown(false);
     setFormData({ ...formData, serviced_by: employee.id });
   };
@@ -397,7 +397,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               <div ref={employeeDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">
                   Serviced By
-                  {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.name})</span>}
+                  {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.fullName})</span>}
                 </label>
                 <div className="relative">
                   <input
@@ -437,7 +437,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <div className="text-sm font-medium text-white">{employee.name}</div>
+                              <div className="text-sm font-medium text-white">{employee.fullName}</div>
                               <div className="text-xs text-slate-400 mt-0.5">
                                 {employee.employee_id && `ID: ${employee.employee_id} • `}
                                 {employee.email}
