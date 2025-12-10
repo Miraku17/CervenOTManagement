@@ -153,6 +153,11 @@ const AdminDashboard: React.FC = () => {
     return authorizedPositions.includes(userPosition);
   };
 
+  // Check if user has access to edit time
+  const hasEditTimeAccess = () => {
+    return userPosition === 'Operations Manager';
+  };
+
   const selectedEmployee = useMemo(() =>
     employees.find(e => e.id === selectedEmployeeId),
   [employees, selectedEmployeeId]);
@@ -183,12 +188,14 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'EMPLOYEES' || currentView === 'EMPLOYEE_DETAIL'}
             onClick={() => handleNavigate('EMPLOYEES')}
           />
-          <SidebarItem
-            icon={<Users size={20} />}
-            label="Edit Time"
-            isActive={currentView === 'EDIT_TIME'}
-            onClick={() => handleNavigate('EDIT_TIME')}
-          />
+          {hasEditTimeAccess() && (
+            <SidebarItem
+              icon={<Users size={20} />}
+              label="Edit Time"
+              isActive={currentView === 'EDIT_TIME'}
+              onClick={() => handleNavigate('EDIT_TIME')}
+            />
+          )}
           {hasOvertimeAccess() && (
             <SidebarItem
               icon={<FileText size={20} />}
@@ -279,12 +286,14 @@ const AdminDashboard: React.FC = () => {
                 isActive={currentView === 'EXPORT'}
                 onClick={() => handleNavigate('EXPORT')}
               />
-              <SidebarItem
-                icon={<Users size={24} />}
-                label="Edit Time"
-                isActive={currentView === 'EDIT_TIME'}
-                onClick={() => handleNavigate('EDIT_TIME')}
-              />
+              {hasEditTimeAccess() && (
+                <SidebarItem
+                  icon={<Users size={24} />}
+                  label="Edit Time"
+                  isActive={currentView === 'EDIT_TIME'}
+                  onClick={() => handleNavigate('EDIT_TIME')}
+                />
+              )}
               {hasOvertimeAccess() && (
                 <SidebarItem
                   icon={<FileText size={24} />}
@@ -395,7 +404,22 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {currentView === 'EDIT_TIME' && (
-              <EditTimeView employees={employees} />
+              hasEditTimeAccess() ? (
+                <EditTimeView employees={employees} />
+              ) : (
+                <div className="p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+                      <X className="w-8 h-8 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+                      <p className="text-slate-400">You don't have permission to edit time records.</p>
+                      <p className="text-slate-500 text-sm mt-2">Only Operations Managers can access this feature.</p>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
 
             {currentView === 'OVERTIME_REQUESTS' && (
