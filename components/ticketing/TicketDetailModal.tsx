@@ -1,6 +1,8 @@
-import React from 'react';
-import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/services/supabase';
 
 interface Ticket {
   id: string;
@@ -49,29 +51,414 @@ interface TicketDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   ticket: Ticket | null;
+  onUpdate?: (updatedTicket: Ticket) => void;
 }
 
-const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticket }) => {
+const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const [hours, minutes] = (value || '00:00').split(':');
+
+  // Scroll selected items into view when opening
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const selectedHour = containerRef.current.querySelector('[data-selected="true"][data-type="hour"]');
+      const selectedMinute = containerRef.current.querySelector('[data-selected="true"][data-type="minute"]');
+      
+      if (selectedHour) selectedHour.scrollIntoView({ block: 'center' });
+      if (selectedMinute) selectedMinute.scrollIntoView({ block: 'center' });
+    }
+  }, [isOpen]);
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none flex items-center justify-between hover:border-slate-600 transition-colors"
+      >
+        <span>{value || '--:--'}</span>
+        <Clock size={16} className="text-slate-400" />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-50 mt-1 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl flex overflow-hidden h-64 animate-in fade-in zoom-in-95 duration-100">
+           {/* Hours */}
+           <div className="flex-1 overflow-y-auto custom-scrollbar border-r border-slate-700">
+             <div className="px-2 py-1.5 text-[10px] uppercase text-slate-500 font-bold sticky top-0 bg-slate-900/95 backdrop-blur-sm text-center border-b border-slate-800 z-10">Hour</div>
+             {Array.from({ length: 24 }).map((_, i) => {
+               const h = i.toString().padStart(2, '0');
+               const isSelected = hours === h;
+               return (
+                 <button
+                   key={h}
+                   type="button"
+                   data-type="hour"
+                   data-selected={isSelected}
+                   onClick={() => onChange(`${h}:${minutes || '00'}`)}
+                   className={`w-full text-center py-2 text-sm hover:bg-slate-800 transition-colors ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'text-slate-300'}`}
+                 >
+                   {h}
+                 </button>
+               );
+             })}
+           </div>
+
+           {/* Minutes */}
+           <div className="flex-1 overflow-y-auto custom-scrollbar">
+             <div className="px-2 py-1.5 text-[10px] uppercase text-slate-500 font-bold sticky top-0 bg-slate-900/95 backdrop-blur-sm text-center border-b border-slate-800 z-10">Min</div>
+             {Array.from({ length: 60 }).map((_, i) => {
+               const m = i.toString().padStart(2, '0');
+               const isSelected = minutes === m;
+               return (
+                 <button
+                   key={m}
+                   type="button"
+                   data-type="minute"
+                   data-selected={isSelected}
+                   onClick={() => onChange(`${hours || '00'}:${m}`)}
+                   className={`w-full text-center py-2 text-sm hover:bg-slate-800 transition-colors ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'text-slate-300'}`}
+                 >
+                   {m}
+                 </button>
+               );
+             })}
+           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Fields that are stored as TIMESTAMP (date + time) in the DB, but edited as TIME in UI
+const TIMESTAMP_FIELDS = ['store_arrival', 'work_start', 'work_end', 'pause_time_start', 'pause_time_end'];
+
+const getTimestampTime = (isoString: string | null | undefined): string => {
+  if (!isoString) return '';
+  // If it's a simple time string (e.g. "HH:mm:ss" or "HH:mm") and not an ISO string
+  if (!isoString.includes('T') && isoString.includes(':')) {
+    return isoString.substring(0, 5);
+  }
+  try {
+    return format(new Date(isoString), 'HH:mm');
+  } catch (e) {
+    return '';
+  }
+};
+
+const setTimestampTime = (originalIsoString: string | null | undefined, newTime: string): string => {
+  const dateBase = originalIsoString ? new Date(originalIsoString) : new Date();
+  const [hours, minutes] = newTime.split(':').map(Number);
+  dateBase.setHours(hours);
+  dateBase.setMinutes(minutes);
+  dateBase.setSeconds(0);
+  return dateBase.toISOString();
+};
+
+// Helper functions for Status mapping
+const toDbStatus = (status: string): string => {
+  if (!status) return 'open';
+  const s = status.toLowerCase();
+  if (s === 'in progress') return 'in_progress';
+  if (s === 'on hold') return 'on_hold';
+  return s;
+};
+
+const toUiStatus = (status: string): string => {
+  if (!status) return 'Open';
+  const s = status.toLowerCase();
+  if (s === 'in_progress') return 'In Progress';
+  if (s === 'on_hold') return 'On Hold';
+  return s.charAt(0).toUpperCase() + s.slice(1);
+};
+
+interface LabelValueProps {
+  label: string;
+  value: React.ReactNode;
+  fullWidth?: boolean;
+  editable?: boolean;
+  editKey?: keyof Ticket;
+  type?: string;
+  isTextarea?: boolean;
+  isEditMode: boolean;
+  editData: Partial<Ticket>;
+  setEditData: (data: Partial<Ticket>) => void;
+  isSaving?: boolean;
+}
+
+const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
+  <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-5 mb-4">
+    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
+      <Icon size={18} className="text-blue-400" />
+      <h3 className="font-semibold text-slate-200">{title}</h3>
+    </div>
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-6">
+      {children}
+    </div>
+  </div>
+);
+
+const LabelValue = ({
+  label,
+  value,
+  fullWidth = false,
+  editable = false,
+  editKey,
+  type = 'text',
+  isTextarea = false,
+  isEditMode,
+  editData,
+  setEditData,
+  isSaving = false
+}: LabelValueProps) => {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to handle time changes for timestamp fields
+  const handleTimeChange = (val: string) => {
+    if (editKey && TIMESTAMP_FIELDS.includes(editKey)) {
+      // It's a timestamp field, we need to merge the new time with the existing date
+      const currentValue = editData[editKey] as string;
+      const newValue = setTimestampTime(currentValue, val);
+      setEditData({ ...editData, [editKey]: newValue });
+    } else if (editKey) {
+      // It's a regular time field
+      setEditData({ ...editData, [editKey]: val });
+    }
+  };
+
+  // Helper to get the display value for the time picker
+  const getTimeValue = () => {
+    if (editKey && TIMESTAMP_FIELDS.includes(editKey)) {
+      return getTimestampTime(editData[editKey] as string);
+    }
+    return (editData[editKey as keyof Ticket] as string) || '';
+  };
+
+  return (
+    <div className={`${fullWidth ? 'col-span-full' : ''}`}>
+      <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">{label}</span>
+      {isEditMode && editable && editKey ? (
+        isTextarea ? (
+          <textarea
+            disabled={isSaving}
+            value={editData[editKey] as string || ''}
+            onChange={(e) => setEditData({ ...editData, [editKey]: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+            rows={3}
+          />
+        ) : type === 'date' ? (
+          <div 
+            className={`relative ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            onClick={() => !isSaving && dateInputRef.current?.showPicker()}
+          >
+            <input
+              ref={dateInputRef}
+              disabled={isSaving}
+              type="date"
+              value={editData[editKey] as string || ''}
+              onChange={(e) => setEditData({ ...editData, [editKey]: e.target.value })}
+              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm pl-3 pr-10 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:cursor-not-allowed"
+            />
+            <Calendar 
+              size={18} 
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white pointer-events-none" 
+            />
+          </div>
+        ) : type === 'time' ? (
+          <div className={isSaving ? 'opacity-50 pointer-events-none' : ''}>
+             <TimePicker
+              value={getTimeValue()}
+              onChange={handleTimeChange}
+            />
+          </div>
+        ) : (
+          <input
+            disabled={isSaving}
+            type={type}
+            value={editData[editKey] as string || ''}
+            onChange={(e) => setEditData({ ...editData, [editKey]: e.target.value })}
+            className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        )
+      ) : (
+        <div className="text-sm text-slate-300 font-medium break-words">{value || <span className="text-slate-600 italic">N/A</span>}</div>
+      )}
+    </div>
+  );
+};
+
+const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticket, onUpdate }) => {
+  const { user } = useAuth();
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editData, setEditData] = useState<Partial<Ticket>>({});
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Check if user is admin or assigned employee
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        setIsAdmin(profile?.role === 'admin');
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      }
+    };
+
+    checkUserRole();
+  }, [user?.id]);
+
+  // Reset edit data when ticket changes
+  useEffect(() => {
+    if (ticket) {
+      setEditData({
+        action_taken: ticket.action_taken || '',
+        final_resolution: ticket.final_resolution || '',
+        status: toUiStatus(ticket.status || 'Open'),
+        parts_replaced: ticket.parts_replaced || '',
+        new_parts_serial: ticket.new_parts_serial || '',
+        old_parts_serial: ticket.old_parts_serial || '',
+        date_ack: ticket.date_ack || '',
+        time_ack: ticket.time_ack || '',
+        date_attended: ticket.date_attended || '',
+        store_arrival: ticket.store_arrival || '',
+        work_start: ticket.work_start || '',
+        work_end: ticket.work_end || '',
+        date_resolved: ticket.date_resolved || '',
+        sla_status: ticket.sla_status || '',
+        downtime: ticket.downtime || '',
+        date_responded: ticket.date_responded || '',
+        time_responded: ticket.time_responded || '',
+        pause_time_start: ticket.pause_time_start || '',
+        pause_time_end: ticket.pause_time_end || '',
+      });
+    }
+  }, [ticket]);
+
   if (!isOpen || !ticket) return null;
+
+  const canEdit = isAdmin || (user?.id === ticket.serviced_by);
+
+  const handleSave = async () => {
+    if (!ticket) return;
+
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/tickets/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: ticket.id,
+          ...editData,
+          status: toDbStatus(editData.status || 'Open')
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update ticket');
+      }
+
+      if (onUpdate && data.ticket) {
+        onUpdate(data.ticket);
+      }
+
+      setIsEditMode(false);
+      setShowSuccessModal(true);
+      onClose();
+    } catch (error: any) {
+      console.error('Error updating ticket:', error);
+      alert(error.message || 'Failed to update ticket');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    // Reset edit data
+    if (ticket) {
+      setEditData({
+        action_taken: ticket.action_taken || '',
+        final_resolution: ticket.final_resolution || '',
+        status: toUiStatus(ticket.status || 'Open'),
+        parts_replaced: ticket.parts_replaced || '',
+        new_parts_serial: ticket.new_parts_serial || '',
+        old_parts_serial: ticket.old_parts_serial || '',
+        date_ack: ticket.date_ack || '',
+        time_ack: ticket.time_ack || '',
+        date_attended: ticket.date_attended || '',
+        store_arrival: ticket.store_arrival || '',
+        work_start: ticket.work_start || '',
+        work_end: ticket.work_end || '',
+        date_resolved: ticket.date_resolved || '',
+        sla_status: ticket.sla_status || '',
+        downtime: ticket.downtime || '',
+        date_responded: ticket.date_responded || '',
+        time_responded: ticket.time_responded || '',
+        pause_time_start: ticket.pause_time_start || '',
+        pause_time_end: ticket.pause_time_end || '',
+      });
+    }
+  };
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     try {
-      return format(new Date(dateString), 'MMM dd, yyyy');
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) { // Check if date is invalid
+        return 'N/A';
+      }
+      return format(date, 'MMM dd, yyyy');
     } catch (e) {
-      return dateString;
+      return 'N/A';
     }
   };
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    const s = status.toLowerCase().replace(/_/g, ' ');
+    switch (s) {
       case 'open':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
-      case 'closed':
-      case 'resolved':
-        return 'bg-green-500/10 text-green-400 border-green-500/20';
-      case 'pending':
+      case 'in progress':
         return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+      case 'on hold':
+        return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
+      case 'closed':
+        return 'bg-green-500/10 text-green-400 border-green-500/20';
       default:
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
     }
@@ -92,25 +479,6 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     }
   };
 
-  const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-    <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-5 mb-4">
-      <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
-        <Icon size={18} className="text-blue-400" />
-        <h3 className="font-semibold text-slate-200">{title}</h3>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-6">
-        {children}
-      </div>
-    </div>
-  );
-
-  const LabelValue = ({ label, value, fullWidth = false }: { label: string, value: React.ReactNode, fullWidth?: boolean }) => (
-    <div className={`${fullWidth ? 'col-span-full' : ''}`}>
-      <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">{label}</span>
-      <div className="text-sm text-slate-300 font-medium break-words">{value || <span className="text-slate-600 italic">N/A</span>}</div>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
@@ -119,9 +487,47 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         <div className="flex items-start justify-between p-6 border-b border-slate-800 bg-slate-900 sticky top-0 rounded-t-2xl z-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border ${getStatusColor(ticket.status)} uppercase`}>
-                {ticket.status}
-              </span>
+              {isEditMode ? (
+                <div className="relative" ref={statusDropdownRef}>
+                  <button
+                    disabled={isSaving}
+                    onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold border ${getStatusColor(editData.status || 'Open')} uppercase transition-all hover:brightness-110 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {editData.status || 'Open'}
+                    <ChevronDown size={14} className={`transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {isStatusDropdownOpen && !isSaving && (
+                    <div className="absolute top-full left-0 mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden ring-1 ring-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                      {['Open', 'In Progress', 'On Hold', 'Closed'].map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setEditData({ ...editData, status });
+                            setIsStatusDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 text-xs font-semibold uppercase hover:bg-slate-800 transition-all border-b border-slate-800 last:border-0 flex items-center gap-3 ${
+                            status === editData.status ? 'bg-slate-800/50 text-white' : 'text-slate-400'
+                          }`}
+                        >
+                          <div className={`w-2 h-2 rounded-full shadow-[0_0_8px] ${
+                             status === 'Open' ? 'bg-blue-500 shadow-blue-500/50' :
+                             status === 'In Progress' ? 'bg-yellow-500 shadow-yellow-500/50' :
+                             status === 'On Hold' ? 'bg-orange-500 shadow-orange-500/50' :
+                             'bg-green-500 shadow-green-500/50'
+                          }`} />
+                          {status}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border ${getStatusColor(ticket.status)} uppercase`}>
+                  {toUiStatus(ticket.status)}
+                </span>
+              )}
               <span className={`flex items-center gap-1.5 text-sm font-medium ${getSeverityColor(ticket.sev)}`}>
                 <AlertTriangle size={14} />
                 {ticket.sev} Priority
@@ -132,78 +538,239 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               <span className="text-slate-500 text-lg font-normal">#{ticket.rcc_reference_number}</span>
             </h2>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center gap-2">
+            {canEdit && !isEditMode && (
+              <button
+                onClick={() => setIsEditMode(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <Edit2 size={16} />
+                Edit
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto custom-scrollbar">
           
           <DetailSection title="General Information" icon={FileText}>
-            <LabelValue label="RCC Reference" value={ticket.rcc_reference_number} />
-            <LabelValue label="Date Reported" value={formatDate(ticket.date_reported)} />
-            <LabelValue label="Time Reported" value={ticket.time_reported} />
-            <LabelValue label="Problem Category" value={ticket.problem_category} />
-            <LabelValue label="Device" value={ticket.device} />
-            <LabelValue label="Request Detail" value={ticket.request_detail} fullWidth />
+            <LabelValue label="RCC Reference" value={ticket.rcc_reference_number} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Date Reported" value={formatDate(ticket.date_reported)} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Time Reported" value={ticket.time_reported} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Problem Category" value={ticket.problem_category} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Device" value={ticket.device} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Request Detail" value={ticket.request_detail} fullWidth isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
           <DetailSection title="Location & Contact" icon={MapPin}>
-            <LabelValue label="Store Name" value={ticket.stores?.store_name} />
-            <LabelValue label="Store Code" value={ticket.stores?.store_code} />
-            <LabelValue label="Station" value={ticket.stations?.name} />
-            <LabelValue label="Manager on Duty (MOD)" value={ticket.manager_on_duty?.manager_name} />
+            <LabelValue label="Store Name" value={ticket.stores?.store_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Store Code" value={ticket.stores?.store_code} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Station" value={ticket.stations?.name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Manager on Duty (MOD)" value={ticket.manager_on_duty?.manager_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
           <DetailSection title="People Involved" icon={User}>
-            <LabelValue label="Reported By" value={ticket.reported_by_user ? `${ticket.reported_by_user.first_name} ${ticket.reported_by_user.last_name}` : ticket.reported_by} />
-            <LabelValue label="Serviced By" value={ticket.serviced_by_user ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}` : ticket.serviced_by} />
+            <LabelValue label="Reported By" value={ticket.reported_by_user ? `${ticket.reported_by_user.first_name} ${ticket.reported_by_user.last_name}` : ticket.reported_by} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Serviced By" value={ticket.serviced_by_user ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}` : ticket.serviced_by} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
           <DetailSection title="Resolution & Action" icon={CheckCircle}>
-            <LabelValue label="Action Taken" value={ticket.action_taken} fullWidth />
-            <LabelValue label="Final Resolution" value={ticket.final_resolution} fullWidth />
-            <LabelValue label="Date Resolved" value={formatDate(ticket.date_resolved)} />
-            <LabelValue label="SLA Status" value={ticket.sla_status} />
+            <LabelValue
+              label="Action Taken"
+              value={ticket.action_taken}
+              fullWidth
+              editable
+              editKey="action_taken"
+              isTextarea
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Final Resolution"
+              value={ticket.final_resolution}
+              fullWidth
+              editable
+              editKey="final_resolution"
+              isTextarea
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Date Resolved"
+              value={formatDate(ticket.date_resolved)}
+              editable
+              editKey="date_resolved"
+              type="date"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue label="SLA Status" value={ticket.sla_status} editable editKey="sla_status" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
           <DetailSection title="Timeline & Metrics" icon={Timer}>
-            <LabelValue label="Date Acknowledged" value={formatDate(ticket.date_ack)} />
-            <LabelValue label="Time Acknowledged" value={ticket.time_ack} />
-            <LabelValue label="Date Attended" value={formatDate(ticket.date_attended)} />
-            <LabelValue label="Store Arrival" value={ticket.store_arrival} />
-            <LabelValue label="Work Start" value={ticket.work_start} />
-            <LabelValue label="Work End" value={ticket.work_end} />
-            <LabelValue label="Downtime" value={ticket.downtime} />
-            <LabelValue label="SLA Count (Hrs)" value={ticket.sla_count_hrs?.toString()} />
-            <LabelValue label="Date Responded" value={formatDate(ticket.date_responded)} />
-            <LabelValue label="Time Responded" value={ticket.time_responded} />
+            <LabelValue
+              label="Date Acknowledged"
+              value={formatDate(ticket.date_ack)}
+              editable
+              editKey="date_ack"
+              type="date"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Time Acknowledged"
+              value={getTimestampTime(ticket.time_ack)}
+              editable
+              editKey="time_ack"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Date Attended"
+              value={formatDate(ticket.date_attended)}
+              editable
+              editKey="date_attended"
+              type="date"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Store Arrival"
+              value={getTimestampTime(ticket.store_arrival)}
+              editable
+              editKey="store_arrival"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Work Start"
+              value={getTimestampTime(ticket.work_start)}
+              editable
+              editKey="work_start"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Work End"
+              value={getTimestampTime(ticket.work_end)}
+              editable
+              editKey="work_end"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Pause Start"
+              value={getTimestampTime(ticket.pause_time_start)}
+              editable
+              editKey="pause_time_start"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Pause End"
+              value={getTimestampTime(ticket.pause_time_end)}
+              editable
+              editKey="pause_time_end"
+              type="time"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue label="Downtime" value={ticket.downtime} editable editKey="downtime" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="SLA Count (Hrs)" value={ticket.sla_count_hrs?.toString()} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Date Responded" value={formatDate(ticket.date_responded)} editable editKey="date_responded" type="date" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Time Responded" value={getTimestampTime(ticket.time_responded)} editable editKey="time_responded" type="time" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
            <DetailSection title="Parts Information" icon={Box}>
-            <LabelValue label="Parts Replaced" value={ticket.parts_replaced} />
-            <LabelValue label="New Parts Serial" value={ticket.new_parts_serial} />
-            <LabelValue label="Old Parts Serial" value={ticket.old_parts_serial} />
+            <LabelValue
+              label="Parts Replaced"
+              value={ticket.parts_replaced}
+              editable
+              editKey="parts_replaced"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="New Parts Serial"
+              value={ticket.new_parts_serial}
+              editable
+              editKey="new_parts_serial"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Old Parts Serial"
+              value={ticket.old_parts_serial}
+              editable
+              editKey="old_parts_serial"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
           </DetailSection>
 
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900 rounded-b-2xl flex justify-end">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
-          >
-            Close
-          </button>
+        <div className="p-4 border-t border-slate-800 bg-slate-900 rounded-b-2xl flex justify-end gap-3">
+          {isEditMode ? (
+            <>
+              <button
+                onClick={handleCancelEdit}
+                disabled={isSaving}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                <XCircle size={18} />
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save size={18} />
+                    Save Changes
+                  </>
+                )}
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={onClose}
+              className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+            >
+              Close
+            </button>
+          )}
         </div>
       </div>
+      
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-8 shadow-2xl transform transition-all scale-100 flex flex-col items-center gap-4 max-w-sm w-full mx-4">
+            <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center border border-green-500/20">
+              <CheckCircle size={32} className="text-green-500" />
+            </div>
+            <h3 className="text-xl font-bold text-white text-center">Update Successful</h3>
+            <p className="text-slate-400 text-center">The ticket has been updated successfully.</p>
+            <button 
+              onClick={() => setShowSuccessModal(false)}
+              className="mt-2 w-full px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default TicketDetailModal;
+
+

@@ -13,7 +13,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    const { data: tickets, error } = await supabaseAdmin
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Build the query
+    let query = supabaseAdmin
       .from('tickets')
       .select(`
         *,
@@ -35,8 +40,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         manager_on_duty:store_managers (
           manager_name
         )
-      `)
-      .order('created_at', { ascending: false });
+      `);
+
+    // If user is not admin, filter by tickets they are servicing
+    if (req.user.role !== 'admin') {
+      query = query.eq('serviced_by', req.user.id);
+    }
+
+    const { data: tickets, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       throw error;
