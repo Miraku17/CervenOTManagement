@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
+import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, AreaChart, Area
 } from 'recharts';
-import { Ticket, AlertTriangle, CheckCircle, Clock, Activity, AlertCircle } from 'lucide-react';
+import { Ticket, AlertTriangle, CheckCircle, Clock, Activity, AlertCircle, ShieldX } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/services/supabase';
+import { useRouter } from 'next/navigation';
 
 interface TicketStats {
   total: number;
@@ -15,11 +18,49 @@ interface TicketStats {
 }
 
 export default function TicketOverviewPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [stats, setStats] = useState<TicketStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user?.id) {
+        setCheckingRole(false);
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(profile?.role === 'admin');
+        }
+      } catch (error) {
+        console.error('Error checking user role:', error);
+        setIsAdmin(false);
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+
+    checkUserRole();
+  }, [user?.id]);
 
   useEffect(() => {
     const fetchStats = async () => {
+      if (!isAdmin) return;
+
       try {
         const response = await fetch('/api/tickets/stats');
         const data = await response.json();
@@ -33,15 +74,42 @@ export default function TicketOverviewPage() {
       }
     };
 
-    fetchStats();
-  }, []);
+    if (!checkingRole) {
+      fetchStats();
+    }
+  }, [isAdmin, checkingRole]);
 
-  if (loading) {
+  // Show loading while checking role
+  if (checkingRole || loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-slate-400">Loading overview...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied for non-admins
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <ShieldX className="w-10 h-10 text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+            <p className="text-slate-400">You don't have permission to view the overview page.</p>
+            <p className="text-slate-500 text-sm mt-2">Only administrators can access this feature.</p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/ticketing/tickets')}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+          >
+            Go to Tickets
+          </button>
         </div>
       </div>
     );

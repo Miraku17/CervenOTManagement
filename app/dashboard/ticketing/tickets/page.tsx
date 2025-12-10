@@ -4,6 +4,9 @@ import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, C
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/services/supabase';
+import { useRouter } from 'next/navigation';
 
 // Define the Ticket interface to match the API response and Modal props
 interface Ticket {
@@ -50,6 +53,8 @@ interface Ticket {
 }
 
 export default function TicketsPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -61,6 +66,40 @@ export default function TicketsPage() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [checkingRole, setCheckingRole] = useState(true);
+
+  // Check if user is admin
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user?.id) {
+        setCheckingRole(false);
+        return;
+      }
+
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching user role:', error);
+          setIsAdmin(false);
+        } else {
+          setIsAdmin(profile?.role === 'admin');
+        }
+      } catch (error) {
+        console.error('Error checking user role:', error);
+        setIsAdmin(false);
+      } finally {
+        setCheckingRole(false);
+      }
+    };
+
+    checkUserRole();
+  }, [user?.id]);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -69,6 +108,8 @@ export default function TicketsPage() {
       const data = await response.json();
       if (response.ok) {
         setTickets(data.tickets || []);
+      } else if (response.status === 403) {
+        console.error('Access denied: Admin role required');
       }
     } catch (error) {
       console.error('Error fetching tickets:', error);
@@ -78,8 +119,10 @@ export default function TicketsPage() {
   };
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    if (!checkingRole) {
+      fetchTickets();
+    }
+  }, [checkingRole]);
 
   const handleTicketClick = (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -141,7 +184,9 @@ export default function TicketsPage() {
         ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
       
-      const matchesStatus = statusFilter === 'all' || ticket.status.toLowerCase() === statusFilter.toLowerCase();
+      // Normalize DB status (snake_case) to match Filter (space separated)
+      const normalizedTicketStatus = ticket.status.toLowerCase().replace(/_/g, ' ');
+      const matchesStatus = statusFilter === 'all' || normalizedTicketStatus === statusFilter.toLowerCase();
 
       return matchesSearch && matchesStatus;
     })
@@ -152,11 +197,11 @@ export default function TicketsPage() {
     });
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
+    switch (status.toLowerCase().replace(/_/g, ' ')) {
       case 'open': return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
-      case 'closed': 
-      case 'resolved': return 'bg-green-500/20 text-green-400 border-green-500/20';
-      case 'pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
+      case 'in progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
+      case 'on hold': return 'bg-orange-500/20 text-orange-400 border-orange-500/20';
+      case 'closed': return 'bg-green-500/20 text-green-400 border-green-500/20';
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/20';
     }
   };
@@ -171,21 +216,35 @@ export default function TicketsPage() {
     }
   };
 
+  // Show loading while checking role or fetching tickets
+  if (checkingRole || loading) {
+    return (
+      <div className="flex items-center justify-center h-full min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400">Loading tickets...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Tickets Management</h1>
-          <p className="text-slate-400">Manage and track all support tickets.</p>
+          <p className="text-slate-400">{isAdmin ? 'Manage and track all support tickets.' : 'View tickets assigned to you.'}</p>
         </div>
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-        >
-          <Plus size={20} />
-          <span>Create Ticket</span>
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+          >
+            <Plus size={20} />
+            <span>Create Ticket</span>
+          </button>
+        )}
       </div>
 
       {/* Filters & Search */}
@@ -208,7 +267,7 @@ export default function TicketsPage() {
             <ArrowUpDown size={16} />
             <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
           </button>
-          {['all', 'open', 'pending', 'resolved', 'closed'].map((status) => (
+          {['all', 'open', 'in progress', 'on hold', 'closed'].map((status) => (
             <button
               key={status}
               onClick={() => setStatusFilter(status)}
@@ -266,20 +325,22 @@ export default function TicketsPage() {
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <span className="text-sm font-mono text-slate-400">#{ticket.rcc_reference_number}</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase`}>
-                      {ticket.status}
+                      {ticket.status.replace(/_/g, ' ')}
                     </span>
                     <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${getSeverityColor(ticket.sev)}`}>
                       <AlertTriangle size={11} />
                       {ticket.sev}
                     </span>
                   </div>
-                  <button
-                    onClick={(e) => handleDeleteClick(ticket.id, e)}
-                    className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-                    title="Delete ticket"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={(e) => handleDeleteClick(ticket.id, e)}
+                      className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      title="Delete ticket"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
 
                 {/* Body */}
@@ -332,6 +393,11 @@ export default function TicketsPage() {
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
         ticket={selectedTicket}
+        onUpdate={(updatedTicket) => {
+          // Update the ticket in the local state
+          setTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+          setSelectedTicket(updatedTicket);
+        }}
       />
 
       {/* Delete Confirmation Modal */}

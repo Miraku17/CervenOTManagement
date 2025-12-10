@@ -764,7 +764,7 @@ const EmployeeDashboard: React.FC = () => {
                         <CalendarDays className="w-4 h-4" />
                         <span>File a Leave</span>
                       </button>
-                      {/* <button
+                      <button
                         onClick={() => {
                           router.push('/dashboard/ticketing');
                           setIsActionsMenuOpen(false);
@@ -773,7 +773,7 @@ const EmployeeDashboard: React.FC = () => {
                       >
                         <Ticket className="w-4 h-4" />
                         <span>Ticketing</span>
-                      </button> */}
+                      </button>
                     </div>
                   )}
                 </div>
