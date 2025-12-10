@@ -1,11 +1,16 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  if (!supabase) {
+    console.error('Supabase admin client not available');
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
   const { latitude, longitude, address } = req.body;

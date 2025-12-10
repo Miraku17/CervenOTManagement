@@ -1,11 +1,16 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  if (!supabase) {
+    console.error('Supabase admin client not available');
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
   const { latitude, longitude, address, overtimeComment } = req.body;
@@ -68,6 +73,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     let overtime = null;
     if (overtimeComment) {
       // Check if user already has an overtime request for today
+      // Use explicit join syntax or verify if `attendance!inner` works with service role.
+      // Service role ignores RLS, so simple joins work.
       const { data: existingOvertimeRequests, error: checkError } = await supabase
         .from('overtime')
         .select('id, attendance_id, attendance!inner(date, user_id)')
