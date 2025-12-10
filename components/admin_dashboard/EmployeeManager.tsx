@@ -14,6 +14,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Employee, Position } from "@/types";
 import EmployeeForm from "@/components/admin_dashboard/EmployeeForm";
+import { useUser } from "@/hooks/useUser";
 
 interface EmployeeManagerProps {
   employees: Employee[];
@@ -30,6 +31,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   onDeleteEmployee,
   positions,
 }) => {
+  const { user } = useUser();
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [deleteModal, setDeleteModal] = useState<{
@@ -37,6 +39,9 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     employee: Employee | null;
   }>({ isOpen: false, employee: null });
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Check if current user is Operations Manager
+  const isOperationsManager = user?.positions?.name === 'Operations Manager';
 
   const filteredEmployees = useMemo(() => {
     const term = searchTerm.toLowerCase();
@@ -245,13 +250,15 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
             <FileDown size={18} />
             <span className="hidden sm:inline">Export All Data</span>
           </button>
-          <button
-            onClick={() => setIsCreating(true)}
-            className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors flex items-center gap-2 shadow-lg shadow-blue-900/40"
-          >
-            <Plus size={18} />
-            <span className="font-medium">Add Employee</span>
-          </button>
+          {isOperationsManager && (
+            <button
+              onClick={() => setIsCreating(true)}
+              className="px-4 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-500 transition-colors flex items-center gap-2 shadow-lg shadow-blue-900/40"
+            >
+              <Plus size={18} />
+              <span className="font-medium">Add Employee</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -287,13 +294,15 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                   <p className="text-slate-500 text-xs">ID: {employee.employee_id || "N/A"}</p>
                 </div>
               </div>
-              <button
-                onClick={(e) => handleDeleteClick(e, employee)}
-                className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Delete employee"
-              >
-                <Trash2 size={18} />
-              </button>
+              {isOperationsManager && (
+                <button
+                  onClick={(e) => handleDeleteClick(e, employee)}
+                  className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                  title="Delete employee"
+                >
+                  <Trash2 size={18} />
+                </button>
+              )}
             </div>
 
             <div className="space-y-2.5">

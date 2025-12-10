@@ -12,6 +12,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  // Security Check: Verify user has "Operations Manager" position
+  if (!req.user || !req.user.id) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const { data: callerProfile, error: callerError } = await supabase
+    .from('profiles')
+    .select('positions(name)')
+    .eq('id', req.user.id)
+    .single();
+
+  const callerPosition = callerProfile?.positions ? (callerProfile.positions as any).name : null;
+
+  if (callerError || callerPosition !== 'Operations Manager') {
+    return res.status(403).json({ 
+      error: 'Forbidden: Only Operations Managers allowed to update passwords.' 
+    });
+  }
+
   const { userId, newPassword } = req.body;
 
   if (!userId || typeof userId !== 'string') {
