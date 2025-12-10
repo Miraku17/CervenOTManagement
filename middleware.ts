@@ -70,8 +70,6 @@ export async function middleware(request: NextRequest) {
     if (pathname.startsWith('/dashboard/ticketing') && userRole !== 'admin') {
       const restrictedTicketingPaths = [
         '/dashboard/ticketing/stores',
-        '/dashboard/ticketing/store-inventory',
-        '/dashboard/ticketing/asset-inventory'
       ];
 
       if (restrictedTicketingPaths.some(path => pathname.startsWith(path))) {

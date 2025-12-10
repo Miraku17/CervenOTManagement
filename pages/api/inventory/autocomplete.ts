@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -9,12 +9,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
     // Fetch all autocomplete data in parallel - now with IDs
     const [categoriesRes, brandsRes, modelsRes, stationsRes] = await Promise.all([
-      supabase.from('categories').select('id, name').order('name'),
-      supabase.from('brands').select('id, name').order('name'),
-      supabase.from('models').select('id, name').order('name'),
-      supabase.from('stations').select('id, name').order('name'),
+      supabaseAdmin.from('categories').select('id, name').order('name'),
+      supabaseAdmin.from('brands').select('id, name').order('name'),
+      supabaseAdmin.from('models').select('id, name').order('name'),
+      supabaseAdmin.from('stations').select('id, name').order('name'),
     ]);
 
     if (categoriesRes.error) throw categoriesRes.error;
@@ -34,4 +38,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin', requirePosition: 'Operations Manager' });
+export default withAuth(handler, { requireRole: ['admin', 'employee'] });
