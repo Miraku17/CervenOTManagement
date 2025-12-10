@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
+import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
@@ -18,18 +19,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const now = new Date().toISOString();
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    const isValidUUID = adminId && uuidRegex.test(adminId);
 
-    if (!isValidUUID) {
-      return res.status(400).json({ message: 'Invalid adminId' });
-    }
+    // Use the authenticated user ID from withAuth middleware
+    const actualAdminId = req.user?.id || adminId;
 
-    // Verify user has authorization to approve/reject
+    // Verify user has authorization to approve/reject (optional extra validation)
     const { data: adminProfile, error: profileError } = await supabase
       .from('profiles')
       .select('positions(name)')
-      .eq('id', adminId)
+      .eq('id', actualAdminId)
       .single();
 
     if (profileError || !adminProfile) {
@@ -72,7 +70,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (level === 'level1') {
       // Level 1 approval
-      updates.level1_reviewer = adminId;
+      updates.level1_reviewer = actualAdminId;
       updates.level1_status = action === 'approve' ? 'approved' : 'rejected';
       updates.level1_reviewed_at = now;
       if (comment) {
@@ -89,7 +87,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Level 1 approval required before level 2 approval' });
       }
 
-      updates.level2_reviewer = adminId;
+      updates.level2_reviewer = actualAdminId;
       updates.level2_status = action === 'approve' ? 'approved' : 'rejected';
       updates.level2_reviewed_at = now;
       if (comment) {
@@ -104,11 +102,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (updates.final_status === 'approved') {
       updates.status = 'approved';
       updates.approved_at = now;
-      updates.reviewer = adminId;
+      updates.reviewer = actualAdminId;
     } else if (updates.final_status === 'rejected') {
       updates.status = 'rejected';
       updates.approved_at = now;
-      updates.reviewer = adminId;
+      updates.reviewer = actualAdminId;
     }
 
     console.log(`Updating overtime request ${id} at ${level}:`, updates);
@@ -149,3 +147,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 }
+
+export default withAuth(handler, { requireRole: 'admin' });

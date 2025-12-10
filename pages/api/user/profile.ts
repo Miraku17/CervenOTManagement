@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
+import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
@@ -10,10 +11,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ message: 'Method Not Allowed' });
   }
 
-  const { userId } = req.query;
+  // Use authenticated user's ID instead of query parameter
+  const userId = req.user?.id;
 
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ message: 'User ID is required' });
+  if (!userId) {
+    return res.status(401).json({ message: 'User not authenticated' });
   }
 
   try {
@@ -32,3 +34,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 }
+
+export default withAuth(handler);

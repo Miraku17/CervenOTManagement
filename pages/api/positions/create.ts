@@ -1,7 +1,8 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
+import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabaseAdmin) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
@@ -51,3 +52,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: error.message || 'An unexpected error occurred.' });
   }
 }
+
+export default withAuth(handler, { requireRole: 'admin' });

@@ -1,16 +1,20 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { userId, latitude, longitude, address, overtimeComment } = req.body;
+  const { latitude, longitude, address, overtimeComment } = req.body;
+
+  // Use authenticated user ID from middleware
+  const userId = req.user?.id;
 
   if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
@@ -136,3 +140,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withAuth(handler);

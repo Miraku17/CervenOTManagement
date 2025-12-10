@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
+import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
@@ -11,41 +12,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Check user authorization
-    const userId = req.query.userId || req.headers['x-user-id'];
-
-    if (!userId) {
-      return res.status(401).json({ message: 'User ID required for authorization' });
-    }
-
-    // Fetch user position to verify access
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('positions(name)')
-      .eq('id', userId)
-      .single();
-
-    if (profileError || !userProfile) {
-      return res.status(403).json({ message: 'Unable to verify user permissions' });
-    }
-
-    // Check if user has authorized position
-    const authorizedPositions = [
-      'Admin Tech',
-      'Technical Support Engineer',
-      'Operations Technical Lead',
-      'Operations Manager'
-    ];
-
-    const userPosition = (userProfile.positions as any)?.name;
-
-    if (!userPosition || !authorizedPositions.includes(userPosition)) {
-      return res.status(403).json({
-        message: 'Access denied. You do not have permission to view overtime requests.',
-        position: userPosition
-      });
-    }
-
     // First, fetch all overtime requests
     const { data: overtimeData, error: overtimeError } = await supabase
       .from('overtime')
@@ -119,3 +85,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 }
+
+export default withAuth(handler, { requireRole: 'admin' });

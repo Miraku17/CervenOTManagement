@@ -1,17 +1,21 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { supabaseServer as supabase } from '@/lib/supabase-server';
 import { formatInTimeZone } from 'date-fns-tz';
+import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { userId, date } = req.query;
+  const { date } = req.query;
 
-  if (!userId || typeof userId !== 'string') {
-    return res.status(400).json({ error: 'User ID is required' });
+  // Use authenticated user's ID instead of query parameter
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   if (!date || typeof date !== 'string') {
@@ -140,3 +144,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withAuth(handler);

@@ -1,16 +1,20 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { supabase } from '@/services/supabase';
+import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    const { userId, month, year } = req.query;
+    const { month, year } = req.query;
+
+    // Use authenticated user's ID instead of query parameter
+    const userId = req.user?.id;
 
     if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
+      return res.status(401).json({ error: 'User not authenticated' });
     }
 
     // Build date range filter if month and year are provided
@@ -43,3 +47,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: error.message || 'Internal server error' });
   }
 }
+
+export default withAuth(handler);
