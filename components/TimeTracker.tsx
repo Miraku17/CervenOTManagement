@@ -14,6 +14,11 @@ interface TimeTrackerProps {
     address: string | null;
   };
   onRefreshLocation?: () => void;
+  todayOvertimeRequest?: {
+    id: string;
+    comment: string;
+    status: string;
+  } | null;
 }
 
 export const TimeTracker: React.FC<TimeTrackerProps> = ({
@@ -22,7 +27,8 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
   activeLog,
   isLoading = false,
   locationStatus,
-  onRefreshLocation
+  onRefreshLocation,
+  todayOvertimeRequest
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [now, setNow] = useState(new Date());
@@ -45,7 +51,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
   useEffect(() => {
     if (activeLog && activeLog.status === 'IN_PROGRESS') {
       const startTime = activeLog.startTime;
-      
+
       // Update immediately
       setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
 
@@ -65,6 +71,15 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
       if (intervalRef.current) window.clearInterval(intervalRef.current);
     };
   }, [activeLog]);
+
+  // Reset overtime checkbox state if there's already a request today
+  useEffect(() => {
+    if (todayOvertimeRequest) {
+      setIsOvertime(false);
+      setOvertimeComment('');
+      setOvertimeError(null);
+    }
+  }, [todayOvertimeRequest]);
 
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -200,6 +215,27 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                 </div>
             </div>
 
+            {/* Overtime Request Status - Always visible */}
+            {todayOvertimeRequest && (
+              <div className="mb-4 bg-blue-900/30 border border-blue-500/50 rounded-lg p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`px-2 py-0.5 rounded text-xs font-semibold ${
+                    todayOvertimeRequest.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                    todayOvertimeRequest.status === 'approved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                    'bg-red-500/20 text-red-400 border border-red-500/30'
+                  }`}>
+                    {todayOvertimeRequest.status.toUpperCase()}
+                  </div>
+                </div>
+                <p className="text-sm text-slate-200 font-semibold mb-1">Overtime Request Submitted Today</p>
+                <p className="text-xs text-slate-400 italic mb-3">&quot;{todayOvertimeRequest.comment}&quot;</p>
+                <p className="text-xs text-amber-400 font-medium flex items-center gap-1">
+                  <span>⚠️</span>
+                  <span>Only one overtime request allowed per day</span>
+                </p>
+              </div>
+            )}
+
             <div className="flex flex-col items-center gap-6 flex-1 justify-center">
                 <div className="flex flex-col items-center">
                     <div className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Session Duration</div>
@@ -214,7 +250,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                      : 'Ready to start a new session'}
                 </div>
 
-                {isRunning && (
+                {isRunning && !todayOvertimeRequest && (
                   <div className="w-full space-y-3 px-4 py-3 bg-slate-700/30 rounded-lg border border-slate-600">
                     <div className="space-y-2">
                       <label className="flex items-center space-x-2 text-slate-300">

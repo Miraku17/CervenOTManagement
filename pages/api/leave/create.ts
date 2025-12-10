@@ -1,8 +1,9 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { differenceInDays, parseISO } from 'date-fns';
+import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
@@ -12,7 +13,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: 'Server misconfiguration: Missing admin privileges.' });
   }
 
-  const { userId, type, startDate, endDate, reason } = req.body;
+  // Use authenticated user's ID instead of body parameter
+  const userId = req.user?.id;
+  const { type, startDate, endDate, reason } = req.body;
 
   if (!userId || !type || !startDate || !endDate || !reason) {
     return res.status(400).json({ error: 'Missing required fields.' });
@@ -90,3 +93,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ error: error.message || 'Failed to submit leave request.' });
   }
 }
+
+export default withAuth(handler);

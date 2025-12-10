@@ -1,16 +1,25 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
+import type { NextApiResponse } from 'next';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
+import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { userId, latitude, longitude, address, overtimeComment } = req.body;
+  if (!supabase) {
+    console.error('Supabase admin client not available');
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
+  const { latitude, longitude, address, overtimeComment } = req.body;
+
+  // Use authenticated user ID from middleware
+  const userId = req.user?.id;
 
   if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
@@ -63,6 +72,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Insert into overtime table if user submitted an overtime comment
     let overtime = null;
     if (overtimeComment) {
+      // Check if user already has an overtime request for today
+      // Use explicit join syntax or verify if `attendance!inner` works with service role.
+      // Service role ignores RLS, so simple joins work.
+      const { data: existingOvertimeRequests, error: checkError } = await supabase
+        .from('overtime')
+        .select('id, attendance_id, attendance!inner(date, user_id)')
+        .eq('attendance.user_id', userId)
+        .eq('attendance.date', today);
+
+      if (checkError) throw checkError;
+
+      if (existingOvertimeRequests && existingOvertimeRequests.length > 0) {
+        return res.status(400).json({
+          error: 'You have already submitted an overtime request for today. Only one overtime request per day is allowed.'
+        });
+      }
+
       // Calculate approved overtime hours if total hours > 8
       let approvedHours = null;
       if (totalHours > 8) {
@@ -121,3 +147,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+export default withAuth(handler);

@@ -1,7 +1,8 @@
-import { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
+import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
@@ -29,15 +30,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Get unique user IDs for batch fetching
     const requesterIds = [...new Set(overtimeData.map(ot => ot.requested_by))];
     const reviewerIds = [...new Set(overtimeData.map(ot => ot.reviewer).filter(Boolean))];
+    const level1ReviewerIds = [...new Set(overtimeData.map(ot => ot.level1_reviewer).filter(Boolean))];
+    const level2ReviewerIds = [...new Set(overtimeData.map(ot => ot.level2_reviewer).filter(Boolean))];
     const attendanceIds = [...new Set(overtimeData.map(ot => ot.attendance_id))];
 
+    // Combine all reviewer IDs for a single fetch
+    const allReviewerIds = [...new Set([...reviewerIds, ...level1ReviewerIds, ...level2ReviewerIds])];
+
     // Fetch all related data in parallel
-    const [requestersResult, reviewersResult, attendanceResult] = await Promise.all([
-      supabase.from('profiles').select('id, first_name, last_name, email').in('id', requesterIds),
-      reviewerIds.length > 0
-        ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', reviewerIds)
+    const [requestersResult, reviewersResult, attendanceResult, dailySummaryResult] = await Promise.all([
+      supabase.from('profiles').select('id, first_name, last_name, email, positions(name)').in('id', requesterIds),
+      allReviewerIds.length > 0
+        ? supabase.from('profiles').select('id, first_name, last_name, email, positions(name)').in('id', allReviewerIds)
         : Promise.resolve({ data: [], error: null }),
-      supabase.from('attendance').select('id, date, total_minutes').in('id', attendanceIds),
+      supabase.from('attendance').select('id, date, total_minutes, user_id').in('id', attendanceIds),
+      supabase.from('attendance_daily_summary').select('user_id, date, overtime_minutes').in('user_id', requesterIds),
     ]);
 
     // Create lookup maps
@@ -45,16 +52,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const reviewersMap = new Map(reviewersResult.data?.map(p => [p.id, p]) || []);
     const attendanceMap = new Map(attendanceResult.data?.map(a => [a.id, a]) || []);
 
+    // Create daily summary lookup map by user_id and date
+    const dailySummaryMap = new Map(
+      dailySummaryResult.data?.map(ds => [`${ds.user_id}_${ds.date}`, ds]) || []
+    );
+
     // Combine the data
-    const transformedData = overtimeData.map(ot => ({
-      ...ot,
-      requested_by: requestersMap.get(ot.requested_by),
-      reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null,
-      attendance: attendanceMap.get(ot.attendance_id),
-    }));
+    const transformedData = overtimeData.map(ot => {
+      const attendance = attendanceMap.get(ot.attendance_id);
+      const dailySummary = attendance
+        ? dailySummaryMap.get(`${attendance.user_id}_${attendance.date}`)
+        : null;
+
+      return {
+        ...ot,
+        requested_by: requestersMap.get(ot.requested_by),
+        reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null,
+        level1_reviewer_profile: ot.level1_reviewer ? reviewersMap.get(ot.level1_reviewer) : null,
+        level2_reviewer_profile: ot.level2_reviewer ? reviewersMap.get(ot.level2_reviewer) : null,
+        attendance: attendance,
+        overtime_minutes: dailySummary?.overtime_minutes || null,
+      };
+    });
 
     console.log('Overtime requests fetched:', transformedData.length);
-    console.log('Sample request with reviewer:', transformedData.find(r => r.reviewer));
+    console.log('Sample request with two-level approval:', transformedData.find(r => r.level1_reviewer || r.level2_reviewer));
 
     return res.status(200).json({ data: transformedData });
 
@@ -63,3 +85,5 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 }
+
+export default withAuth(handler, { requireRole: 'admin' });
