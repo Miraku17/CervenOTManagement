@@ -77,30 +77,28 @@ const AdminDashboard: React.FC = () => {
 
   // Fetch employees
   const fetchEmployees = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*, positions(name), role');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('No active session');
+        return;
+      }
 
-    if (data) {
-      const fetchedEmployees: Employee[] = data.map((profile: any) => ({
-        id: profile.id,
-        employee_id: profile.employee_id || 'N/A',
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        fullName: `${profile.first_name} ${profile.last_name}`,
-        email: profile.email,
-        contact_number: profile.contact_number || '',
-        address: profile.address || '',
-        position: profile.positions?.name || 'N/A',
-        department: profile.department || 'N/A', // Assuming department exists or set a default
-        joinDate: profile.created_at ? new Date(profile.created_at).toLocaleDateString() : 'N/A',
-        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${profile.first_name}+${profile.last_name}`, // Static avatar
-        status: 'Active', // Default status for now
-        role: profile.role,
-      }));
-      setEmployees(fetchedEmployees);
-    }
-    if (error) {
+      const response = await fetch('/api/employees/get', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch employees');
+      }
+
+      const data = await response.json();
+      setEmployees(data.employees);
+    } catch (error) {
       console.error('Error fetching employees:', error);
     }
   };

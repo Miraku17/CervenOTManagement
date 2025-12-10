@@ -9,22 +9,32 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Fetch all employees from profiles table
+    // Fetch all employees from profiles table with all necessary fields
     const { data: employees, error } = await supabaseServer
       .from('profiles')
-      .select('id, first_name, last_name, email, employee_id')
+      .select('*, positions(name)')
       .order('first_name', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    // Format the employee data
-    const formattedEmployees = (employees || []).map(emp => ({
+    // Format the employee data to match the Employee interface
+    const formattedEmployees = (employees || []).map((emp: any) => ({
       id: emp.id,
-      name: `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.email,
-      employee_id: emp.employee_id,
+      employee_id: emp.employee_id || 'N/A',
+      firstName: emp.first_name || '',
+      lastName: emp.last_name || '',
+      fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.email,
       email: emp.email,
+      contact_number: emp.contact_number || '',
+      address: emp.address || '',
+      position: emp.positions?.name || 'N/A',
+      department: emp.department || 'N/A',
+      joinDate: emp.created_at ? new Date(emp.created_at).toLocaleDateString() : 'N/A',
+      avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${emp.first_name}+${emp.last_name}`,
+      status: 'Active', // Default status
+      role: emp.role,
     }));
 
     return res.status(200).json({ employees: formattedEmployees });
