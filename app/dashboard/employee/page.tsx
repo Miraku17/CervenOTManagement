@@ -834,7 +834,7 @@ const EmployeeDashboard: React.FC = () => {
                 <span className="font-medium">File a Leave</span>
               </button>
 
-              {/* <button
+              <button
                 onClick={() => {
                   router.push('/dashboard/ticketing');
                   setIsMobileMenuOpen(false); // Close menu after clicking
@@ -843,7 +843,7 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <Ticket size={20} />
                 <span className="font-medium">Ticketing</span>
-              </button> */}
+              </button>
 
               {isAdmin && (
                 <button
