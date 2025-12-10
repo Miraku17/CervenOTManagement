@@ -16,6 +16,7 @@ export default function TicketingLayout({
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ export default function TicketingLayout({
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, positions(name)')
           .eq('id', user.id)
           .single();
 
@@ -35,6 +36,7 @@ export default function TicketingLayout({
         }
 
         setIsAdmin(profile?.role === 'admin');
+        setUserPosition((profile?.positions as any)?.name || null);
       } catch (error) {
         console.error('Error checking user role:', error);
       } finally {
@@ -49,6 +51,10 @@ export default function TicketingLayout({
     router.push(path);
     setIsMobileMenuOpen(false);
   };
+
+  // Check if user has access to stores and inventory sections
+  // Access granted ONLY if: admin AND position is "Operations Manager"
+  const hasInventoryAccess = isAdmin && userPosition === 'Operations Manager';
 
   const SidebarContent = () => (
     <>
@@ -81,19 +87,21 @@ export default function TicketingLayout({
         )}
 
         {isAdmin && (
-          <>
-            <button
-              onClick={() => handleNavigate('/dashboard/ticketing/overview')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                pathname === '/dashboard/ticketing/overview'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <LayoutDashboard size={20} />
-              <span className="font-medium">Overview</span>
-            </button>
+          <button
+            onClick={() => handleNavigate('/dashboard/ticketing/overview')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              pathname === '/dashboard/ticketing/overview'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <LayoutDashboard size={20} />
+            <span className="font-medium">Overview</span>
+          </button>
+        )}
 
+        {hasInventoryAccess && (
+          <>
             <button
               onClick={() => handleNavigate('/dashboard/ticketing/stores')}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${

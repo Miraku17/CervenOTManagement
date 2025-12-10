@@ -8,12 +8,45 @@ import StoreDetailModal from '@/components/ticketing/StoreDetailModal';
 import ImportStoresModal from '@/components/ticketing/ImportStoresModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 
 export default function StoresPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Access control check
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const isAdmin = profile?.role === 'admin';
+        const userPosition = (profile?.positions as any)?.name || null;
+        const hasAccess = isAdmin && userPosition === 'Operations Manager';
+
+        if (!hasAccess) {
+          router.push('/dashboard/ticketing/tickets');
+        }
+      } catch (error) {
+        console.error('Error checking access:', error);
+        router.push('/dashboard/ticketing/tickets');
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, router]);
 
   // Detail Modal State
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);

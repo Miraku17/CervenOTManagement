@@ -13,7 +13,7 @@ export default function TicketingPage() {
   useEffect(() => {
     const redirectUser = async () => {
       if (loading) return;
-      
+
       if (!user) {
         // Should be handled by middleware, but just in case
         router.push('/auth/login');
@@ -23,11 +23,15 @@ export default function TicketingPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, positions(name)')
           .eq('id', user.id)
           .single();
 
-        if (profile?.role === 'admin') {
+        const isAdmin = profile?.role === 'admin';
+        const userPosition = (profile?.positions as any)?.name || null;
+        const hasInventoryAccess = isAdmin && userPosition === 'Operations Manager';
+
+        if (hasInventoryAccess) {
           router.push('/dashboard/ticketing/stores');
         } else {
           router.push('/dashboard/ticketing/tickets');

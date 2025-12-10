@@ -5,6 +5,9 @@ import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 
 interface Asset {
   id: string;
@@ -19,6 +22,8 @@ interface Asset {
 }
 
 export default function AssetInventoryPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -28,6 +33,34 @@ export default function AssetInventoryPage() {
   const [selectedAssetForDetail, setSelectedAssetForDetail] = useState<Asset | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Access control check
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const isAdmin = profile?.role === 'admin';
+        const userPosition = (profile?.positions as any)?.name || null;
+        const hasAccess = isAdmin && userPosition === 'Operations Manager';
+
+        if (!hasAccess) {
+          router.push('/dashboard/ticketing/tickets');
+        }
+      } catch (error) {
+        console.error('Error checking access:', error);
+        router.push('/dashboard/ticketing/tickets');
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, router]);
 
   // Toast notification state
   const [toast, setToast] = useState<{

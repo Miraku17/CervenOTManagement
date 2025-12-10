@@ -7,6 +7,9 @@ import StoreInventoryDetailModal from '@/components/ticketing/StoreInventoryDeta
 import { ConfirmModal } from '@/components/ConfirmModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 
 interface InventoryItem {
   id: string;
@@ -39,10 +42,40 @@ interface InventoryItem {
 }
 
 export default function StoreInventoryPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Access control check
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const isAdmin = profile?.role === 'admin';
+        const userPosition = (profile?.positions as any)?.name || null;
+        const hasAccess = isAdmin && userPosition === 'Operations Manager';
+
+        if (!hasAccess) {
+          router.push('/dashboard/ticketing/tickets');
+        }
+      } catch (error) {
+        console.error('Error checking access:', error);
+        router.push('/dashboard/ticketing/tickets');
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, router]);
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
