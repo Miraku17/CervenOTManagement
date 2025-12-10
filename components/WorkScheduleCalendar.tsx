@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane } from 'lucide-react';
+import type { LeaveRequest } from '@/types';
 
 interface WorkSchedule {
   id: string;
@@ -20,6 +21,7 @@ interface WorkScheduleCalendarProps {
 
 export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ userId, isOpen, onClose }) => {
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +33,28 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Fetch leave requests for the employee
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchLeaveRequests = async () => {
+      try {
+        const response = await fetch(`/api/leave/employee?employeeId=${userId}`);
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch leave requests');
+        }
+
+        const result = await response.json();
+        setLeaveRequests(result.data || []);
+      } catch (error) {
+        console.error('Error fetching leave requests:', error);
+      }
+    };
+
+    fetchLeaveRequests();
+  }, [userId]);
 
   // Fetch schedules when month/year changes
   useEffect(() => {
@@ -70,6 +94,27 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
     });
     return map;
   }, [schedules]);
+
+  // Helper function to check if a date is within a leave request range
+  const getLeaveRequestForDate = (dateStr: string): LeaveRequest | null => {
+    const checkDate = new Date(dateStr);
+
+    for (const leave of leaveRequests) {
+      const startDate = new Date(leave.start_date);
+      const endDate = new Date(leave.end_date);
+
+      // Set time to midnight for accurate date comparison
+      checkDate.setHours(0, 0, 0, 0);
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(0, 0, 0, 0);
+
+      if (checkDate >= startDate && checkDate <= endDate) {
+        return leave;
+      }
+    }
+
+    return null;
+  };
 
   const monthName = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long' });
 
@@ -116,10 +161,29 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const schedule = schedulesByDate[dateStr];
+      const leaveRequest = getLeaveRequestForDate(dateStr);
       const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
       const isSelected = selectedDate === dateStr;
       const isRestDay = schedule?.is_rest_day;
       const hasSchedule = !!schedule;
+      const hasLeave = !!leaveRequest;
+
+      // Determine background color based on priority: leave > rest day > schedule
+      let bgClass = 'border-slate-700 bg-slate-900/50 opacity-60';
+      if (hasLeave) {
+        // Different colors based on leave status
+        if (leaveRequest.status === 'approved') {
+          bgClass = 'border-green-700 bg-green-900/30 hover:bg-green-900/40';
+        } else if (leaveRequest.status === 'rejected') {
+          bgClass = 'border-red-700 bg-red-900/30 hover:bg-red-900/40';
+        } else {
+          bgClass = 'border-amber-700 bg-amber-900/30 hover:bg-amber-900/40';
+        }
+      } else if (isRestDay) {
+        bgClass = 'border-slate-700 bg-orange-900/20 hover:bg-orange-900/30';
+      } else if (hasSchedule) {
+        bgClass = 'border-slate-700 bg-slate-800 hover:bg-slate-750';
+      }
 
       days.push(
         <div
@@ -129,24 +193,37 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
             h-16 sm:h-20 md:h-24 p-1.5 sm:p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
             ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-900/20' : ''}
             ${!isSelected && isToday ? 'border-blue-500/50 bg-blue-500/10' : ''}
-            ${!isSelected && !isToday && isRestDay ? 'border-slate-700 bg-orange-900/20 hover:bg-orange-900/30' : ''}
-            ${!isSelected && !isToday && !isRestDay && hasSchedule ? 'border-slate-700 bg-slate-800 hover:bg-slate-750' : ''}
-            ${!isSelected && !isToday && !hasSchedule ? 'border-slate-700 bg-slate-900/50 opacity-60' : ''}
+            ${!isSelected && !isToday ? bgClass : ''}
           `}
         >
           <div className="flex justify-between items-start z-10 relative">
             <span className={`text-xs sm:text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-400'} group-hover:text-blue-300`}>
               {d}
             </span>
-            {isRestDay && (
+            {hasLeave ? (
+              <Plane className={`w-3 h-3 sm:w-4 sm:h-4 ${
+                leaveRequest.status === 'approved' ? 'text-green-400' :
+                leaveRequest.status === 'rejected' ? 'text-red-400' :
+                'text-amber-400'
+              }`} />
+            ) : isRestDay ? (
               <Coffee className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400" />
-            )}
-            {!isRestDay && hasSchedule && (
+            ) : hasSchedule ? (
               <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
-            )}
+            ) : null}
           </div>
 
-          {isRestDay ? (
+          {hasLeave ? (
+            <div className="mt-auto z-10 relative">
+              <span className={`text-[10px] sm:text-xs font-medium ${
+                leaveRequest.status === 'approved' ? 'text-green-400' :
+                leaveRequest.status === 'rejected' ? 'text-red-400' :
+                'text-amber-400'
+              }`}>
+                {leaveRequest.leave_type}
+              </span>
+            </div>
+          ) : isRestDay ? (
             <div className="mt-auto z-10 relative">
               <span className="text-[10px] sm:text-xs text-orange-400 font-medium">Rest Day</span>
             </div>
@@ -170,6 +247,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
   };
 
   const selectedSchedule = selectedDate ? schedulesByDate[selectedDate] : null;
+  const selectedLeaveRequest = selectedDate ? getLeaveRequestForDate(selectedDate) : null;
 
   if (!isOpen) return null;
 
@@ -261,7 +339,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
           </div>
         )}
 
-              <div className="mt-4 pt-4 border-t border-slate-700 flex gap-4 text-xs">
+              <div className="mt-4 pt-4 border-t border-slate-700 flex flex-wrap gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-blue-500"></div>
                   <span className="text-slate-400">Scheduled</span>
@@ -269,6 +347,18 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                 <div className="flex items-center gap-2">
                   <Coffee className="w-3 h-3 text-orange-400" />
                   <span className="text-slate-400">Rest Day</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Plane className="w-3 h-3 text-green-400" />
+                  <span className="text-slate-400">Leave (Approved)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Plane className="w-3 h-3 text-amber-400" />
+                  <span className="text-slate-400">Leave (Pending)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Plane className="w-3 h-3 text-red-400" />
+                  <span className="text-slate-400">Leave (Rejected)</span>
                 </div>
               </div>
             </div>
@@ -301,7 +391,63 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               </button>
             </div>
 
-            <div className="p-3 sm:p-5 bg-slate-900/50">
+            <div className="p-3 sm:p-5 bg-slate-900/50 space-y-4">
+              {/* Leave Request Section */}
+              {selectedLeaveRequest && (
+                <div className={`rounded-xl p-4 border ${
+                  selectedLeaveRequest.status === 'approved' ? 'bg-green-900/20 border-green-700/30' :
+                  selectedLeaveRequest.status === 'rejected' ? 'bg-red-900/20 border-red-700/30' :
+                  'bg-amber-900/20 border-amber-700/30'
+                }`}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <Plane className={`w-8 h-8 ${
+                      selectedLeaveRequest.status === 'approved' ? 'text-green-400' :
+                      selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                      'text-amber-400'
+                    }`} />
+                    <div>
+                      <h4 className={`text-lg font-bold ${
+                        selectedLeaveRequest.status === 'approved' ? 'text-green-300' :
+                        selectedLeaveRequest.status === 'rejected' ? 'text-red-300' :
+                        'text-amber-300'
+                      }`}>{selectedLeaveRequest.leave_type}</h4>
+                      <p className="text-xs text-slate-400 uppercase tracking-wider">
+                        {selectedLeaveRequest.status}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase block mb-1">Date Range</span>
+                      <div className="text-sm text-white">
+                        {new Date(selectedLeaveRequest.start_date).toLocaleDateString()} - {new Date(selectedLeaveRequest.end_date).toLocaleDateString()}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-xs text-slate-500 uppercase block mb-1">Reason</span>
+                      <p className="text-sm text-slate-300">{selectedLeaveRequest.reason}</p>
+                    </div>
+
+                    {selectedLeaveRequest.reviewer && (
+                      <div>
+                        <span className="text-xs text-slate-500 uppercase block mb-1">Reviewed By</span>
+                        <div className="text-sm text-slate-300">
+                          {selectedLeaveRequest.reviewer.first_name} {selectedLeaveRequest.reviewer.last_name}
+                        </div>
+                        {selectedLeaveRequest.reviewed_at && (
+                          <div className="text-xs text-slate-500">
+                            on {new Date(selectedLeaveRequest.reviewed_at).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Schedule Section */}
               {selectedSchedule ? (
                 selectedSchedule.is_rest_day ? (
                   <div className="bg-orange-900/20 border border-orange-700/30 rounded-xl p-4 text-center">
@@ -335,7 +481,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                     </div>
                   </div>
                 )
-              ) : (
+              ) : !selectedLeaveRequest && (
                 <div className="text-center py-10 text-slate-500 flex flex-col items-center">
                   <CalendarIcon className="w-10 h-10 mb-3 opacity-30" />
                   <p className="text-sm">No schedule found for this date</p>

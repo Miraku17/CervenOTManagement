@@ -73,7 +73,7 @@ export interface AttendanceRecord {
   } | null;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE' | 'EMPLOYEE_SCHEDULE';
 
 export interface Position {
   id: number;
@@ -94,4 +94,27 @@ export interface Store {
   mobile_number?: string;
   store_address?: string;
   status?: string;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employee_id: string;
+  employee?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  };
+  leave_type: string;
+  start_date: string;
+  end_date: string;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  reviewer_id?: string;
+  reviewer?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+  reviewed_at?: string;
 }

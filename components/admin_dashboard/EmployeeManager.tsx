@@ -54,7 +54,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   }, [employees, searchTerm]);
 
   const handleExportPDF = async () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Sort employees alphabetically by fullName
@@ -140,12 +140,12 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         fillColor: [248, 250, 252], // Slate 50
       },
       columnStyles: {
-        0: { cellWidth: 20 }, // Employee ID
-        1: { cellWidth: 35 }, // Full Name
-        2: { cellWidth: 40 }, // Email
-        3: { cellWidth: 30 }, // Position
-        4: { cellWidth: 18 }, // Status
-        5: { cellWidth: 25 }, // Contact
+        0: { cellWidth: 25 }, // Employee ID
+        1: { cellWidth: 45 }, // Full Name
+        2: { cellWidth: 55 }, // Email
+        3: { cellWidth: 40 }, // Position
+        4: { cellWidth: 20 }, // Status
+        5: { cellWidth: 32 }, // Contact
         6: { cellWidth: 'auto' }, // Address
       },
       margin: { left: 14, right: 14 },
