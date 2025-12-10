@@ -24,6 +24,7 @@ import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
 import LeaveRequestsView from '@/components/admin_dashboard/LeaveRequestsView';
 import ImportScheduleView from '@/components/admin_dashboard/ImportScheduleView';
+import EmployeeScheduleView from '@/components/admin_dashboard/EmployeeScheduleView';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
@@ -217,6 +218,12 @@ const AdminDashboard: React.FC = () => {
             onClick={() => handleNavigate('IMPORT_SCHEDULE')}
           />
           <SidebarItem
+            icon={<Calendar size={20} />}
+            label="Employee Schedule"
+            isActive={currentView === 'EMPLOYEE_SCHEDULE'}
+            onClick={() => handleNavigate('EMPLOYEE_SCHEDULE')}
+          />
+          <SidebarItem
             icon={<Ticket size={20} />}
             label="Ticketing"
             isActive={false} // Always false as it navigates away
@@ -313,6 +320,12 @@ const AdminDashboard: React.FC = () => {
                 label="Import Schedule"
                 isActive={currentView === 'IMPORT_SCHEDULE'}
                 onClick={() => handleNavigate('IMPORT_SCHEDULE')}
+              />
+              <SidebarItem
+                icon={<Calendar size={24} />}
+                label="Employee Schedule"
+                isActive={currentView === 'EMPLOYEE_SCHEDULE'}
+                onClick={() => handleNavigate('EMPLOYEE_SCHEDULE')}
               />
               <SidebarItem
                 icon={<Ticket size={24} />}
@@ -447,6 +460,10 @@ const AdminDashboard: React.FC = () => {
 
             {currentView === 'IMPORT_SCHEDULE' && (
               <ImportScheduleView />
+            )}
+
+            {currentView === 'EMPLOYEE_SCHEDULE' && (
+              <EmployeeScheduleView employees={employees} />
             )}
 
           </div>
