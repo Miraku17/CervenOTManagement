@@ -5,10 +5,11 @@ import { User } from "@supabase/supabase-js";
 interface UserProfile extends User {
   first_name?: string;
   last_name?: string;
-  positions?: { name: string };
   contact_number?: string;
   address?: string;
   role?: string;
+  position?: string; // Flattened position name
+  leave_credits?: number;
 }
 
 /**
@@ -40,7 +41,12 @@ export const useUser = () => {
           .single();
 
         if (mounted) {
-          setUser({ ...authUser, ...profile });
+          const userWithProfile: UserProfile = {
+            ...authUser,
+            ...profile,
+            position: (profile?.positions as any)?.name, // Extract and flatten position name
+          };
+          setUser(userWithProfile);
           setLoading(false);
         }
       } catch (err) {

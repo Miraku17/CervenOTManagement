@@ -7,13 +7,15 @@ export interface AuthenticatedRequest extends NextApiRequest {
     id: string;
     email?: string;
     role?: string;
+    position?: string;
   };
 }
 
 export const withAuth = (
   handler: (req: AuthenticatedRequest, res: NextApiResponse) => Promise<void> | void,
   options?: {
-    requireRole?: 'admin' | 'employee';
+    requireRole?: string | string[];
+    requirePosition?: string | string[];
   }
 ) => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
@@ -88,15 +90,15 @@ export const withAuth = (
         return res.status(401).json({ error: 'Unauthorized: Invalid token or session' });
       }
 
-      // Fetch user profile to get role
+      // Fetch user profile to get role and position
       // We use supabaseAdmin to bypass RLS for reading the role, to be safe.
-      // If supabaseAdmin is missing, we fall back to a "employee" role or try to fetch with the user context.
       let role = 'employee';
+      let position: string | undefined;
       
       if (supabaseAdmin) {
         const { data: profile, error: profileError } = await supabaseAdmin
           .from('profiles')
-          .select('role')
+          .select('role, positions(name)')
           .eq('id', user.id)
           .single();
 
@@ -104,6 +106,8 @@ export const withAuth = (
           console.error('[API Auth] Failed to fetch user profile:', profileError);
         } else {
            role = profile?.role || 'employee';
+           // Extract position name safely
+           position = (profile?.positions as any)?.name; 
         }
       }
 
@@ -112,13 +116,43 @@ export const withAuth = (
         id: user.id,
         email: user.email,
         role: role,
+        position: position,
       };
 
-      // Check role if required
-      if (options?.requireRole && role !== options.requireRole) {
-        return res.status(403).json({
-          error: `Forbidden: ${options.requireRole} role required`
-        });
+      // Check authorization
+      if (options) {
+        const { requireRole, requirePosition } = options;
+        
+        const allowedRoles = requireRole 
+          ? (Array.isArray(requireRole) ? requireRole : [requireRole]) 
+          : [];
+          
+        const allowedPositions = requirePosition 
+          ? (Array.isArray(requirePosition) ? requirePosition : [requirePosition]) 
+          : [];
+
+        // Determine if specific restrictions are in place
+        const hasRoleRestriction = allowedRoles.length > 0;
+        const hasPositionRestriction = allowedPositions.length > 0;
+
+        // Assume authorized initially, then check restrictions
+        let isAuthorized = true;
+
+        if (hasRoleRestriction) {
+          if (!allowedRoles.includes(role)) {
+            isAuthorized = false;
+          }
+        }
+
+        if (hasPositionRestriction) {
+          if (!(position && allowedPositions.includes(position))) {
+            isAuthorized = false;
+          }
+        }
+
+        if ((hasRoleRestriction || hasPositionRestriction) && !isAuthorized) {
+           return res.status(403).json({ error: 'Forbidden' });
+        }
       }
 
       return handler(req as AuthenticatedRequest, res);
