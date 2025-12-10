@@ -63,6 +63,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Insert into overtime table if user submitted an overtime comment
     let overtime = null;
     if (overtimeComment) {
+      // Check if user already has an overtime request for today
+      const { data: existingOvertimeRequests, error: checkError } = await supabase
+        .from('overtime')
+        .select('id, attendance_id, attendance!inner(date, user_id)')
+        .eq('attendance.user_id', userId)
+        .eq('attendance.date', today);
+
+      if (checkError) throw checkError;
+
+      if (existingOvertimeRequests && existingOvertimeRequests.length > 0) {
+        return res.status(400).json({
+          error: 'You have already submitted an overtime request for today. Only one overtime request per day is allowed.'
+        });
+      }
+
       // Calculate approved overtime hours if total hours > 8
       let approvedHours = null;
       if (totalHours > 8) {

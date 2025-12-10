@@ -38,6 +38,14 @@ const EmployeeDashboard: React.FC = () => {
   // Admin check
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Overtime request check
+  const [hasOvertimeRequestToday, setHasOvertimeRequestToday] = useState(false);
+  const [todayOvertimeRequest, setTodayOvertimeRequest] = useState<{
+    id: string;
+    comment: string;
+    status: string;
+  } | null>(null);
+
   // Check if user is admin
   useEffect(() => {
     const checkAdminStatus = async () => {
@@ -118,6 +126,39 @@ const EmployeeDashboard: React.FC = () => {
     setLeaveRefreshTrigger(prev => prev + 1);
   };
 
+  // Check if user has already submitted an overtime request today
+  const checkTodayOvertimeRequest = async () => {
+    if (!user?.id) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('overtime')
+        .select('id, comment, status, attendance!inner(date, user_id)')
+        .eq('attendance.user_id', user.id)
+        .eq('attendance.date', today);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        setHasOvertimeRequestToday(true);
+        setTodayOvertimeRequest({
+          id: data[0].id,
+          comment: data[0].comment,
+          status: data[0].status
+        });
+        console.log('Found overtime request for today:', data[0]);
+      } else {
+        setHasOvertimeRequestToday(false);
+        setTodayOvertimeRequest(null);
+      }
+    } catch (error) {
+      console.error('Error checking overtime request:', error);
+      setHasOvertimeRequestToday(false);
+      setTodayOvertimeRequest(null);
+    }
+  };
+
   // Initialize dashboard - load all data in parallel
   useEffect(() => {
     if (!user?.id || authLoading) return;
@@ -129,7 +170,8 @@ const EmployeeDashboard: React.FC = () => {
       await Promise.all([
         checkActiveSession(),
         fetchAttendanceRecords(),
-        requestLocationOnMount()
+        requestLocationOnMount(),
+        checkTodayOvertimeRequest()
       ]);
 
       console.log('Dashboard initialization complete');
@@ -530,6 +572,12 @@ const EmployeeDashboard: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
+        // Check if it's an overtime already requested error
+        if (data.error && data.error.includes('already submitted an overtime request')) {
+          showToast('error', 'Overtime already requested today. Only one overtime request per day is allowed.');
+        } else {
+          showToast('error', data.error || 'Failed to clock out. Please try again.');
+        }
         throw new Error(data.error || 'Failed to clock out');
       }
 
@@ -553,11 +601,12 @@ const EmployeeDashboard: React.FC = () => {
         : 'Successfully clocked out!';
       showToast('success', message);
 
-      // Refresh attendance records from database
+      // Refresh attendance records and overtime request status from database
       fetchAttendanceRecords();
+      checkTodayOvertimeRequest();
     } catch (error: any) {
       console.error('Clock-out error:', error);
-      showToast('error', error.message || 'Failed to clock out. Please try again.');
+      // Error toast is already shown above, no need to show it again
     } finally {
       setIsClocking(false);
     }
@@ -853,6 +902,7 @@ const EmployeeDashboard: React.FC = () => {
                 address: currentAddress,
               }}
               onRefreshLocation={() => requestLocation(true)}
+              todayOvertimeRequest={todayOvertimeRequest}
             />
           </div>
         </div>
