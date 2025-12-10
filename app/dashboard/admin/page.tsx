@@ -37,6 +37,7 @@ const AdminDashboard: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const [positions, setPositions] = useState<Position[]>([]);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   // Check if user is admin, redirect if not
   useEffect(() => {
@@ -45,13 +46,16 @@ const AdminDashboard: React.FC = () => {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, positions(name)')
         .eq('id', user.id)
         .single();
 
       if (profile?.role !== 'admin') {
         router.push('/dashboard/employee');
       }
+
+      // Set user position for access control
+      setUserPosition(profile?.positions?.name || null);
     };
 
     checkAdminAccess();
@@ -139,6 +143,17 @@ const AdminDashboard: React.FC = () => {
     setEmployees(prev => prev.map(e => e.id === updatedEmployee.id ? updatedEmployee : e));
   };
 
+  // Check if user has access to overtime requests
+  const hasOvertimeAccess = () => {
+    if (!userPosition) return false;
+    const authorizedPositions = [
+      'Admin Tech',
+      'Technical Support Engineer',
+      'Operations Technical Lead',
+      'Operations Manager'
+    ];
+    return authorizedPositions.includes(userPosition);
+  };
 
   const selectedEmployee = useMemo(() =>
     employees.find(e => e.id === selectedEmployeeId),
@@ -176,12 +191,14 @@ const AdminDashboard: React.FC = () => {
             isActive={currentView === 'EDIT_TIME'}
             onClick={() => handleNavigate('EDIT_TIME')}
           />
-          <SidebarItem
-            icon={<FileText size={20} />}
-            label="Overtime Requests"
-            isActive={currentView === 'OVERTIME_REQUESTS'}
-            onClick={() => handleNavigate('OVERTIME_REQUESTS')}
-          />
+          {hasOvertimeAccess() && (
+            <SidebarItem
+              icon={<FileText size={20} />}
+              label="Overtime Requests"
+              isActive={currentView === 'OVERTIME_REQUESTS'}
+              onClick={() => handleNavigate('OVERTIME_REQUESTS')}
+            />
+          )}
           <SidebarItem
             icon={<Calendar size={20} />}
             label="Leave Requests"
@@ -270,12 +287,14 @@ const AdminDashboard: React.FC = () => {
                 isActive={currentView === 'EDIT_TIME'}
                 onClick={() => handleNavigate('EDIT_TIME')}
               />
-              <SidebarItem
-                icon={<FileText size={24} />}
-                label="Overtime Requests"
-                isActive={currentView === 'OVERTIME_REQUESTS'}
-                onClick={() => handleNavigate('OVERTIME_REQUESTS')}
-              />
+              {hasOvertimeAccess() && (
+                <SidebarItem
+                  icon={<FileText size={24} />}
+                  label="Overtime Requests"
+                  isActive={currentView === 'OVERTIME_REQUESTS'}
+                  onClick={() => handleNavigate('OVERTIME_REQUESTS')}
+                />
+              )}
               <SidebarItem
                 icon={<Calendar size={24} />}
                 label="Leave Requests"
@@ -382,7 +401,22 @@ const AdminDashboard: React.FC = () => {
             )}
 
             {currentView === 'OVERTIME_REQUESTS' && (
-              <OvertimeRequestsView />
+              hasOvertimeAccess() ? (
+                <OvertimeRequestsView />
+              ) : (
+                <div className="p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+                      <X className="w-8 h-8 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+                      <p className="text-slate-400">You don't have permission to view overtime requests.</p>
+                      <p className="text-slate-500 text-sm mt-2">Only authorized positions can access this feature.</p>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
 
             {currentView === 'LEAVE_REQUESTS' && (

@@ -45,6 +45,7 @@ const EmployeeDashboard: React.FC = () => {
     comment: string;
     status: string;
   } | null>(null);
+  const [overtimeHistoryRefreshKey, setOvertimeHistoryRefreshKey] = useState(0);
 
   // Check if user is admin
   useEffect(() => {
@@ -604,6 +605,9 @@ const EmployeeDashboard: React.FC = () => {
       // Refresh attendance records and overtime request status from database
       fetchAttendanceRecords();
       checkTodayOvertimeRequest();
+
+      // Refresh overtime history to show the new request immediately
+      setOvertimeHistoryRefreshKey(prev => prev + 1);
     } catch (error: any) {
       console.error('Clock-out error:', error);
       // Error toast is already shown above, no need to show it again
@@ -912,7 +916,7 @@ const EmployeeDashboard: React.FC = () => {
         </div>
 
         <div>
-          <OvertimeHistory />
+          <OvertimeHistory key={overtimeHistoryRefreshKey} />
         </div>
 
         <div>
