@@ -55,7 +55,7 @@ const AdminDashboard: React.FC = () => {
       }
 
       // Set user position for access control
-      setUserPosition(profile?.positions?.name || null);
+      setUserPosition((profile?.positions as any)?.name || null);
     };
 
     checkAdminAccess();
