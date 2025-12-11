@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer } from '@/lib/supabase-server';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -8,9 +8,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   try {
     // Fetch all employees from profiles table with all necessary fields
-    const { data: employees, error } = await supabaseServer
+    const { data: employees, error } = await supabaseAdmin
       .from('profiles')
       .select('*, positions(name)')
       .order('first_name', { ascending: true });
