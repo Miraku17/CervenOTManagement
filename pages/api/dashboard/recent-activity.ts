@@ -8,6 +8,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  if (!supabase) {
+    console.error('Supabase admin client not initialized');
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+
   const { limit = '20' } = req.query;
 
   try {

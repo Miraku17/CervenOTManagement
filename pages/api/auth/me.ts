@@ -8,23 +8,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method Not Allowed' });
-  }
-
-  // Use authenticated user's ID instead of query parameter
-  const userId = req.user?.id;
-
-  if (!userId) {
-    return res.status(401).json({ message: 'User not authenticated' });
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, email, positions(name)')
-      .eq('id', userId)
-      .single();
-  if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
@@ -38,7 +21,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Fetch user profile
-    const { data: profile, error: profileError } = await supabaseServer
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, email')
       .eq('id', userId)

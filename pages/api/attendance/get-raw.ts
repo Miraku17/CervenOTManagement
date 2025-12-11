@@ -4,6 +4,10 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (!supabase) {
+    return res.status(500).json({ error: 'Server configuration error' });
+  }
+
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
