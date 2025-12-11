@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { formatInTimeZone } from 'date-fns-tz';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 

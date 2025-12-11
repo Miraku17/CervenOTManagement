@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {

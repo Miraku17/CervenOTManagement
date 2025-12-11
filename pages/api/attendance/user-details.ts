@@ -1,6 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabaseServer as supabase } from '@/lib/supabase-server';
-import { formatInTimeZone } from 'date-fns-tz';
+import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
