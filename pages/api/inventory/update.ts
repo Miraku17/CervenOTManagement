@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -15,7 +15,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const { data: inventoryItem, error: updateError } = await supabase
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
+    
+    const { data: inventoryItem, error: updateError } = await supabaseAdmin
       .from('store_inventory')
       .update({
         store_id,

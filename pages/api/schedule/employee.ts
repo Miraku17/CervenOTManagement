@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -8,6 +8,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+      if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
+    
     const { month, year } = req.query;
 
     // Use authenticated user's ID instead of query parameter
@@ -18,7 +24,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Build date range filter if month and year are provided
-    let query = supabase
+    let query = supabaseAdmin
       .from('working_schedules')
       .select('*')
       .eq('employee_id', userId)

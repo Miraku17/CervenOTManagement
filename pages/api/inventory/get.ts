@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -9,8 +9,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+    
     // Fetch inventory items with all related data via joins
-    const { data: inventoryItems, error } = await supabase
+    const { data: inventoryItems, error } = await supabaseAdmin
       .from('store_inventory')
       .select(`
         id,
