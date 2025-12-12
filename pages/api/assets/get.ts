@@ -9,6 +9,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+      if (!supabaseAdmin) {
+          throw new Error('Database connection not available');
+        }
+
+        
     // Fetch assets with all related data via joins
     const { data: assets, error } = await supabaseAdmin
       .from('asset_inventory')
