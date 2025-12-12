@@ -44,7 +44,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         ? supabase.from('profiles').select('id, first_name, last_name, email, positions(name)').in('id', allReviewerIds)
         : Promise.resolve({ data: [], error: null }),
       supabase.from('attendance').select('id, date, total_minutes, user_id').in('id', attendanceIds),
-      supabase.from('attendance_daily_summary').select('user_id, date, overtime_minutes').in('user_id', requesterIds),
+      supabase.from('attendance_daily_summary').select('user_id, work_date, overtime_minutes').in('user_id', requesterIds),
     ]);
 
     // Create lookup maps
@@ -52,9 +52,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const reviewersMap = new Map(reviewersResult.data?.map(p => [p.id, p]) || []);
     const attendanceMap = new Map(attendanceResult.data?.map(a => [a.id, a]) || []);
 
-    // Create daily summary lookup map by user_id and date
+    // Create daily summary lookup map by user_id and work_date
     const dailySummaryMap = new Map(
-      dailySummaryResult.data?.map(ds => [`${ds.user_id}_${ds.date}`, ds]) || []
+      dailySummaryResult.data?.map(ds => [`${ds.user_id}_${ds.work_date}`, ds]) || []
     );
 
     // Combine the data

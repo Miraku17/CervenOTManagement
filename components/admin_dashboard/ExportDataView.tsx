@@ -62,15 +62,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const email = row.profiles?.email || '';
       const date = row.date;
 
-      const timeInDate = row.time_in ? new Date(row.time_in) : null;
-      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
-
-      let totalHours = 0;
-      if (timeInDate && timeOutDate) {
-        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
-        const totalMinutes = Math.floor(diffMs / 60000);
-        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
-      }
+      // Use the calculated total_hours from API (already has lunch deduction applied)
+      let totalHours = row.total_hours || 0;
 
       const employeeKey = `${fullName}_${email}`;
       if (!employeeData.has(employeeKey)) {
@@ -99,14 +92,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     );
 
     for (const emp of sortedEmployees) {
-      // Calculate total overtime hours (hours beyond 8 per day)
+      // Calculate total overtime hours using the API's calculated overtime_hours
       let totalOvertimeHours = 0;
-      uniqueDates.forEach(date => {
-        const hours = emp.dateHours.get(date);
-        if (hours !== undefined && hours > 8) {
-          totalOvertimeHours += (hours - 8);
+      for (const row of data) {
+        const firstName = row.profiles?.first_name || '';
+        const lastName = row.profiles?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        const email = row.profiles?.email || '';
+        const employeeKey = `${fullName}_${email}`;
+
+        if (employeeKey === `${emp.name}_${emp.email}`) {
+          totalOvertimeHours += (row.overtime_hours || 0);
         }
-      });
+      }
 
       const row = [
         emp.name,
@@ -159,16 +157,17 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
       const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
 
+      // Use calculated values from API (already has lunch deduction applied)
+      const totalHoursRaw = row.total_hours_raw || 0;
+      const lunchDeduction = row.lunch_deduction || 0;
+      const totalHours = row.total_hours || 0;
+      const overtimeHours = row.overtime_hours || 0;
+
       let totalMinutes = 0;
-      let totalHours = 0;
       if (timeInDate && timeOutDate) {
         const diffMs = timeOutDate.getTime() - timeInDate.getTime();
         totalMinutes = Math.floor(diffMs / 60000);
-        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
       }
-
-      // Calculate overtime hours (hours beyond 8)
-      const overtimeHours = totalHours > 8 ? Number((totalHours - 8).toFixed(2)) : 0;
 
       const addressIn = row.clock_in_address || 'N/A';
       const addressOut = row.clock_out_address || 'N/A';
@@ -258,17 +257,14 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
       const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
 
-      let totalHours = 0;
-      if (timeInDate && timeOutDate) {
-        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
-        const totalMinutes = Math.floor(diffMs / 60000);
-        totalHours = parseFloat((totalMinutes / 60).toFixed(2));
-      }
+      // Use calculated values from API (already has lunch deduction applied)
+      const totalHours = row.total_hours || 0;
+      const overtimeHours = row.overtime_hours || 0;
 
-      const overtimeHours = totalHours > 8 ? Number((totalHours - 8).toFixed(2)) : 0;
       const overtimeComment = row.overtimeRequest?.comment || 'N/A';
       const overtimeStatus = row.overtimeRequest?.status || 'N/A';
-      const overtimeApprovedHours = row.overtimeRequest?.approved_hours || 'N/A';
+      // Use overtime_hours (with lunch deduction) instead of approved_hours
+      const overtimeApprovedHours = overtimeHours > 0 ? overtimeHours.toFixed(2) : 'N/A';
       const overtimeRequestedAt = row.overtimeRequest?.requested_at
         ? new Date(row.overtimeRequest.requested_at).toLocaleString()
         : 'N/A';
