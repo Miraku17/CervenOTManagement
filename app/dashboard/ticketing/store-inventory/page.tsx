@@ -13,9 +13,6 @@ import { supabase } from '@/services/supabase';
 
 interface InventoryItem {
   id: string;
-  serial_number: string | null;
-  under_warranty: boolean | null;
-  warranty_date: string | null;
   created_at: string;
   updated_at: string;
   stores: {
@@ -23,21 +20,27 @@ interface InventoryItem {
     store_name: string;
     store_code: string;
   } | null;
-  categories: {
-    id: string;
-    name: string;
-  } | null;
-  brands: {
-    id: string;
-    name: string;
-  } | null;
-  models: {
-    id: string;
-    name: string;
-  } | null;
   stations: {
     id: string;
     name: string;
+  } | null;
+  assets: {
+    id: string;
+    serial_number: string | null;
+    under_warranty: boolean | null;
+    warranty_date: string | null;
+    categories: {
+      id: string;
+      name: string;
+    } | null;
+    brands: {
+      id: string;
+      name: string;
+    } | null;
+    models: {
+      id: string;
+      name: string;
+    } | null;
   } | null;
 }
 
@@ -185,14 +188,15 @@ export default function StoreInventoryPage() {
         throw new Error(data.error || 'Failed to delete item');
       }
 
-      setIsDeleteModalOpen(false);
+      // setIsDeleteModalOpen(false); // Removed: Modal closes only after fetchInventory and toast
       setDeleteItem(null);
       showToast('success', 'Inventory item deleted successfully!');
-      await fetchInventory();
+      await fetchInventory(); // Refreshes table, which should re-evaluate deleteItem and close modal
+      setIsDeleteModalOpen(false); // Explicitly close modal on success
     } catch (error: any) {
       console.error('Error deleting item:', error);
       showToast('error', error.message || 'Failed to delete item');
-      setIsDeleteModalOpen(false);
+      setIsDeleteModalOpen(false); // Ensure modal closes on error
     } finally {
       setIsDeleting(false);
     }
@@ -209,8 +213,8 @@ export default function StoreInventoryPage() {
 
     // Sort inventory alphabetically by brand name
     const sortedItems = [...filteredItems].sort((a, b) => {
-      const nameA = a.brands?.name || '';
-      const nameB = b.brands?.name || '';
+      const nameA = a.assets?.brands?.name || '';
+      const nameB = b.assets?.brands?.name || '';
       return nameA.localeCompare(nameB);
     });
 
@@ -259,11 +263,11 @@ export default function StoreInventoryPage() {
     ];
 
     const tableRows = sortedItems.map((item) => [
-      `${item.brands?.name || 'N/A'}\n${item.categories?.name || 'N/A'}`,
-      item.serial_number || 'N/A',
-      item.categories?.name || 'N/A',
-      item.brands?.name || 'N/A',
-      item.models?.name || 'N/A',
+      `${item.assets?.brands?.name || 'N/A'}\n${item.assets?.categories?.name || 'N/A'}`,
+      item.assets?.serial_number || 'N/A',
+      item.assets?.categories?.name || 'N/A',
+      item.assets?.brands?.name || 'N/A',
+      item.assets?.models?.name || 'N/A',
       `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
       item.stations?.name || 'N/A',
     ]);
@@ -315,9 +319,9 @@ export default function StoreInventoryPage() {
   };
 
   // Get unique values for filters
-  const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.categories?.name).filter(Boolean))) as string[];
+  const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.assets?.categories?.name).filter(Boolean))) as string[];
   const uniqueStores = Array.from(new Set(inventoryItems.map(item => item.stores?.store_name).filter(Boolean))) as string[];
-  const uniqueBrands = Array.from(new Set(inventoryItems.map(item => item.brands?.name).filter(Boolean))) as string[];
+  const uniqueBrands = Array.from(new Set(inventoryItems.map(item => item.assets?.brands?.name).filter(Boolean))) as string[];
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -335,29 +339,29 @@ export default function StoreInventoryPage() {
     // Search filter
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
-      item.serial_number?.toLowerCase().includes(searchLower) ||
-      item.categories?.name.toLowerCase().includes(searchLower) ||
-      item.brands?.name.toLowerCase().includes(searchLower) ||
-      item.models?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.serial_number?.toLowerCase().includes(searchLower) ||
+      item.assets?.categories?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.brands?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.models?.name.toLowerCase().includes(searchLower) ||
       item.stores?.store_name.toLowerCase().includes(searchLower) ||
       item.stores?.store_code.toLowerCase().includes(searchLower) ||
       item.stations?.name.toLowerCase().includes(searchLower)
     );
 
     // Category filter
-    const matchesCategory = !selectedCategory || item.categories?.name === selectedCategory;
+    const matchesCategory = !selectedCategory || item.assets?.categories?.name === selectedCategory;
 
     // Store filter
     const matchesStore = !selectedStore || item.stores?.store_name === selectedStore;
 
     // Brand filter
-    const matchesBrand = !selectedBrand || item.brands?.name === selectedBrand;
+    const matchesBrand = !selectedBrand || item.assets?.brands?.name === selectedBrand;
 
     // Serial number filter
     const matchesSerialNumber =
       serialNumberFilter === 'all' ||
-      (serialNumberFilter === 'with' && item.serial_number) ||
-      (serialNumberFilter === 'without' && !item.serial_number);
+      (serialNumberFilter === 'with' && item.assets?.serial_number) ||
+      (serialNumberFilter === 'without' && !item.assets?.serial_number);
 
     return matchesSearch && matchesCategory && matchesStore && matchesBrand && matchesSerialNumber;
   });
@@ -586,7 +590,7 @@ export default function StoreInventoryPage() {
                         {loading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                          new Set(inventoryItems.map(i => i.categories?.id).filter(Boolean)).size
+                          new Set(inventoryItems.map(i => i.assets?.categories?.id).filter(Boolean)).size
                         )}
                       </h3>
                   </div>
@@ -670,21 +674,21 @@ export default function StoreInventoryPage() {
                                         <Package size={20} />
                                     </div>
                                     <div>
-                                        <div className="text-sm">{item.brands?.name || 'N/A'}</div>
-                                        <div className="text-xs text-slate-500">{item.categories?.name || 'Uncategorized'}</div>
+                                        <div className="text-sm">{item.assets?.brands?.name || 'N/A'}</div>
+                                        <div className="text-xs text-slate-500">{item.assets?.categories?.name || 'Uncategorized'}</div>
                                     </div>
                                 </div>
                             </td>
                             <td className="p-4 text-slate-400 font-mono text-sm">
-                              {item.serial_number || <span className="text-slate-600 italic">No S/N</span>}
+                              {item.assets?.serial_number || <span className="text-slate-600 italic">No S/N</span>}
                             </td>
                             <td className="p-4 text-slate-400">
                                 <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
-                                  {item.categories?.name || 'N/A'}
+                                  {item.assets?.categories?.name || 'N/A'}
                                 </span>
                             </td>
-                            <td className="p-4 text-slate-400">{item.brands?.name || 'N/A'}</td>
-                            <td className="p-4 text-slate-400">{item.models?.name || <span className="text-slate-600">—</span>}</td>
+                            <td className="p-4 text-slate-400">{item.assets?.brands?.name || 'N/A'}</td>
+                            <td className="p-4 text-slate-400">{item.assets?.models?.name || <span className="text-slate-600">—</span>}</td>
                             <td className="p-4 text-slate-400">
                               <div>
                                 <div className="text-sm">{item.stores?.store_name || 'N/A'}</div>
@@ -749,12 +753,13 @@ export default function StoreInventoryPage() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={isDeleteModalOpen}
-        title="Delete Inventory Item"
-        message={`Are you sure you want to delete this item${deleteItem?.serial_number ? ` (${deleteItem.serial_number})` : ''}? This action cannot be undone.`}
+        title="Remove Item from Store"
+        message={`Are you sure you want to remove this item${deleteItem?.assets?.serial_number ? ` (${deleteItem.assets.serial_number})` : ''} from the store inventory? This will NOT delete the asset itself from the main asset database.`}
         type="danger"
-        confirmText={isDeleting ? "Deleting..." : "Delete Item"}
+        confirmText={isDeleting ? "Removing..." : "Remove Item"}
         onConfirm={handleConfirmDelete}
         onCancel={() => !isDeleting && setIsDeleteModalOpen(false)}
+        isLoading={isDeleting}
       />
     </div>
   );

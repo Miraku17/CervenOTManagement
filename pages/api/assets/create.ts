@@ -8,7 +8,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date } = req.body;
+  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status } = req.body;
 
   if (!category_id || !brand_id) {
     return res.status(400).json({ error: 'Category and brand are required' });
@@ -30,6 +30,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           serial_number: serial_number || null,
           under_warranty: under_warranty || false,
           warranty_date: warranty_date || null,
+          status: status || 'Available',
         },
       ])
       .select()

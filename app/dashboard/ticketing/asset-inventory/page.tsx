@@ -12,6 +12,7 @@ import { supabase } from '@/services/supabase';
 interface Asset {
   id: string;
   serial_number: string | null;
+  status: string;
   created_at: string;
   updated_at: string;
   under_warranty: boolean | null;
@@ -89,7 +90,7 @@ export default function AssetInventoryPage() {
       const data = await response.json();
 
       if (response.ok) {
-        setAssets(data.items || []);
+        setAssets(data.assets || []);
       } else {
         showToast('error', 'Failed to fetch assets');
       }
@@ -276,41 +277,60 @@ export default function AssetInventoryPage() {
       )}
 
       {/* Delete Confirmation Modal */}
-      {deleteId && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-md border border-slate-700">
-            <div className="p-6">
-              <h3 className="text-xl font-bold text-white mb-2">Delete Asset</h3>
-              <p className="text-slate-400 mb-6">
-                Are you sure you want to delete this asset? This action cannot be undone.
-              </p>
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setDeleteId(null)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleDelete(deleteId)}
-                  disabled={isDeleting}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
-                >
-                  {isDeleting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Deleting...</span>
-                    </>
-                  ) : (
-                    <span>Delete</span>
-                  )}
-                </button>
+      {deleteId && (() => {
+        const assetToDelete = assets.find(a => a.id === deleteId);
+        const isInUse = assetToDelete?.status === 'In Use';
+        
+        return (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+            <div className={`bg-slate-900 rounded-lg shadow-xl w-full max-w-md border ${isInUse ? 'border-amber-500/50' : 'border-slate-700'}`}>
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-4">
+                  {isInUse ? <AlertTriangle className="text-amber-500" size={24} /> : <AlertTriangle className="text-red-500" size={24} />}
+                  <h3 className="text-xl font-bold text-white">Delete Asset</h3>
+                </div>
+                
+                {isInUse ? (
+                  <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 mb-6">
+                    <p className="text-amber-200 font-medium mb-1">Warning: Asset currently In Use</p>
+                    <p className="text-amber-200/70 text-sm">
+                      This asset is currently assigned to a store. Deleting it will <strong>permanently remove</strong> it from both the Asset Inventory and the Store Inventory.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-slate-400 mb-6">
+                    Are you sure you want to delete this asset? This action cannot be undone.
+                  </p>
+                )}
+
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setDeleteId(null)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDelete(deleteId)}
+                    disabled={isDeleting}
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Deleting...</span>
+                      </>
+                    ) : (
+                      <span>{isInUse ? 'Force Delete' : 'Delete'}</span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -410,13 +430,14 @@ export default function AssetInventoryPage() {
                         <th className="p-4 font-semibold">Brand</th>
                         <th className="p-4 font-semibold">Model</th>
                         <th className="p-4 font-semibold">Serial Number</th>
+                        <th className="p-4 font-semibold">Status</th>
                         <th className="p-4 font-semibold text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
                     {loading ? (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                        <td colSpan={6} className="p-8 text-center text-slate-400">
                           <div className="flex items-center justify-center gap-2">
                             <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
                             <span>Loading assets...</span>
@@ -425,7 +446,7 @@ export default function AssetInventoryPage() {
                       </tr>
                     ) : filteredAssets.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-slate-400">
+                        <td colSpan={6} className="p-8 text-center text-slate-400">
                           {searchTerm ? 'No assets found matching your search.' : 'No assets yet. Click "Add Asset" to create one.'}
                         </td>
                       </tr>
@@ -442,6 +463,17 @@ export default function AssetInventoryPage() {
                                 {asset.models?.name || '-'}
                             </td>
                             <td className="p-4 text-slate-400 font-mono text-sm">{asset.serial_number || '-'}</td>
+                            <td className="p-4">
+                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${
+                                  asset.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                  asset.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                                  asset.status === 'Under Repair' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                                  asset.status === 'Broken' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                                  'bg-slate-700 text-slate-400 border-slate-600'
+                                }`}>
+                                  {asset.status || 'Available'}
+                                </span>
+                            </td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button

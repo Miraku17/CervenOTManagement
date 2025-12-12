@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle, X, Loader2 } from 'lucide-react'; // Import Loader2
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
   type?: 'info' | 'warning' | 'danger';
   children?: React.ReactNode;
+  isLoading?: boolean; // New prop for loading state
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -23,6 +24,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancel,
   type = 'info',
   children,
+  isLoading = false, // Default to false
 }) => {
   if (!isOpen) return null;
 
@@ -64,6 +66,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             onClick={onCancel}
             className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+            disabled={isLoading} // Disable cancel button too while loading
           >
             <X className="w-5 h-5" />
           </button>
@@ -73,17 +76,17 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="p-5 bg-slate-800/50 flex gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading} // Disable cancel button too while loading
           >
             {cancelText}
           </button>
           <button
-            onClick={() => {
-              onConfirm();
-              onCancel();
-            }}
-            className={`px-4 py-2 rounded-lg text-white font-medium transition-colors cursor-pointer ${colors[type].button}`}
+            onClick={onConfirm} // Only call onConfirm
+            className={`px-4 py-2 rounded-lg text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${colors[type].button}`}
+            disabled={isLoading}
           >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
             {confirmText}
           </button>
         </div>

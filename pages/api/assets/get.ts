@@ -9,18 +9,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
 
-      if (!supabaseAdmin) {
-          throw new Error('Database connection not available');
-        }
-
-        
-    // Fetch assets with all related data via joins
     const { data: assets, error } = await supabaseAdmin
       .from('asset_inventory')
       .select(`
         id,
         serial_number,
+        status,
         under_warranty,
         warranty_date,
         created_at,
@@ -43,7 +41,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (error) throw error;
 
     return res.status(200).json({
-      items: assets || [],
+      assets: assets || [],
       count: assets?.length || 0,
     });
   } catch (error: any) {

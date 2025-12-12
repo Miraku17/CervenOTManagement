@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 .next
+supabase
 
 # Editor directories and files
 .vscode/*

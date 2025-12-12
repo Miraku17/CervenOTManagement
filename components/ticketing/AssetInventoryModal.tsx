@@ -12,6 +12,7 @@ interface AutocompleteOption {
 interface Asset {
   id: string;
   serial_number: string | null;
+  status: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
   categories: { id: string; name: string } | null;
@@ -47,6 +48,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   const [serialNumber, setSerialNumber] = useState('');
+  
+  const [status, setStatus] = useState('Available');
 
   const [underWarranty, setUnderWarranty] = useState<boolean>(false);
   const [warrantyDate, setWarrantyDate] = useState('');
@@ -104,6 +107,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
         setSelectedModelId(null);
       }
       setSerialNumber(editItem.serial_number || '');
+      setStatus(editItem.status || 'Available');
       setUnderWarranty(editItem.under_warranty || false);
       setWarrantyDate(editItem.warranty_date || '');
     } else if (isOpen && !editItem && !isViewingDetail) {
@@ -115,6 +119,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setStatus('Available');
       setUnderWarranty(false);
       setWarrantyDate('');
     }
@@ -198,6 +203,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           brand_id: brandId,
           model_id: modelId,
           serial_number: serialNumber || null,
+          status,
           under_warranty: underWarranty,
           warranty_date: warrantyDate || null,
         }),
@@ -217,6 +223,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setModel('');
       setSelectedModelId(null);
       setSerialNumber('');
+      setStatus('Available');
       setUnderWarranty(false);
       setWarrantyDate('');
 
@@ -417,6 +424,35 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                 className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="e.g., SN123456789"
               />
+            )}
+          </div>
+
+          {/* Status */}
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium text-slate-300 mb-1">Status</label>
+            {isViewingDetail ? (
+              <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${
+                editItem?.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                editItem?.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                editItem?.status === 'Under Repair' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                editItem?.status === 'Broken' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                'bg-slate-700 text-slate-400 border-slate-600'
+              }`}>
+                {editItem?.status || 'Available'}
+              </div>
+            ) : (
+              <select
+                id="status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="Available">Available</option>
+                <option value="In Use">In Use</option>
+                <option value="Under Repair">Under Repair</option>
+                <option value="Broken">Broken</option>
+                <option value="Retired">Retired</option>
+              </select>
             )}
           </div>
 

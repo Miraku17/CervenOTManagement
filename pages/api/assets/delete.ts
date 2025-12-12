@@ -21,6 +21,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     
+    // First, delete any references in store_inventory (Manual Cascade)
+    const { error: storeDeleteError } = await supabaseAdmin
+      .from('store_inventory')
+      .delete()
+      .eq('asset_id', id);
+
+    if (storeDeleteError) {
+      console.error('Error deleting associated store inventory items:', storeDeleteError);
+      throw new Error('Failed to clean up store inventory associations');
+    }
+
+    // Then delete the asset itself
     const { error } = await supabaseAdmin
       .from('asset_inventory')
       .delete()

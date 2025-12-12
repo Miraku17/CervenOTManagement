@@ -19,12 +19,34 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // First, fetch the item to get the asset_id before deleting
+    const { data: itemToDelete, error: fetchError } = await supabaseAdmin
+      .from('store_inventory')
+      .select('asset_id')
+      .eq('id', id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    // Delete the inventory item
     const { error: deleteError } = await supabaseAdmin
       .from("store_inventory")
       .delete()
       .eq("id", id);
 
     if (deleteError) throw deleteError;
+
+    // Automatically update the asset status back to 'Available'
+    if (itemToDelete?.asset_id) {
+      const { error: updateError } = await supabaseAdmin
+        .from('asset_inventory')
+        .update({ status: 'Available' })
+        .eq('id', itemToDelete.asset_id);
+      
+      if (updateError) {
+        console.warn('Failed to revert asset status to Available:', updateError);
+      }
+    }
 
     return res.status(200).json({
       message: "Inventory item deleted successfully",
