@@ -39,6 +39,10 @@ async function getOrCreateRecord(
 ): Promise<string | null> {
   if (!value || value.trim() === '') return null;
 
+  if (!supabaseAdmin) {
+    throw new Error('Database connection not available');
+  }
+
   const trimmedValue = value.trim();
 
   // Try to find existing record
