@@ -21,6 +21,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
+    
     // First, try to find existing record
     const { data: existing, error: findError } = await supabaseAdmin
       .from(tableName)

@@ -15,6 +15,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+
+    
     const { data: inventoryItem, error: updateError } = await supabaseAdmin
       .from('store_inventory')
       .update({

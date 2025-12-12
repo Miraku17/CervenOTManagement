@@ -9,6 +9,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+    
     // Fetch inventory items with all related data via joins
     const { data: inventoryItems, error } = await supabaseAdmin
       .from('store_inventory')

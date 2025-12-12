@@ -361,7 +361,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-60 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
+        <div className={`fixed top-4 right-4 z-[60] px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
           toast.type === 'success'
             ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
             : 'bg-red-500/10 border border-red-500/20 text-red-400'
@@ -375,8 +375,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         </div>
       )}
 
-      <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700">
-        <div className="flex justify-between items-center p-4 border-b border-slate-700">
+      <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-slate-900 z-[55] flex justify-between items-center p-4 border-b border-slate-700">
           <h2 className="text-xl font-bold text-white">
             {isEditMode ? 'Edit Inventory Item' : 'Add New Store Inventory Item'}
           </h2>
@@ -419,7 +419,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
 
             {/* Dropdown Menu */}
             {showStoreDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
                 {filteredStores.length > 0 ? (
                   filteredStores.map((store) => (
                     <button
@@ -486,7 +486,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               required
             />
             {showCategoryDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {categories
                   .filter(c => !category || c.name.toLowerCase().includes(category.toLowerCase()))
                   .map((cat) => (
@@ -528,7 +528,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               required
             />
             {showBrandDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {brands
                   .filter(b => !brand || b.name.toLowerCase().includes(brand.toLowerCase()))
                   .map((brd) => (
@@ -569,7 +569,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               placeholder="Type or select model..."
             />
             {showModelDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {models
                   .filter(m => !model || m.name.toLowerCase().includes(model.toLowerCase()))
                   .map((mdl) => (
@@ -647,7 +647,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               placeholder="Type or select station..."
             />
             {showStationDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {stations
                   .filter(s => !station || s.name.toLowerCase().includes(station.toLowerCase()))
                   .map((stn) => (

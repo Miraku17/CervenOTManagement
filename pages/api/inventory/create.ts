@@ -15,6 +15,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+
+    if (!supabaseAdmin) {
+      throw new Error('Database connection not available');
+    }
+    
     // Create the inventory item with foreign keys
     const { data: inventoryItem, error: insertError } = await supabaseAdmin
       .from('store_inventory')
