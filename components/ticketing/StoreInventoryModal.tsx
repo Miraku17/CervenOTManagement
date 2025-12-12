@@ -18,7 +18,7 @@ interface Station {
 interface Asset {
   id: string;
   serial_number: string | null;
-  status: string;
+  status: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
   categories: { id: string; name: string } | null;
