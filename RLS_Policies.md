@@ -30,6 +30,9 @@ ALTER TABLE public.stations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.models ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_managers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.brands ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 ```
 
 ---
@@ -81,7 +84,7 @@ TO authenticated
 USING (auth.uid() = employee_id);
 ```
 
-#### **D. Shared Reference Data Tables (`positions`, `stores`, `stations`)**
+#### **D. Shared Reference Data Tables (`positions`, `stores`, `stations`, `brands`, `categories`, `models`)**
 *These tables contain reference data that should be read-only for all authenticated users. Modifications are assumed to be handled by admin APIs.*
 
 ```sql
@@ -102,9 +105,38 @@ CREATE POLICY "Enable read access for authenticated users"
 ON public.stations FOR SELECT
 TO authenticated
 USING (true);
+
+-- Brands: Read-only for all authenticated users
+CREATE POLICY "Enable read access for authenticated users"
+ON public.brands FOR SELECT
+TO authenticated
+USING (true);
+
+-- Categories: Read-only for all authenticated users
+CREATE POLICY "Enable read access for authenticated users"
+ON public.categories FOR SELECT
+TO authenticated
+USING (true);
+
+-- Models: Read-only for all authenticated users
+CREATE POLICY "Enable read access for authenticated users"
+ON public.models FOR SELECT
+TO authenticated
+USING (true);
 ```
 
-#### **E. `tickets` Table (Ticketing System)**
+#### **E. `store_managers` Table (Reference Data)**
+*This table contains manager information linked to stores and should be read-only for all authenticated users. Modifications are handled by admin APIs.*
+
+```sql
+-- Store Managers: Read-only for all authenticated users
+CREATE POLICY "Enable read access for authenticated users"
+ON public.store_managers FOR SELECT
+TO authenticated
+USING (true);
+```
+
+#### **F. `tickets` Table (Ticketing System)**
 *This policy allows authenticated users to create and manage tickets. Adjust `SELECT` and `UPDATE` policies if you require stricter access (e.g., only see tickets assigned to them or their store).*
 
 ```sql

@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -22,7 +22,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     // First, try to find existing record
-    const { data: existing, error: findError } = await supabase
+    const { data: existing, error: findError } = await supabaseAdmin
       .from(tableName)
       .select('id, name')
       .eq('name', value)
@@ -36,7 +36,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Create new record
-    const { data: newRecord, error: insertError } = await supabase
+    const { data: newRecord, error: insertError } = await supabaseAdmin
       .from(tableName)
       .insert([{ name: value }])
       .select('id')

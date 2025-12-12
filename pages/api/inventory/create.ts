@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -16,7 +16,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     // Create the inventory item with foreign keys
-    const { data: inventoryItem, error: insertError } = await supabase
+    const { data: inventoryItem, error: insertError } = await supabaseAdmin
       .from('store_inventory')
       .insert([
         {

@@ -51,19 +51,19 @@ ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can view relevant tickets" 
 ON tickets FOR SELECT 
-USING (auth.uid() = reported_by OR auth.uid() = serviced_by OR get_my_role() = 'admin');
+USING (auth.uid() = reported_by OR auth.uid() = serviced_by OR get_my_role() = 'admin'); // done
 
 CREATE POLICY "Users can create tickets" 
 ON tickets FOR INSERT 
-WITH CHECK (auth.uid() = reported_by);
+WITH CHECK (auth.uid() = reported_by); // this should be admin // done
 
 CREATE POLICY "Users can update serviced tickets" 
 ON tickets FOR UPDATE 
-USING (auth.uid() = serviced_by OR get_my_role() = 'admin');
+USING (auth.uid() = serviced_by OR get_my_role() = 'admin'); // done 
 
 CREATE POLICY "Admins can delete tickets" 
 ON tickets FOR DELETE 
-USING (get_my_role() = 'admin');
+USING (get_my_role() = 'admin'); // done
 ```
 
 **Attendance:**

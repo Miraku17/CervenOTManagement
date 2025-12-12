@@ -1,5 +1,5 @@
 import type { NextApiResponse } from 'next';
-import { supabase } from '@/services/supabase';
+import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -15,7 +15,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const { data: asset, error: updateError } = await supabase
+    const { data: asset, error: updateError } = await supabaseAdmin
       .from('asset_inventory')
       .update({
         category_id,
