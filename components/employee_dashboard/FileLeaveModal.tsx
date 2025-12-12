@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calendar as CalendarIcon, AlertCircle, Loader2, Check } from 'lucide-react';
+import { X, Calendar as CalendarIcon, AlertCircle, Loader2, Check, ChevronDown } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
 interface FileLeaveModalProps {
@@ -110,16 +110,21 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1.5">Leave Type</label>
-              <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
-              >
-                <option value="Vacation">Vacation Leave</option>
-                <option value="Sick">Sick Leave</option>
-                <option value="Personal">Personal Leave</option>
-                <option value="Emergency">Emergency Leave</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.type}
+                  onChange={(e) => setFormData({ ...formData, type: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                >
+                  <option value="Vacation">Vacation Leave</option>
+                  <option value="Sick">Sick Leave</option>
+                  <option value="Personal">Personal Leave</option>
+                  <option value="Emergency">Emergency Leave</option>
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                  <ChevronDown size={16} />
+                </div>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">

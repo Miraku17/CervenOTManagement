@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Download, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
+import { Plus, Search, Filter, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet } from 'lucide-react';
 import StoreInventoryModal from '@/components/ticketing/StoreInventoryModal';
 import StoreInventoryDetailModal from '@/components/ticketing/StoreInventoryDetailModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -13,9 +13,6 @@ import { supabase } from '@/services/supabase';
 
 interface InventoryItem {
   id: string;
-  serial_number: string | null;
-  under_warranty: boolean | null;
-  warranty_date: string | null;
   created_at: string;
   updated_at: string;
   stores: {
@@ -23,21 +20,28 @@ interface InventoryItem {
     store_name: string;
     store_code: string;
   } | null;
-  categories: {
-    id: string;
-    name: string;
-  } | null;
-  brands: {
-    id: string;
-    name: string;
-  } | null;
-  models: {
-    id: string;
-    name: string;
-  } | null;
   stations: {
     id: string;
     name: string;
+  } | null;
+  assets: {
+    id: string;
+    serial_number: string | null;
+    status: string | null;
+    under_warranty: boolean | null;
+    warranty_date: string | null;
+    categories: {
+      id: string;
+      name: string;
+    } | null;
+    brands: {
+      id: string;
+      name: string;
+    } | null;
+    models: {
+      id: string;
+      name: string;
+    } | null;
   } | null;
 }
 
@@ -103,6 +107,10 @@ export default function StoreInventoryPage() {
     type: 'success' | 'error';
     message: string;
   }>({ show: false, type: 'success', message: '' });
+
+  // Import states
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filterRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
@@ -185,14 +193,15 @@ export default function StoreInventoryPage() {
         throw new Error(data.error || 'Failed to delete item');
       }
 
-      setIsDeleteModalOpen(false);
+      // setIsDeleteModalOpen(false); // Removed: Modal closes only after fetchInventory and toast
       setDeleteItem(null);
       showToast('success', 'Inventory item deleted successfully!');
-      await fetchInventory();
+      await fetchInventory(); // Refreshes table, which should re-evaluate deleteItem and close modal
+      setIsDeleteModalOpen(false); // Explicitly close modal on success
     } catch (error: any) {
       console.error('Error deleting item:', error);
       showToast('error', error.message || 'Failed to delete item');
-      setIsDeleteModalOpen(false);
+      setIsDeleteModalOpen(false); // Ensure modal closes on error
     } finally {
       setIsDeleting(false);
     }
@@ -203,14 +212,108 @@ export default function StoreInventoryPage() {
     setEditItem(null); // Clear edit item when modal closes
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/inventory/download-template');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'store_inventory_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('success', 'Template downloaded successfully!');
+    } catch (error: any) {
+      console.error('Error downloading template:', error);
+      showToast('error', error.message || 'Failed to download template');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast('error', 'Please upload an Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64 = e.target?.result as string;
+          const fileData = base64.split(',')[1]; // Remove data:application/... prefix
+
+          const response = await fetch('/api/inventory/import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fileData }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to import file');
+          }
+
+          // Show success message with details
+          const { result } = data;
+          let message = `Import completed! ${result.success} items imported successfully.`;
+          if (result.failed > 0) {
+            message += ` ${result.failed} items failed.`;
+          }
+
+          showToast(result.failed > 0 ? 'error' : 'success', message);
+
+          // Log errors for debugging
+          if (result.errors && result.errors.length > 0) {
+            console.error('Import errors:', result.errors);
+          }
+
+          // Refresh inventory
+          await fetchInventory();
+        } catch (error: any) {
+          console.error('Error importing file:', error);
+          showToast('error', error.message || 'Failed to import file');
+        } finally {
+          setIsImporting(false);
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Error reading file:', error);
+      showToast('error', error.message || 'Failed to read file');
+      setIsImporting(false);
+    }
+  };
+
   const handlePrint = async () => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Sort inventory alphabetically by brand name
     const sortedItems = [...filteredItems].sort((a, b) => {
-      const nameA = a.brands?.name || '';
-      const nameB = b.brands?.name || '';
+      const nameA = a.assets?.brands?.name || '';
+      const nameB = b.assets?.brands?.name || '';
       return nameA.localeCompare(nameB);
     });
 
@@ -259,11 +362,11 @@ export default function StoreInventoryPage() {
     ];
 
     const tableRows = sortedItems.map((item) => [
-      `${item.brands?.name || 'N/A'}\n${item.categories?.name || 'N/A'}`,
-      item.serial_number || 'N/A',
-      item.categories?.name || 'N/A',
-      item.brands?.name || 'N/A',
-      item.models?.name || 'N/A',
+      `${item.assets?.brands?.name || 'N/A'}\n${item.assets?.categories?.name || 'N/A'}`,
+      item.assets?.serial_number || 'N/A',
+      item.assets?.categories?.name || 'N/A',
+      item.assets?.brands?.name || 'N/A',
+      item.assets?.models?.name || 'N/A',
       `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
       item.stations?.name || 'N/A',
     ]);
@@ -315,9 +418,9 @@ export default function StoreInventoryPage() {
   };
 
   // Get unique values for filters
-  const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.categories?.name).filter(Boolean))) as string[];
+  const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.assets?.categories?.name).filter(Boolean))) as string[];
   const uniqueStores = Array.from(new Set(inventoryItems.map(item => item.stores?.store_name).filter(Boolean))) as string[];
-  const uniqueBrands = Array.from(new Set(inventoryItems.map(item => item.brands?.name).filter(Boolean))) as string[];
+  const uniqueBrands = Array.from(new Set(inventoryItems.map(item => item.assets?.brands?.name).filter(Boolean))) as string[];
 
   // Clear all filters
   const clearAllFilters = () => {
@@ -335,29 +438,29 @@ export default function StoreInventoryPage() {
     // Search filter
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch = !searchTerm || (
-      item.serial_number?.toLowerCase().includes(searchLower) ||
-      item.categories?.name.toLowerCase().includes(searchLower) ||
-      item.brands?.name.toLowerCase().includes(searchLower) ||
-      item.models?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.serial_number?.toLowerCase().includes(searchLower) ||
+      item.assets?.categories?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.brands?.name.toLowerCase().includes(searchLower) ||
+      item.assets?.models?.name.toLowerCase().includes(searchLower) ||
       item.stores?.store_name.toLowerCase().includes(searchLower) ||
       item.stores?.store_code.toLowerCase().includes(searchLower) ||
       item.stations?.name.toLowerCase().includes(searchLower)
     );
 
     // Category filter
-    const matchesCategory = !selectedCategory || item.categories?.name === selectedCategory;
+    const matchesCategory = !selectedCategory || item.assets?.categories?.name === selectedCategory;
 
     // Store filter
     const matchesStore = !selectedStore || item.stores?.store_name === selectedStore;
 
     // Brand filter
-    const matchesBrand = !selectedBrand || item.brands?.name === selectedBrand;
+    const matchesBrand = !selectedBrand || item.assets?.brands?.name === selectedBrand;
 
     // Serial number filter
     const matchesSerialNumber =
       serialNumberFilter === 'all' ||
-      (serialNumberFilter === 'with' && item.serial_number) ||
-      (serialNumberFilter === 'without' && !item.serial_number);
+      (serialNumberFilter === 'with' && item.assets?.serial_number) ||
+      (serialNumberFilter === 'without' && !item.assets?.serial_number);
 
     return matchesSearch && matchesCategory && matchesStore && matchesBrand && matchesSerialNumber;
   });
@@ -394,6 +497,30 @@ export default function StoreInventoryPage() {
               <span>Add Item</span>
             </button>
             <button
+              onClick={handleDownloadTemplate}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+            >
+              <FileSpreadsheet size={20} />
+              <span>Download Template</span>
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <>
+                  <Upload size={20} />
+                  <span>Import XLSX</span>
+                </>
+              )}
+            </button>
+            <button
               onClick={handlePrint}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
             >
@@ -402,6 +529,15 @@ export default function StoreInventoryPage() {
             </button>
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
@@ -586,7 +722,7 @@ export default function StoreInventoryPage() {
                         {loading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                          new Set(inventoryItems.map(i => i.categories?.id).filter(Boolean)).size
+                          new Set(inventoryItems.map(i => i.assets?.categories?.id).filter(Boolean)).size
                         )}
                       </h3>
                   </div>
@@ -670,21 +806,21 @@ export default function StoreInventoryPage() {
                                         <Package size={20} />
                                     </div>
                                     <div>
-                                        <div className="text-sm">{item.brands?.name || 'N/A'}</div>
-                                        <div className="text-xs text-slate-500">{item.categories?.name || 'Uncategorized'}</div>
+                                        <div className="text-sm">{item.assets?.brands?.name || 'N/A'}</div>
+                                        <div className="text-xs text-slate-500">{item.assets?.categories?.name || 'Uncategorized'}</div>
                                     </div>
                                 </div>
                             </td>
                             <td className="p-4 text-slate-400 font-mono text-sm">
-                              {item.serial_number || <span className="text-slate-600 italic">No S/N</span>}
+                              {item.assets?.serial_number || <span className="text-slate-600 italic">No S/N</span>}
                             </td>
                             <td className="p-4 text-slate-400">
                                 <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
-                                  {item.categories?.name || 'N/A'}
+                                  {item.assets?.categories?.name || 'N/A'}
                                 </span>
                             </td>
-                            <td className="p-4 text-slate-400">{item.brands?.name || 'N/A'}</td>
-                            <td className="p-4 text-slate-400">{item.models?.name || <span className="text-slate-600">—</span>}</td>
+                            <td className="p-4 text-slate-400">{item.assets?.brands?.name || 'N/A'}</td>
+                            <td className="p-4 text-slate-400">{item.assets?.models?.name || <span className="text-slate-600">—</span>}</td>
                             <td className="p-4 text-slate-400">
                               <div>
                                 <div className="text-sm">{item.stores?.store_name || 'N/A'}</div>
@@ -749,12 +885,13 @@ export default function StoreInventoryPage() {
       {/* Delete Confirmation Modal */}
       <ConfirmModal
         isOpen={isDeleteModalOpen}
-        title="Delete Inventory Item"
-        message={`Are you sure you want to delete this item${deleteItem?.serial_number ? ` (${deleteItem.serial_number})` : ''}? This action cannot be undone.`}
+        title="Remove Item from Store"
+        message={`Are you sure you want to remove this item${deleteItem?.assets?.serial_number ? ` (${deleteItem.assets.serial_number})` : ''} from the store inventory? This will NOT delete the asset itself from the main asset database.`}
         type="danger"
-        confirmText={isDeleting ? "Deleting..." : "Delete Item"}
+        confirmText={isDeleting ? "Removing..." : "Remove Item"}
         onConfirm={handleConfirmDelete}
         onCancel={() => !isDeleting && setIsDeleteModalOpen(false)}
+        isLoading={isDeleting}
       />
     </div>
   );

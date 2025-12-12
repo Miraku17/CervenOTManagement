@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface Store {
   id: string;
@@ -9,37 +10,35 @@ interface Store {
   store_code: string;
 }
 
-interface AutocompleteOption {
+interface Station {
   id: string;
   name: string;
 }
 
-interface InventoryItem {
+interface Asset {
   id: string;
   serial_number: string | null;
+  status: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  categories: { id: string; name: string } | null;
+  brands: { id: string; name: string } | null;
+  models: { id: string; name: string } | null;
+}
+
+// Updated InventoryItem interface to reflect the new database schema
+interface InventoryItem {
+  id: string;
   stores: {
     id: string;
     store_name: string;
     store_code: string;
   } | null;
-  categories: {
-    id: string;
-    name: string;
-  } | null;
-  brands: {
-    id: string;
-    name: string;
-  } | null;
-  models: {
-    id: string;
-    name: string;
-  } | null;
   stations: {
     id: string;
     name: string;
   } | null;
+  assets: Asset | null; // Now links to the Asset
 }
 
 interface StoreInventoryModalProps {
@@ -58,30 +57,13 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
 
-  // Autocomplete fields - now store full objects with IDs
-  const [category, setCategory] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [categories, setCategories] = useState<AutocompleteOption[]>([]);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
-
-  const [brand, setBrand] = useState('');
-  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
-  const [brands, setBrands] = useState<AutocompleteOption[]>([]);
-  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
-
-  const [model, setModel] = useState('');
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
-  const [models, setModels] = useState<AutocompleteOption[]>([]);
-  const [showModelDropdown, setShowModelDropdown] = useState(false);
-
-  const [serialNumber, setSerialNumber] = useState('');
-
-  const [underWarranty, setUnderWarranty] = useState<boolean>(false);
-  const [warrantyDate, setWarrantyDate] = useState('');
+  // New state for assets
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   const [station, setStation] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
-  const [stations, setStations] = useState<AutocompleteOption[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
   const [showStationDropdown, setShowStationDropdown] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -93,11 +75,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     message: string;
   }>({ show: false, type: 'success', message: '' });
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const categoryRef = useRef<HTMLDivElement>(null);
-  const brandRef = useRef<HTMLDivElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
-  const stationRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null); // For store dropdown
+  const stationRef = useRef<HTMLDivElement>(null); // For station dropdown
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -107,11 +86,12 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     }, 3000);
   };
 
-  // Fetch stores and autocomplete data when modal opens
+  // Fetch stores, stations and assets when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchStores();
-      fetchAutocompleteData();
+      fetchStations();
+      fetchAssets();
     }
   }, [isOpen]);
 
@@ -131,35 +111,15 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         setStoreSearchTerm(store.store_name);
       }
 
-      // Set category
-      if (editItem.categories) {
-        setCategory(editItem.categories.name);
-        setSelectedCategoryId(editItem.categories.id);
-      }
-
-      // Set brand
-      if (editItem.brands) {
-        setBrand(editItem.brands.name);
-        setSelectedBrandId(editItem.brands.id);
-      }
-
-      // Set model
-      if (editItem.models) {
-        setModel(editItem.models.name);
-        setSelectedModelId(editItem.models.id);
-      }
-
-      // Set serial number
-      setSerialNumber(editItem.serial_number || '');
-
-      // Set warranty fields
-      setUnderWarranty(editItem.under_warranty || false);
-      setWarrantyDate(editItem.warranty_date || '');
-
       // Set station
       if (editItem.stations) {
         setStation(editItem.stations.name);
         setSelectedStationId(editItem.stations.id);
+      }
+
+      // Set asset
+      if (editItem.assets) {
+        setSelectedAssetId(editItem.assets.id);
       }
     } else if (isOpen && !editItem) {
       // Reset form when opening for new item
@@ -167,15 +127,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setStoreName('');
       setStoreCode('');
       setStoreSearchTerm('');
-      setCategory('');
-      setSelectedCategoryId(null);
-      setBrand('');
-      setSelectedBrandId(null);
-      setModel('');
-      setSelectedModelId(null);
-      setSerialNumber('');
-      setUnderWarranty(false);
-      setWarrantyDate('');
+      setSelectedAssetId(null);
       setStation('');
       setSelectedStationId(null);
     }
@@ -186,15 +138,6 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setShowStoreDropdown(false);
-      }
-      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-        setShowCategoryDropdown(false);
-      }
-      if (brandRef.current && !brandRef.current.contains(event.target as Node)) {
-        setShowBrandDropdown(false);
-      }
-      if (modelRef.current && !modelRef.current.contains(event.target as Node)) {
-        setShowModelDropdown(false);
       }
       if (stationRef.current && !stationRef.current.contains(event.target as Node)) {
         setShowStationDropdown(false);
@@ -221,31 +164,30 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     }
   };
 
-  const fetchAutocompleteData = async () => {
+  const fetchStations = async () => {
     try {
-      const response = await fetch('/api/inventory/autocomplete');
+      const response = await fetch('/api/stations/get');
       const data = await response.json();
       if (response.ok) {
-        setCategories(data.categories || []);
-        setBrands(data.brands || []);
-        setModels(data.models || []);
         setStations(data.stations || []);
       }
     } catch (error) {
-      console.error('Error fetching autocomplete data:', error);
+      console.error('Error fetching stations:', error);
     }
   };
 
-  // Helper function to get or create an autocomplete value
-  const getOrCreateAutocompleteId = async (tableName: string, value: string): Promise<string> => {
-    const response = await fetch('/api/inventory/get-or-create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tableName, value }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    return data.id;
+  const fetchAssets = async () => {
+    try {
+      const response = await fetch('/api/assets/get'); // Use the new API endpoint
+      const data = await response.json();
+      if (response.ok) {
+        setAssets(data.assets || []);
+      } else {
+        console.error('Failed to fetch assets:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+    }
   };
 
   const handleStoreSelect = (store: Store) => {
@@ -264,10 +206,32 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     setShowStoreDropdown(false);
   };
 
+  const handleStationSelect = (selected: Station) => {
+    setStation(selected.name);
+    setSelectedStationId(selected.id);
+    setShowStationDropdown(false);
+  };
+
   const filteredStores = stores.filter(store =>
     store.store_name.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
     store.store_code.toLowerCase().includes(storeSearchTerm.toLowerCase())
   );
+
+  const filteredStations = stations.filter(s =>
+    !station || s.name.toLowerCase().includes(station.toLowerCase())
+  );
+
+  // Helper function to get or create an autocomplete value
+  const getOrCreateAutocompleteId = async (tableName: string, value: string): Promise<string> => {
+    const response = await fetch('/api/inventory/get-or-create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tableName, value }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    return data.id;
+  };
 
   if (!isOpen) return null;
 
@@ -278,25 +242,26 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       showToast('error', 'Please select a store');
       return;
     }
+    if (!selectedAssetId) {
+      showToast('error', 'Please select an asset');
+      return;
+    }
 
     setIsSubmitting(true);
 
     try {
-      // Get or create IDs for autocomplete values
-      const categoryId = selectedCategoryId || await getOrCreateAutocompleteId('categories', category);
-      const brandId = selectedBrandId || await getOrCreateAutocompleteId('brands', brand);
-      const modelId = model ? (selectedModelId || await getOrCreateAutocompleteId('models', model)) : null;
-      const stationId = station ? (selectedStationId || await getOrCreateAutocompleteId('stations', station)) : null;
+      // Get or create station ID if a station name is entered
+      let finalStationId = selectedStationId;
+      if (station && !finalStationId) {
+        finalStationId = await getOrCreateAutocompleteId('stations', station);
+      } else if (!station) {
+        finalStationId = null; // Ensure it's null if the text is empty
+      }
 
       const payload = {
         store_id: selectedStore.id,
-        category_id: categoryId,
-        brand_id: brandId,
-        model_id: modelId,
-        serial_number: serialNumber || null,
-        under_warranty: underWarranty,
-        warranty_date: warrantyDate || null,
-        station_id: stationId,
+        station_id: finalStationId,
+        asset_id: selectedAssetId,
       };
 
       const response = await fetch(
@@ -323,29 +288,16 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setStoreName('');
       setStoreCode('');
       setStoreSearchTerm('');
-      setCategory('');
-      setSelectedCategoryId(null);
-      setBrand('');
-      setSelectedBrandId(null);
-      setModel('');
-      setSelectedModelId(null);
-      setSerialNumber('');
-      setUnderWarranty(false);
-      setWarrantyDate('');
+      setSelectedAssetId(null);
       setStation('');
       setSelectedStationId(null);
-
-      // Refresh autocomplete data to include newly added values
-      await fetchAutocompleteData();
-
+      
       showToast('success', `Inventory item ${isEditMode ? 'updated' : 'created'} successfully!`);
 
-      // Call onSuccess callback if provided
       if (onSuccess) {
         onSuccess();
       }
 
-      // Close modal after a brief delay to show the success toast
       setTimeout(() => {
         onClose();
       }, 1500);
@@ -378,7 +330,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-slate-900 z-[55] flex justify-between items-center p-4 border-b border-slate-700">
           <h2 className="text-xl font-bold text-white">
-            {isEditMode ? 'Edit Inventory Item' : 'Add New Store Inventory Item'}
+            {isEditMode ? 'Edit Store Inventory Item' : 'Add New Store Inventory Item'}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
             <X size={24} />
@@ -468,208 +420,151 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
               </div>
             </div>
           )}
-          {/* Category Autocomplete */}
-          <div ref={categoryRef} className="relative">
-            <label htmlFor="category" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
-            <input
-              type="text"
-              id="category"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                // Clear selected ID when user types, so new values can be created
-                setSelectedCategoryId(null);
-              }}
-              onFocus={() => setShowCategoryDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select category..."
-              required
-            />
-            {showCategoryDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
-                {categories
-                  .filter(c => !category || c.name.toLowerCase().includes(category.toLowerCase()))
-                  .map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setCategory(cat.name);
-                        setSelectedCategoryId(cat.id);
-                        setShowCategoryDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                {categories.filter(c => !category || c.name.toLowerCase().includes(category.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-sm text-slate-500">No categories found</div>
-                )}
-              </div>
-            )}
-          </div>
 
-          {/* Brand Autocomplete */}
-          <div ref={brandRef} className="relative">
-            <label htmlFor="brand" className="block text-sm font-medium text-slate-300 mb-1">Brand</label>
-            <input
-              type="text"
-              id="brand"
-              value={brand}
-              onChange={(e) => {
-                setBrand(e.target.value);
-                // Clear selected ID when user types, so new values can be created
-                setSelectedBrandId(null);
-              }}
-              onFocus={() => setShowBrandDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select brand..."
-              required
-            />
-            {showBrandDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
-                {brands
-                  .filter(b => !brand || b.name.toLowerCase().includes(brand.toLowerCase()))
-                  .map((brd) => (
-                    <button
-                      key={brd.id}
-                      type="button"
-                      onClick={() => {
-                        setBrand(brd.name);
-                        setSelectedBrandId(brd.id);
-                        setShowBrandDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
-                    >
-                      {brd.name}
-                    </button>
-                  ))}
-                {brands.filter(b => !brand || b.name.toLowerCase().includes(brand.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-sm text-slate-500">No brands found</div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Model Autocomplete */}
-          <div ref={modelRef} className="relative">
-            <label htmlFor="model" className="block text-sm font-medium text-slate-300 mb-1">Model</label>
-            <input
-              type="text"
-              id="model"
-              value={model}
-              onChange={(e) => {
-                setModel(e.target.value);
-                // Clear selected ID when user types, so new values can be created
-                setSelectedModelId(null);
-              }}
-              onFocus={() => setShowModelDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select model..."
-            />
-            {showModelDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
-                {models
-                  .filter(m => !model || m.name.toLowerCase().includes(model.toLowerCase()))
-                  .map((mdl) => (
-                    <button
-                      key={mdl.id}
-                      type="button"
-                      onClick={() => {
-                        setModel(mdl.name);
-                        setSelectedModelId(mdl.id);
-                        setShowModelDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
-                    >
-                      {mdl.name}
-                    </button>
-                  ))}
-                {models.filter(m => !model || m.name.toLowerCase().includes(model.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-sm text-slate-500">No models found</div>
-                )}
-              </div>
-            )}
-          </div>
-          <div>
-            <label htmlFor="serialNumber" className="block text-sm font-medium text-slate-300 mb-1">Serial Number</label>
-            <input
-              type="text"
-              id="serialNumber"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., SN123456789"
-            />
-          </div>
-
-          {/* Under Warranty */}
-          <div>
-            <label htmlFor="underWarranty" className="block text-sm font-medium text-slate-300 mb-1">Under Warranty</label>
-            <select
-              id="underWarranty"
-              value={underWarranty ? 'yes' : 'no'}
-              onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="no">No</option>
-              <option value="yes">Yes</option>
-            </select>
-          </div>
-
-          {/* Warranty Date */}
-          <div>
-            <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
-            <input
-              type="date"
-              id="warrantyDate"
-              value={warrantyDate}
-              onChange={(e) => setWarrantyDate(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          {/* Station Autocomplete */}
+          {/* Station Selector with Dropdown */}
           <div ref={stationRef} className="relative">
-            <label htmlFor="station" className="block text-sm font-medium text-slate-300 mb-1">Station</label>
-            <input
-              type="text"
-              id="station"
-              value={station}
-              onChange={(e) => {
-                setStation(e.target.value);
-                // Clear selected ID when user types, so new values can be created
-                setSelectedStationId(null);
-              }}
-              onFocus={() => setShowStationDropdown(true)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Type or select station..."
-            />
+            <label htmlFor="stationSearch" className="block text-sm font-medium text-slate-300 mb-1">
+              Select Station {selectedStationId && <span className="text-xs text-slate-500">(Selected: {stations.find(s => s.id === selectedStationId)?.name})</span>}
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="stationSearch"
+                value={station}
+                onChange={(e) => {
+                  setStation(e.target.value);
+                  setShowStationDropdown(true);
+                }}
+                onFocus={() => setShowStationDropdown(true)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Search for a station..."
+              />
+              {selectedStationId && (
+                <button
+                  type="button"
+                  onClick={() => { setStation(''); setSelectedStationId(null); setShowStationDropdown(false); }}
+                  className="absolute right-9 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                  title="Clear selection"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
+            </div>
+
+            {/* Dropdown Menu */}
             {showStationDropdown && (
-              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
-                {stations
-                  .filter(s => !station || s.name.toLowerCase().includes(station.toLowerCase()))
-                  .map((stn) => (
+              <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                {filteredStations.length > 0 ? (
+                  filteredStations.map((stn) => (
                     <button
                       key={stn.id}
                       type="button"
-                      onClick={() => {
-                        setStation(stn.name);
-                        setSelectedStationId(stn.id);
-                        setShowStationDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
+                      onClick={() => handleStationSelect(stn)}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-0"
                     >
-                      {stn.name}
+                      <div className="text-sm font-medium text-white">{stn.name}</div>
                     </button>
-                  ))}
-                {stations.filter(s => !station || s.name.toLowerCase().includes(station.toLowerCase())).length === 0 && (
-                  <div className="px-4 py-2 text-sm text-slate-500">No stations found</div>
+                  ))
+                ) : (
+                  <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                    No stations found
+                  </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Asset Selection Dropdown */}
+          <div>
+            <label htmlFor="assetSelect" className="block text-sm font-medium text-slate-300 mb-1">
+              Select Asset <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <select
+                id="assetSelect"
+                value={selectedAssetId || ''}
+                onChange={(e) => setSelectedAssetId(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                required
+              >
+                <option value="">Select an Asset</option>
+                {assets
+                  .filter(asset => asset.status === 'Available' || (isEditMode && asset.id === editItem?.assets?.id))
+                  .map((asset) => (
+                    <option key={asset.id} value={asset.id}>
+                      {[
+                        asset.categories?.name,
+                        asset.brands?.name,
+                        asset.models?.name,
+                        asset.serial_number ? `(SN: ${asset.serial_number})` : ''
+                      ].filter(Boolean).join(' ')}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
+            </div>
+            {(() => {
+              const availableAssetsForSelection = assets.filter(asset => asset.status === 'Available' || (isEditMode && asset.id === editItem?.assets?.id));
+              if (assets.length === 0) {
+                return (
+                  <p className="text-xs text-red-400 mt-1">No assets found in Asset Inventory. Please add some first.</p>
+                );
+              } else if (availableAssetsForSelection.length === 0 && !isEditMode) {
+                return (
+                  <p className="text-xs text-red-400 mt-1">No available assets to assign. All assets are currently in use or have another status.</p>
+                );
+              } else if (availableAssetsForSelection.length === 0 && isEditMode && !editItem?.assets?.id) {
+                return (
+                  <p className="text-xs text-red-400 mt-1">No available assets to assign. The current asset is not found or is unavailable.</p>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Selected Asset Details (Read-only) */}
+            {selectedAssetId && (() => {
+              const selectedAsset = assets.find(a => a.id === selectedAssetId);
+              if (!selectedAsset) return null;
+              return (
+                <div className="grid grid-cols-2 gap-4 mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Category</label>
+                    <div className="text-sm text-slate-200">{selectedAsset.categories?.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Brand</label>
+                    <div className="text-sm text-slate-200">{selectedAsset.brands?.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Model</label>
+                    <div className="text-sm text-slate-200">{selectedAsset.models?.name || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Serial Number</label>
+                    <div className="text-sm text-slate-200 font-mono">{selectedAsset.serial_number || 'N/A'}</div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-400 mb-1">Warranty Status</label>
+                     <div className={`text-sm inline-flex px-2 py-0.5 rounded ${
+                        selectedAsset.under_warranty 
+                          ? 'bg-emerald-500/10 text-emerald-400' 
+                          : 'bg-slate-700 text-slate-400'
+                      }`}>
+                      {selectedAsset.under_warranty ? 'Under Warranty' : 'Expired / None'}
+                    </div>
+                  </div>
+                  {selectedAsset.warranty_date && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Warranty Date</label>
+                      <div className="text-sm text-slate-200">{format(new Date(selectedAsset.warranty_date), 'PPP')}</div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="flex justify-end gap-3">
             <button
               type="button"

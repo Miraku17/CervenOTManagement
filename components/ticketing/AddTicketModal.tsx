@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown } from 'lucide-react';
+import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown, Search } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
 
@@ -26,6 +26,27 @@ interface Station {
   name: string;
 }
 
+interface InventoryItem {
+  id: string;
+  stores: {
+    id: string;
+    store_name: string;
+    store_code: string;
+  } | null;
+  stations: {
+    id: string;
+    name: string;
+  } | null;
+  assets: {
+    id: string;
+    serial_number: string | null;
+    status: string;
+    categories: { name: string } | null;
+    brands: { name: string } | null;
+    models: { name: string } | null;
+  } | null;
+}
+
 interface AddTicketModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,6 +68,16 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
   const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
+  
+  // Inventory state
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+  const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
+  
+  // Device Search State
+  const [deviceSearch, setDeviceSearch] = useState('');
+  const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
+  const deviceDropdownRef = useRef<HTMLDivElement>(null);
+  
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
@@ -184,13 +215,108 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     fetchManagers();
   }, [selectedStore]);
 
+  // Fetch inventory
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        let url = `/api/inventory/get`;
+        const params = [];
+        
+        if (selectedStore) {
+          params.push(`store_id=${selectedStore.id}`);
+        }
+        if (formData.station_id) {
+          params.push(`station_id=${formData.station_id}`);
+        }
+        
+        if (params.length > 0) {
+          url += `?${params.join('&')}`;
+        }
+
+        const response = await fetch(url);
+        const data = await response.json();
+        if (response.ok) {
+          setInventoryItems(data.items || []);
+        }
+      } catch (err) {
+        console.error('Error fetching inventory:', err);
+        setInventoryItems([]);
+      }
+    };
+
+    fetchInventory();
+  }, [selectedStore, formData.station_id]);
+
+  const filteredInventory = inventoryItems.filter(item => {
+    if (!deviceSearch) return false;
+    const search = deviceSearch.toLowerCase();
+    const asset = item.assets;
+    if (!asset) return false;
+    
+    return (
+      asset.serial_number?.toLowerCase().includes(search) ||
+      asset.brands?.name.toLowerCase().includes(search) ||
+      asset.models?.name.toLowerCase().includes(search) ||
+      asset.categories?.name.toLowerCase().includes(search) ||
+      item.stores?.store_name.toLowerCase().includes(search)
+    );
+  });
+
+  const handleDeviceSearchSelect = (item: InventoryItem) => {
+    // 1. Select Store
+    if (item.stores) {
+      const store = stores.find(s => s.id === item.stores?.id) || {
+        id: item.stores.id,
+        store_name: item.stores.store_name,
+        store_code: item.stores.store_code
+      };
+      // We manually set state to avoid the useEffect clearing our selection
+      setSelectedStore(store);
+      setStoreName(store.store_name);
+      setStoreCode(store.store_code);
+      setStoreSearchTerm(store.store_name);
+    }
+
+    // 2. Select Station & Device Details
+    if (item.assets) {
+      setSelectedInventoryItem(item);
+      
+      const categoryName = item.assets.categories?.name || '';
+      const brandName = item.assets.brands?.name || '';
+      const modelName = item.assets.models?.name || '';
+      const serial = item.assets.serial_number || '';
+      
+      const deviceString = [categoryName, brandName, modelName, serial].filter(Boolean).join(' ');
+      
+      setFormData(prev => ({
+        ...prev,
+        store_id: item.stores?.id || '',
+        station_id: item.stations?.id || '',
+        device: deviceString,
+        // problem_category: categoryName, // Removed: no longer auto-populated
+        mod_id: '', // Will be re-fetched by store effect, or we could try to preserve if needed
+      }));
+    }
+    
+    setDeviceSearch('');
+    setShowDeviceDropdown(false);
+  };
+
   const handleStoreSelect = (store: Store) => {
     setSelectedStore(store);
     setStoreName(store.store_name);
     setStoreCode(store.store_code);
     setStoreSearchTerm(store.store_name);
     setShowStoreDropdown(false);
-    setFormData({ ...formData, store_id: store.id, mod_id: '', station_id: '' });
+    setFormData({ 
+      ...formData, 
+      store_id: store.id, 
+      mod_id: '', 
+      station_id: '', // Reset station
+      device: '', // Reset device
+      problem_category: '' // Reset category
+    });
+    setSelectedInventoryItem(null);
   };
 
   const handleClearStoreSelection = () => {
@@ -199,9 +325,18 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setStoreCode('');
     setStoreSearchTerm('');
     setShowStoreDropdown(false);
-    setFormData({ ...formData, store_id: '', mod_id: '', station_id: '' });
+    setFormData({ 
+      ...formData, 
+      store_id: '', 
+      mod_id: '', 
+      station_id: '',
+      device: '',
+      problem_category: ''
+    });
     setManagers([]);
     setManagerOnDuty('');
+    setInventoryItems([]);
+    setSelectedInventoryItem(null);
   };
 
   const filteredStores = stores.filter(store =>
@@ -229,6 +364,39 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setFormData({ ...formData, serviced_by: '' });
   };
 
+  // Handle inventory item selection
+  const handleInventorySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const itemId = e.target.value;
+    if (!itemId) {
+      setSelectedInventoryItem(null);
+      setFormData(prev => ({
+        ...prev,
+        device: '',
+        problem_category: ''
+      }));
+      return;
+    }
+
+    const item = inventoryItems.find(i => i.id === itemId);
+    if (item && item.assets) { // Ensure item and item.assets exist
+      setSelectedInventoryItem(item);
+      
+      const categoryName = item.assets.categories?.name || '';
+      const brandName = item.assets.brands?.name || '';
+      const modelName = item.assets.models?.name || '';
+      const serial = item.assets.serial_number || '';
+      
+      const deviceString = [categoryName, brandName, modelName, serial].filter(Boolean).join(' ');
+      
+      setFormData(prev => ({
+        ...prev,
+        device: deviceString,
+        // problem_category: categoryName, // Removed: no longer auto-populated
+        station_id: item.stations?.id || prev.station_id // Auto-fill station if available from inventory item
+      }));
+    }
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -238,16 +406,19 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       if (employeeDropdownRef.current && !employeeDropdownRef.current.contains(event.target as Node)) {
         setShowEmployeeDropdown(false);
       }
+      if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(event.target as Node)) {
+        setShowDeviceDropdown(false);
+      }
     };
 
-    if (showStoreDropdown || showEmployeeDropdown) {
+    if (showStoreDropdown || showEmployeeDropdown || showDeviceDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showStoreDropdown, showEmployeeDropdown]);
+  }, [showStoreDropdown, showEmployeeDropdown, showDeviceDropdown]);
 
   // Severity options
   const severityOptions = [
@@ -263,6 +434,17 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     e.preventDefault();
     setLoading(true);
     setError(null);
+
+    if (!selectedInventoryItem && !formData.device) { // Check if no inventory item is selected AND device is not manually entered
+        setError('Device is required');
+        setLoading(false);
+        return;
+    }
+    if (!formData.serviced_by) {
+        setError('Serviced By is required');
+        setLoading(false);
+        return;
+    }
 
     try {
       const response = await fetch('/api/tickets/create', {
@@ -306,6 +488,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       setSelectedEmployee(null);
       setEmployeeSearchTerm('');
       setShowEmployeeDropdown(false);
+      setInventoryItems([]);
+      setSelectedInventoryItem(null);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -377,6 +561,74 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
             </div>
 
             {/* Editable fields */}
+            
+            {/* Quick Device Search */}
+            <div ref={deviceDropdownRef} className="relative mb-6">
+              <label className="block text-sm font-medium text-blue-400 mb-1">
+                Quick Device Search (Optional)
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={deviceSearch}
+                  onChange={(e) => {
+                    setDeviceSearch(e.target.value);
+                    setShowDeviceDropdown(true);
+                  }}
+                  onFocus={() => setShowDeviceDropdown(true)}
+                  className="w-full bg-slate-900/50 border border-blue-500/30 text-white px-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none placeholder-slate-500"
+                  placeholder="Search by Serial, Brand, Model, or Store..."
+                />
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+              </div>
+
+              {/* Device Dropdown Menu */}
+              {showDeviceDropdown && deviceSearch && (
+                <div className="absolute z-[60] w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  {filteredInventory.length > 0 ? (
+                    filteredInventory.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleDeviceSearchSelect(item)}
+                        className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 group"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-sm font-medium text-white group-hover:text-blue-400 transition-colors">
+                              {[
+                                item.assets?.brands?.name,
+                                item.assets?.models?.name,
+                                item.assets?.serial_number ? `(${item.assets.serial_number})` : ''
+                              ].filter(Boolean).join(' ')}
+                            </div>
+                            <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
+                              <span className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">
+                                {item.stores?.store_name}
+                              </span>
+                              <span>•</span>
+                              <span>{item.stations?.name || 'No Station'}</span>
+                            </div>
+                          </div>
+                          <div className={`text-xs px-2 py-1 rounded border ${
+                            item.assets?.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            item.assets?.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                            'bg-slate-800 text-slate-400 border-slate-700'
+                          }`}>
+                            {item.assets?.status || 'Unknown'}
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                      No matching devices found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* RCC Reference Number and Serviced By */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -396,7 +648,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               {/* Serviced By - Employee Selector */}
               <div ref={employeeDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Serviced By
+                  Serviced By <span className="text-red-500">*</span>
                   {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.fullName})</span>}
                 </label>
                 <div className="relative">
@@ -410,6 +662,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     onFocus={() => setShowEmployeeDropdown(true)}
                     className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-20 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Search for an employee..."
+                    required={true}
                   />
                   {selectedEmployee && (
                     <button
@@ -572,6 +825,42 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               </div>
             </div>
 
+            {/* Device Selection from Inventory */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Select Device <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  required
+                  value={selectedInventoryItem?.id || ''}
+                  onChange={handleInventorySelect}
+                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={!selectedStore}
+                >
+                  <option value="">Select Device from Inventory</option>
+                  {inventoryItems.map((item) => {
+                    const label = [
+                      item.assets?.categories?.name,
+                      item.assets?.brands?.name,
+                      item.assets?.models?.name,
+                      item.assets?.serial_number ? `(${item.assets.serial_number})` : ''
+                    ].filter(Boolean).join(' ');
+                    
+                    return (
+                      <option key={item.id} value={item.id}>
+                        {label}
+                      </option>
+                    );
+                  })}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+              </div>
+              {inventoryItems.length === 0 && selectedStore && (
+                <p className="text-xs text-slate-500 mt-1">No devices found for this store/station.</p>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">
@@ -589,22 +878,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
               <div>
                 <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Device <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.device}
-                  onChange={(e) => setFormData({ ...formData, device: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. POS Terminal, Printer"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1">
                   Problem Category <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -613,7 +886,22 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                   value={formData.problem_category}
                   onChange={(e) => setFormData({ ...formData, problem_category: e.target.value })}
                   className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. POS System, Printer, Network/Internet"
+                  placeholder="e.g. Software, Hardware, Network"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1">
+                  Device (Auto-generated) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formData.device}
+                  className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
+                  placeholder="Category Brand Model Serial"
                 />
               </div>
 
