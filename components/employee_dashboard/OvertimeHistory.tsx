@@ -26,7 +26,10 @@ interface OvertimeRequest {
   attendance: {
     date: string;
     total_minutes: number;
+    user_id: string;
   };
+  total_minutes_final?: number; // From attendance_daily_summary (with lunch deduction)
+  overtime_minutes?: number; // From attendance_daily_summary (overtime with lunch deduction)
   level1_reviewer_profile?: ProfileData | null;
   level2_reviewer_profile?: ProfileData | null;
 }
@@ -74,7 +77,23 @@ const OvertimeHistory: React.FC = () => {
 
       if (error) throw error;
 
-      setRequests(data || []);
+      // Enhance data with attendance_daily_summary info (includes lunch deduction)
+      const enhancedData = await Promise.all((data || []).map(async (request) => {
+        const { data: summaryData } = await supabase
+          .from('attendance_daily_summary')
+          .select('total_minutes_final, overtime_minutes')
+          .eq('user_id', request.attendance.user_id)
+          .eq('work_date', request.attendance.date)
+          .single();
+
+        return {
+          ...request,
+          total_minutes_final: summaryData?.total_minutes_final,
+          overtime_minutes: summaryData?.overtime_minutes
+        };
+      }));
+
+      setRequests(enhancedData);
     } catch (err: any) {
       console.error('Error fetching overtime history:', err);
       setError('Failed to load overtime history');
@@ -157,7 +176,11 @@ const OvertimeHistory: React.FC = () => {
                 <div>
                   <label className="text-xs text-slate-500 uppercase font-medium">Overtime Hours</label>
                   <p className="text-slate-200 mt-1 font-mono text-lg">
-                    {selectedRequest.approved_hours !== null ? `${selectedRequest.approved_hours.toFixed(2)} hrs` : 'Pending'}
+                    {selectedRequest.overtime_minutes !== undefined
+                      ? `${(selectedRequest.overtime_minutes / 60).toFixed(2)} hrs`
+                      : selectedRequest.approved_hours !== null
+                        ? `${selectedRequest.approved_hours.toFixed(2)} hrs`
+                        : 'Pending'}
                   </p>
                 </div>
                 <div>
@@ -336,12 +359,17 @@ const OvertimeHistory: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Clock size={16} />
-                    <span>Total: {Math.floor(request.attendance.total_minutes / 60)}h {request.attendance.total_minutes % 60}m</span>
-                    {request.approved_hours !== null && (
+                    <span>
+                      Total: {Math.floor((request.total_minutes_final ?? request.attendance.total_minutes) / 60)}h {(request.total_minutes_final ?? request.attendance.total_minutes) % 60}m
+                      {request.total_minutes_final && <span className="text-xs text-slate-500 ml-1">(lunch deducted)</span>}
+                    </span>
+                    {(request.overtime_minutes !== undefined || request.approved_hours !== null) && (
                       <>
                         <ChevronRight size={16} className="text-slate-600" />
                         <span className="text-emerald-400 font-semibold">
-                          Approved: {request.approved_hours.toFixed(2)} hrs
+                          OT: {request.overtime_minutes !== undefined
+                            ? `${(request.overtime_minutes / 60).toFixed(2)} hrs`
+                            : `${request.approved_hours!.toFixed(2)} hrs`}
                         </span>
                       </>
                     )}

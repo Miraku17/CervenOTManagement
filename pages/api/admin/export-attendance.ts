@@ -19,20 +19,45 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    let query = supabase
-      .from('attendance')
+    let attendanceData: any[] | null = null;
+    let error: any = null;
+
+    // First, try to get data from attendance_daily_summary
+    let summaryQuery = supabase
+      .from('attendance_daily_summary')
       .select('*, profiles(first_name, last_name, email)')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
 
     if (userId) {
-      query = query.eq('user_id', userId);
+      summaryQuery = summaryQuery.eq('user_id', userId);
     }
 
-    const { data: attendanceData, error } = await query;
+    const { data: summaryData, error: summaryError } = await summaryQuery;
 
-    if (error) throw error;
+    // If summary data exists and has records, use it
+    if (!summaryError && summaryData && summaryData.length > 0) {
+      attendanceData = summaryData;
+    } else {
+      // Fallback to attendance table
+      let query = supabase
+        .from('attendance')
+        .select('*, profiles(first_name, last_name, email)')
+        .gte('date', startDate)
+        .lte('date', endDate)
+        .order('date', { ascending: true });
+
+      if (userId) {
+        query = query.eq('user_id', userId);
+      }
+
+      const { data: rawData, error: rawError } = await query;
+      attendanceData = rawData;
+      error = rawError;
+
+      if (error) throw error;
+    }
 
     // Get attendance IDs to fetch overtime requests
     const attendanceIds = attendanceData?.map(a => a.id) || [];
@@ -69,11 +94,48 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ]) || []
     );
 
-    // Merge overtime data with attendance data
-    const data = attendanceData?.map(record => ({
-      ...record,
-      overtimeRequest: overtimeMap.get(record.id) || null
-    }));
+    // Process attendance data with lunch deduction and overtime calculation
+    const data = attendanceData?.map(record => {
+      let totalHours = 0;
+
+      // Check if data is from attendance_daily_summary (has total_minutes_final or total_minutes_raw)
+      if (record.total_minutes_final !== undefined) {
+        totalHours = record.total_minutes_final / 60; // Convert minutes to hours
+      } else if (record.total_minutes_raw !== undefined) {
+        totalHours = record.total_minutes_raw / 60; // Convert minutes to hours
+      } else if (record.time_in && record.time_out) {
+        // Calculate from time_in and time_out for regular attendance table
+        const timeIn = new Date(record.time_in);
+        const timeOut = new Date(record.time_out);
+        const diffMs = timeOut.getTime() - timeIn.getTime();
+        totalHours = diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+      }
+
+      // Round to 2 decimal places
+      totalHours = Math.round(totalHours * 100) / 100;
+
+      // Deduct 1 hour for lunch if worked more than 5 hours
+      let effectiveHours = totalHours > 5 ? totalHours - 1 : totalHours;
+      effectiveHours = Math.round(effectiveHours * 100) / 100;
+
+      // Calculate regular and overtime hours (assuming 8 hours is standard workday)
+      const standardHours = 8;
+      let regularHours = Math.min(effectiveHours, standardHours);
+      let overtimeHours = Math.max(0, effectiveHours - standardHours);
+
+      regularHours = Math.round(regularHours * 100) / 100;
+      overtimeHours = Math.round(overtimeHours * 100) / 100;
+
+      return {
+        ...record,
+        total_hours_raw: totalHours, // Original hours before lunch deduction
+        lunch_deduction: totalHours > 5 ? 1 : 0,
+        total_hours: effectiveHours, // Hours after lunch deduction
+        regular_hours: regularHours,
+        overtime_hours: overtimeHours,
+        overtimeRequest: overtimeMap.get(record.id) || null
+      };
+    });
 
     return res.status(200).json({ data });
 
