@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Clock, UserCheck, TrendingUp, Loader2 } from 'lucide-react';
 import { Employee } from '@/types';
+import { ActiveEmployeesModal } from './ActiveEmployeesModal';
 
 interface DashboardHomeProps {
   employees: Employee[];
@@ -44,10 +45,31 @@ interface RecentActivity {
   logs: ActivityLog[];
 }
 
+interface ActiveEmployee {
+  id: string;
+  userId: string;
+  employeeName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  employeeId: string;
+  position: string;
+  avatarSeed: string;
+  timeIn: string;
+  timeInRaw: string;
+  clockInAddress: string;
+  workingDuration: string;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeEmployees, setActiveEmployees] = useState<ActiveEmployee[]>([]);
+  const [isLoadingActiveEmployees, setIsLoadingActiveEmployees] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -72,6 +94,27 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const fetchActiveEmployees = async () => {
+    setIsLoadingActiveEmployees(true);
+    try {
+      const response = await fetch('/api/dashboard/active-employees');
+      const data = await response.json();
+
+      if (data.activeEmployees) {
+        setActiveEmployees(data.activeEmployees);
+      }
+    } catch (error) {
+      console.error('Error fetching active employees:', error);
+    } finally {
+      setIsLoadingActiveEmployees(false);
+    }
+  };
+
+  const handleActiveNowClick = () => {
+    setIsModalOpen(true);
+    fetchActiveEmployees();
   };
 
   if (isLoading) {
@@ -105,6 +148,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           change="Currently working"
           icon={<UserCheck className="text-violet-400" />}
           color="violet"
+          onClick={handleActiveNowClick}
         />
         <StatCard
           title="Weekly Hours"
@@ -219,18 +263,32 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           )}
         </div>
       </div>
+
+      {/* Active Employees Modal */}
+      <ActiveEmployeesModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        employees={activeEmployees}
+        isLoading={isLoadingActiveEmployees}
+      />
     </div>
   );
 };
 
-const StatCard: React.FC<{ 
-  title: string; 
-  value: string; 
-  change: string; 
-  icon: React.ReactNode; 
+const StatCard: React.FC<{
+  title: string;
+  value: string;
+  change: string;
+  icon: React.ReactNode;
   color: string;
-}> = ({ title, value, change, icon, color }) => (
-  <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700 transition-all">
+  onClick?: () => void;
+}> = ({ title, value, change, icon, color, onClick }) => (
+  <div
+    className={`bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700 transition-all ${
+      onClick ? 'cursor-pointer hover:bg-slate-800/50' : ''
+    }`}
+    onClick={onClick}
+  >
     <div className="flex justify-between items-start mb-4">
       <div>
         <p className="text-slate-400 text-sm font-medium mb-1">{title}</p>
