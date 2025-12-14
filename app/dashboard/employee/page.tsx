@@ -886,66 +886,109 @@ const EmployeeDashboard: React.FC = () => {
       </nav>
 
       {/* Pending Session Alert */}
-      {activeLog && showPendingSessionAlert && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-l-4 border-amber-500 rounded-lg p-4 shadow-lg backdrop-blur-sm">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0">
-                <AlertTriangle className="w-6 h-6 text-amber-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-amber-100 flex items-center gap-2">
-                      <Clock className="w-5 h-5" />
-                      Active Work Session Detected
-                    </h3>
-                    <p className="mt-2 text-amber-200/90 text-sm">
-                      You have an ongoing work session that hasn't been clocked out yet. This may result in extended hours being recorded. Please clock out.
-                    </p>
-                    <p className="mt-2 text-amber-100 font-medium text-sm">
-                      <span className="text-amber-300">Started:</span>{' '}
-                      {new Date(activeLog.startTime).toLocaleString('en-US', {
-                        weekday: 'short',
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        onClick={() => {
-                          const element = document.querySelector('[data-time-tracker]');
-                          if (element) {
-                            element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                          }
-                        }}
-                        className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors shadow-md"
-                      >
-                        Go to Time Tracker
-                      </button>
+      {activeLog && showPendingSessionAlert && (() => {
+        const today = new Date().toISOString().split('T')[0];
+        const activeDate = activeLog.date;
+        const isFromPreviousDay = activeDate !== today;
+
+        return (
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
+            {isFromPreviousDay ? (
+              // Warning for previous day session
+              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-l-4 border-amber-500 rounded-lg p-4 shadow-lg backdrop-blur-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <AlertTriangle className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-amber-100 flex items-center gap-2">
+                          <Clock className="w-5 h-5" />
+                          Active Work Session Detected
+                        </h3>
+                        <p className="mt-2 text-amber-200/90 text-sm">
+                          You have an ongoing work session that hasn't been clocked out yet. This may result in extended hours being recorded. Please clock out.
+                        </p>
+                        <p className="mt-2 text-amber-100 font-medium text-sm">
+                          <span className="text-amber-300">Started:</span>{' '}
+                          {new Date(activeLog.startTime).toLocaleString('en-US', {
+                            weekday: 'short',
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <button
+                            onClick={() => {
+                              const element = document.querySelector('[data-time-tracker]');
+                              if (element) {
+                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                              }
+                            }}
+                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors shadow-md"
+                          >
+                            Go to Time Tracker
+                          </button>
+                          <button
+                            onClick={() => setShowPendingSessionAlert(false)}
+                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"
+                          >
+                            Dismiss
+                          </button>
+                        </div>
+                      </div>
                       <button
                         onClick={() => setShowPendingSessionAlert(false)}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"
+                        className="flex-shrink-0 p-1 text-amber-300 hover:text-amber-100 transition-colors"
                       >
-                        Dismiss
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowPendingSessionAlert(false)}
-                    className="flex-shrink-0 p-1 text-amber-300 hover:text-amber-100 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
-            </div>
+            ) : (
+              // Gentle reminder for same day session
+              <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500 rounded-lg p-4 shadow-lg backdrop-blur-sm">
+                <div className="flex items-start gap-4">
+                  <div className="flex-shrink-0">
+                    <Clock className="w-6 h-6 text-blue-400" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h3 className="text-base font-semibold text-blue-100 flex items-center gap-2">
+                          You're Currently Clocked In
+                        </h3>
+                        <p className="mt-1 text-blue-200/90 text-sm">
+                          Don't forget to clock out when you're done for the day! 😊
+                        </p>
+                        <p className="mt-2 text-blue-100 text-xs">
+                          <span className="text-blue-300">Started:</span>{' '}
+                          {new Date(activeLog.startTime).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setShowPendingSessionAlert(false)}
+                        className="flex-shrink-0 p-1 text-blue-300 hover:text-blue-100 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
