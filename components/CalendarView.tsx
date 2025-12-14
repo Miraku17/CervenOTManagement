@@ -5,9 +5,10 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRig
 interface CalendarViewProps {
   logs: WorkLog[];
   userId?: string;
+  activeLog?: WorkLog | null;
 }
 
-export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
+export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, activeLog }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   
@@ -80,7 +81,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
       return (logsByDate[date] || []).reduce((acc, log) => acc + log.durationSeconds, 0);
   };
 
+  const isDateActive = (date: string) => {
+      return activeLog && activeLog.date === date && activeLog.status === 'IN_PROGRESS';
+  };
+
   const getDisplayHoursForDate = (date: string) => {
+      // Check if this date has an active session
+      if (isDateActive(date)) {
+          return 'Active';
+      }
       // Check if we have a summary from API
       if (monthlySummaries[date] !== undefined) {
           return (monthlySummaries[date] / 60).toFixed(1);
@@ -89,8 +98,10 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
       const totalSeconds = getDailyTotalSeconds(date);
       return (totalSeconds / 3600).toFixed(1);
   };
-  
+
   const hasWorkForDate = (date: string) => {
+       // Check if date has active session
+       if (isDateActive(date)) return true;
        if (monthlySummaries[date] !== undefined && monthlySummaries[date] > 0) return true;
        return getDailyTotalSeconds(date) > 0;
   };
@@ -158,8 +169,14 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
 
                 {hasWork ? (
                     <div className="mt-auto z-10 relative">
-                        <span className="text-sm sm:text-base md:text-lg font-bold text-slate-200">{hours}</span>
-                        <span className="text-[10px] sm:text-xs text-slate-500 ml-0.5 sm:ml-1">hrs</span>
+                        {isDateActive(dateStr) ? (
+                            <span className="text-xs sm:text-sm font-bold text-amber-400 animate-pulse">Active</span>
+                        ) : (
+                            <>
+                                <span className="text-sm sm:text-base md:text-lg font-bold text-slate-200">{hours}</span>
+                                <span className="text-[10px] sm:text-xs text-slate-500 ml-0.5 sm:ml-1">hrs</span>
+                            </>
+                        )}
                     </div>
                 ) : (
                     <div className="mt-auto text-[10px] sm:text-xs text-slate-600 font-medium z-10 relative">-</div>
@@ -183,13 +200,18 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
   // For the modal display
   const displayTotalHoursModal = useMemo(() => {
     if (!selectedDate) return "0.00";
-    
+
+    // If date is active, show "Active" instead of hours
+    if (isDateActive(selectedDate)) {
+      return "Active";
+    }
+
     if (monthlySummaries[selectedDate] !== undefined) {
       return (monthlySummaries[selectedDate] / 60).toFixed(2);
     }
-    
+
     return (getDailyTotalSeconds(selectedDate) / 3600).toFixed(2);
-  }, [monthlySummaries, selectedDate, logsByDate]);
+  }, [monthlySummaries, selectedDate, logsByDate, activeLog]);
 
   return (
     <>
@@ -272,6 +294,22 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
                     </div>
                     
                     <div className="p-3 sm:p-5 max-h-[60vh] overflow-y-auto bg-slate-900/50">
+                        {/* Show active session info if date is active */}
+                        {isDateActive(selectedDate) && (
+                            <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-l-4 border-amber-500 rounded-lg p-4 mb-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <Clock className="w-4 h-4 text-amber-400 animate-pulse" />
+                                    <span className="text-sm font-bold text-amber-100">Active Work Session</span>
+                                </div>
+                                <p className="text-xs text-amber-200/90">
+                                    You have an ongoing work session. Clock out to see the final hours.
+                                </p>
+                                <div className="mt-3 text-xs text-amber-100">
+                                    <span className="text-amber-300">Started:</span>{' '}
+                                    {activeLog && formatTime(activeLog.startTime)}
+                                </div>
+                            </div>
+                        )}
                         {(logsByDate[selectedDate] || []).length > 0 ? (
                             <div className="space-y-3">
                                 {logsByDate[selectedDate].map((log, idx) => (
@@ -336,8 +374,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId }) => {
                     <div className="p-3 sm:p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
                         <span className="text-slate-400 text-xs sm:text-sm font-medium">Total Hours</span>
                          {/* Using data from monthly fetch, no loading spinner needed here as it should be ready if date is selectable */}
-                         <span className="text-lg sm:text-xl font-bold text-blue-400 font-mono">
-                                {displayTotalHoursModal} <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>
+                         <span className={`text-lg sm:text-xl font-bold font-mono ${isDateActive(selectedDate) ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`}>
+                                {displayTotalHoursModal} {!isDateActive(selectedDate) && <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>}
                         </span>
                     </div>
                 </div>

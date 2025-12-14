@@ -26,6 +26,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const now = new Date();
     const today = now.toISOString().split('T')[0];
 
+    // Check for existing active session to prevent double clock-in
+    const { data: activeSession, error: checkError } = await supabase
+      .from('attendance')
+      .select('id, time_in')
+      .eq('user_id', userId)
+      .is('time_out', null)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking active session:', checkError);
+      return res.status(500).json({ error: 'Failed to check attendance status' });
+    }
+
+    if (activeSession) {
+      return res.status(400).json({
+        error: 'You are already clocked in. Please clock out of your current session first.'
+      });
+    }
+
     // Create new attendance record (allows multiple clock-ins per day)
     const { data: attendance, error: insertError } = await supabase
       .from('attendance')

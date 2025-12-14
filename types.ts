@@ -73,7 +73,7 @@ export interface AttendanceRecord {
   } | null;
 }
 
-export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE' | 'EMPLOYEE_SCHEDULE';
+export type ViewState = 'DASHBOARD' | 'EMPLOYEES' | 'EMPLOYEE_DETAIL' | 'EXPORT' | 'EDIT_TIME' | 'OVERTIME_REQUESTS' | 'LEAVE_REQUESTS' | 'IMPORT_SCHEDULE' | 'EMPLOYEE_SCHEDULE' | 'STALE_SESSIONS';
 
 export interface Position {
   id: number;

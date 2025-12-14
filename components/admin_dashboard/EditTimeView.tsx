@@ -345,16 +345,35 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                         </div>
 
                         {!hasTimeOut && (
-                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4">
+                          <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg mb-4 flex items-center justify-between gap-4">
                             <div className="flex items-start gap-2">
                               <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
                               <div>
-                                <p className="text-sm font-medium text-amber-300">Session not completed</p>
+                                <p className="text-sm font-medium text-amber-300">Session in progress</p>
                                 <p className="text-xs text-amber-400/80 mt-1">
-                                  This session has not been clocked out yet. You can only edit completed sessions.
+                                  This session is currently active. Force clock out to enable editing.
                                 </p>
                               </div>
                             </div>
+                            <button
+                                onClick={() => {
+                                    const now = new Date();
+                                    // Format current time to local ISO string for input
+                                    const localIso = formatDatetimeLocal(now.toISOString());
+                                    updateSessionField(session.id, 'timeOut', localIso);
+                                    
+                                    // Small delay to ensure state updates before saving
+                                    setTimeout(() => {
+                                        // We need to pass the updated session object with the new timeOut
+                                        const updatedSession = { ...session, time_out: now.toISOString() };
+                                        handleSave(session.id, updatedSession);
+                                    }, 100);
+                                }}
+                                className="whitespace-nowrap px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-2"
+                            >
+                                <Clock className="w-3 h-3" />
+                                Force Clock Out
+                            </button>
                           </div>
                         )}
 
