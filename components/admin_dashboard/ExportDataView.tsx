@@ -49,8 +49,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     // Group data by employee for DTR Summary
     const employeeData = new Map<string, {
       name: string;
-      email: string;
-      dateHours: Map<string, number>;
+      employeeId: string;
+      dateHours: Map<string, { hours: number; hasActiveSession: boolean }>;
       totalHours: number;
     }>();
 
@@ -59,32 +59,49 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const firstName = row.profiles?.first_name || '';
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
-      const email = row.profiles?.email || '';
+      const employeeId = row.profiles?.employee_id || 'NA';
       const date = row.date;
+      const isActiveSession = row.is_active_session || false;
 
       // Use the calculated total_hours from API (already has lunch deduction applied)
       let totalHours = row.total_hours || 0;
 
-      const employeeKey = `${fullName}_${email}`;
+      const employeeKey = `${fullName}_${employeeId}`;
       if (!employeeData.has(employeeKey)) {
         employeeData.set(employeeKey, {
           name: fullName,
-          email: email,
+          employeeId: employeeId,
           dateHours: new Map(),
           totalHours: 0
         });
       }
 
       const empData = employeeData.get(employeeKey)!;
-      empData.dateHours.set(date, totalHours);
-      empData.totalHours += totalHours;
+      // Handle multiple sessions per day by accumulating hours from completed sessions
+      // and tracking if there's any active session
+      const currentDateData = empData.dateHours.get(date) || { hours: 0, hasActiveSession: false };
+
+      if (isActiveSession) {
+        // Mark that this date has an active session
+        empData.dateHours.set(date, {
+          hours: currentDateData.hours,
+          hasActiveSession: true
+        });
+      } else {
+        // Add hours from completed session
+        empData.dateHours.set(date, {
+          hours: currentDateData.hours + totalHours,
+          hasActiveSession: currentDateData.hasActiveSession
+        });
+        empData.totalHours += totalHours;
+      }
     }
 
     // ==================== SHEET 1: DTR SUMMARY ====================
     const dtrData: any[][] = [];
 
     // Add headers
-    dtrData.push(['Employee Name', 'Email', ...uniqueDates, 'Total Regular Hours', 'Overtime Hours']);
+    dtrData.push(['Employee Name', 'Employee ID', ...uniqueDates, 'Total Regular Hours', 'Overtime Hours']);
 
     // Sort employees by name and add rows
     const sortedEmployees = Array.from(employeeData.values()).sort((a, b) =>
@@ -92,26 +109,45 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     );
 
     for (const emp of sortedEmployees) {
-      // Calculate total overtime hours using the API's calculated overtime_hours
+      // Calculate total overtime hours using the API's calculated daily_overtime_hours
+      // Use a Set to track which dates we've already counted to avoid double-counting
       let totalOvertimeHours = 0;
+      const processedDates = new Set<string>();
+
       for (const row of data) {
         const firstName = row.profiles?.first_name || '';
         const lastName = row.profiles?.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
-        const email = row.profiles?.email || '';
-        const employeeKey = `${fullName}_${email}`;
+        const employeeId = row.profiles?.employee_id || 'NA';
+        const employeeKey = `${fullName}_${employeeId}`;
 
-        if (employeeKey === `${emp.name}_${emp.email}`) {
-          totalOvertimeHours += (row.overtime_hours || 0);
+        if (employeeKey === `${emp.name}_${emp.employeeId}`) {
+          const dateKey = row.date;
+          // Only add daily overtime once per date (to avoid counting it multiple times for multiple sessions)
+          if (!processedDates.has(dateKey)) {
+            totalOvertimeHours += (row.daily_overtime_hours || 0);
+            processedDates.add(dateKey);
+          }
         }
       }
 
       const row = [
         emp.name,
-        emp.email,
+        emp.employeeId,
         ...uniqueDates.map(date => {
-          const hours = emp.dateHours.get(date);
-          return hours !== undefined ? hours.toFixed(2) : '';
+          const dateData = emp.dateHours.get(date);
+          if (!dateData) return '';
+
+          // If there's only an active session (no completed hours), show "Active"
+          if (dateData.hasActiveSession && dateData.hours === 0) {
+            return 'Active';
+          }
+          // If there are completed hours and an active session, show hours + "(Active)"
+          if (dateData.hasActiveSession && dateData.hours > 0) {
+            return `${dateData.hours.toFixed(2)} (Active)`;
+          }
+          // Otherwise just show the hours
+          return dateData.hours.toFixed(2);
         }),
         emp.totalHours.toFixed(2),
         totalOvertimeHours.toFixed(2)
@@ -126,12 +162,14 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     detailedData.push([
       'Date',
       'Employee Name',
-      'Email',
+      'Employee ID',
       'Time In',
       'Time Out',
+      'Session Status',
       'Total Minutes',
       'Total Hours',
-      'Overtime Hours',
+      'Overtime Hours (Per Session)',
+      'Daily Overtime Hours',
       'Clock In Address',
       'Clock Out Address',
       'Has Overtime Request',
@@ -143,25 +181,51 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       'Overtime Reviewer'
     ]);
 
+    // Add explanation row
+    detailedData.push([
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'Per-session calculation',
+      'Daily total (used in DTR Summary)',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      ''
+    ]);
+
     // Add detailed records
     for (const row of data) {
       const firstName = row.profiles?.first_name || '';
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
-      const email = row.profiles?.email || '';
+      const employeeId = row.profiles?.employee_id || 'NA';
       const date = row.date;
 
       const timeInDate = row.time_in ? new Date(row.time_in) : null;
       const timeOutDate = row.time_out ? new Date(row.time_out) : null;
+      const isActiveSession = row.is_active_session || false;
 
       const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
-      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
+      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : (isActiveSession ? 'ACTIVE SESSION' : 'N/A');
+      const sessionStatus = isActiveSession ? 'ACTIVE (Hours calculated up to export time)' : 'Completed';
 
       // Use calculated values from API (already has lunch deduction applied)
       const totalHoursRaw = row.total_hours_raw || 0;
       const lunchDeduction = row.lunch_deduction || 0;
-      const totalHours = row.total_hours || 0;
-      const overtimeHours = row.overtime_hours || 0;
+      const totalHours = isActiveSession ? 'Active' : (row.total_hours || 0);
+      const overtimeHours = isActiveSession ? 'Active' : (row.overtime_hours || 0);
+      const dailyOvertimeHours = isActiveSession ? 'Active' : (row.daily_overtime_hours || 0);
 
       let totalMinutes = 0;
       if (timeInDate && timeOutDate) {
@@ -189,12 +253,14 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       detailedData.push([
         date,
         fullName,
-        email,
+        employeeId,
         timeIn,
         timeOut,
+        sessionStatus,
         totalMinutes,
         totalHours,
         overtimeHours,
+        dailyOvertimeHours,
         addressIn,
         addressOut,
         hasOvertimeRequest,
@@ -227,9 +293,10 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     overtimeData.push([
       'Date',
       'Employee Name',
-      'Email',
+      'Employee ID',
       'Time In',
       'Time Out',
+      'Session Status',
       'Total Hours Worked',
       'Overtime Hours',
       'Overtime Comment',
@@ -248,23 +315,25 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const firstName = row.profiles?.first_name || '';
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
-      const email = row.profiles?.email || '';
+      const employeeId = row.profiles?.employee_id || 'NA';
       const date = row.date;
 
       const timeInDate = row.time_in ? new Date(row.time_in) : null;
       const timeOutDate = row.time_out ? new Date(row.time_out) : null;
+      const isActiveSession = row.is_active_session || false;
 
       const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
-      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : 'N/A';
+      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : (isActiveSession ? 'ACTIVE SESSION' : 'N/A');
+      const sessionStatus = isActiveSession ? 'ACTIVE (Hours calculated up to export time)' : 'Completed';
 
       // Use calculated values from API (already has lunch deduction applied)
-      const totalHours = row.total_hours || 0;
-      const overtimeHours = row.overtime_hours || 0;
+      const totalHours = isActiveSession ? 'Active' : (row.total_hours || 0);
+      const overtimeHours = isActiveSession ? 'Active' : (row.overtime_hours || 0);
 
       const overtimeComment = row.overtimeRequest?.comment || 'N/A';
       const overtimeStatus = row.overtimeRequest?.status || 'N/A';
       // Use overtime_hours (with lunch deduction) instead of approved_hours
-      const overtimeApprovedHours = overtimeHours > 0 ? overtimeHours.toFixed(2) : 'N/A';
+      const overtimeApprovedHours = isActiveSession ? 'Active' : (overtimeHours > 0 ? (overtimeHours as number).toFixed(2) : 'N/A');
       const overtimeRequestedAt = row.overtimeRequest?.requested_at
         ? new Date(row.overtimeRequest.requested_at).toLocaleString()
         : 'N/A';
@@ -278,9 +347,10 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       overtimeData.push([
         date,
         fullName,
-        email,
+        employeeId,
         timeIn,
         timeOut,
+        sessionStatus,
         totalHours,
         overtimeHours,
         overtimeComment,

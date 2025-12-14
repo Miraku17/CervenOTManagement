@@ -25,7 +25,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // First, try to get data from attendance_daily_summary
     let summaryQuery = supabase
       .from('attendance_daily_summary')
-      .select('*, profiles(first_name, last_name, email)')
+      .select('*, profiles(first_name, last_name, email, employee_id)')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
@@ -43,7 +43,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // Fallback to attendance table
       let query = supabase
         .from('attendance')
-        .select('*, profiles(first_name, last_name, email)')
+        .select('*, profiles(first_name, last_name, email, employee_id)')
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true });
@@ -94,9 +94,53 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ]) || []
     );
 
-    // Process attendance data with lunch deduction and overtime calculation
+    // First, calculate daily totals for each user/date combination
+    const dailyTotals = new Map<string, { totalHours: number; hasActiveSession: boolean }>();
+
+    attendanceData?.forEach(record => {
+      const key = `${record.user_id}_${record.date}`;
+      const existing = dailyTotals.get(key) || { totalHours: 0, hasActiveSession: false };
+
+      let sessionHours = 0;
+      let isActive = false;
+
+      if (record.total_minutes_final !== undefined) {
+        sessionHours = record.total_minutes_final / 60;
+      } else if (record.total_minutes_raw !== undefined) {
+        sessionHours = record.total_minutes_raw / 60;
+      } else if (record.time_in && record.time_out) {
+        const timeIn = new Date(record.time_in);
+        const timeOut = new Date(record.time_out);
+        const diffMs = timeOut.getTime() - timeIn.getTime();
+        sessionHours = diffMs / (1000 * 60 * 60);
+      } else if (record.time_in && !record.time_out) {
+        // Active session - don't include in daily total for overtime calculation
+        isActive = true;
+      }
+
+      dailyTotals.set(key, {
+        totalHours: existing.totalHours + sessionHours,
+        hasActiveSession: existing.hasActiveSession || isActive
+      });
+    });
+
+    // Calculate daily overtime for each day
+    const dailyOvertimeMap = new Map<string, number>();
+
+    dailyTotals.forEach((dailyData, key) => {
+      const totalHours = Math.round(dailyData.totalHours * 100) / 100;
+      // Apply lunch deduction once per day
+      const effectiveHours = totalHours > 5 ? totalHours - 1 : totalHours;
+      const roundedEffective = Math.round(effectiveHours * 100) / 100;
+      // Calculate overtime based on daily total
+      const dailyOvertime = Math.max(0, roundedEffective - 8);
+      dailyOvertimeMap.set(key, Math.round(dailyOvertime * 100) / 100);
+    });
+
+    // Process attendance data with per-session calculations
     const data = attendanceData?.map(record => {
       let totalHours = 0;
+      let isActiveSession = false;
 
       // Check if data is from attendance_daily_summary (has total_minutes_final or total_minutes_raw)
       if (record.total_minutes_final !== undefined) {
@@ -109,16 +153,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const timeOut = new Date(record.time_out);
         const diffMs = timeOut.getTime() - timeIn.getTime();
         totalHours = diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
+      } else if (record.time_in && !record.time_out) {
+        // Active session - calculate hours from time_in to now
+        isActiveSession = true;
+        const timeIn = new Date(record.time_in);
+        const now = new Date();
+        const diffMs = now.getTime() - timeIn.getTime();
+        totalHours = diffMs / (1000 * 60 * 60); // Convert milliseconds to hours
       }
 
       // Round to 2 decimal places
       totalHours = Math.round(totalHours * 100) / 100;
 
-      // Deduct 1 hour for lunch if worked more than 5 hours
+      // Per-session lunch deduction (for display in detailed records)
       let effectiveHours = totalHours > 5 ? totalHours - 1 : totalHours;
       effectiveHours = Math.round(effectiveHours * 100) / 100;
 
-      // Calculate regular and overtime hours (assuming 8 hours is standard workday)
+      // Per-session overtime (kept for backward compatibility in detailed view)
       const standardHours = 8;
       let regularHours = Math.min(effectiveHours, standardHours);
       let overtimeHours = Math.max(0, effectiveHours - standardHours);
@@ -126,13 +177,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       regularHours = Math.round(regularHours * 100) / 100;
       overtimeHours = Math.round(overtimeHours * 100) / 100;
 
+      // Get daily overtime for this record
+      const dailyKey = `${record.user_id}_${record.date}`;
+      const dailyOvertime = dailyOvertimeMap.get(dailyKey) || 0;
+
       return {
         ...record,
+        is_active_session: isActiveSession, // Flag to indicate active session
         total_hours_raw: totalHours, // Original hours before lunch deduction
         lunch_deduction: totalHours > 5 ? 1 : 0,
         total_hours: effectiveHours, // Hours after lunch deduction
         regular_hours: regularHours,
-        overtime_hours: overtimeHours,
+        overtime_hours: overtimeHours, // Per-session overtime (for detailed records)
+        daily_overtime_hours: dailyOvertime, // Daily-based overtime (for DTR summary)
         overtimeRequest: overtimeMap.get(record.id) || null
       };
     });
