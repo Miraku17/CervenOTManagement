@@ -13,7 +13,8 @@ import {
   FileText,
   Calendar,
   FileUp,
-  Ticket
+  Ticket,
+  AlertTriangle
 } from 'lucide-react';
 import DashboardHome from '@/components/admin_dashboard/DashboardHome';
 import { Employee, ViewState, WorkLog, Position } from '@/types';
@@ -21,6 +22,7 @@ import EmployeeManager from '@/components/admin_dashboard/EmployeeManager';
 import EmployeeDetail from '@/components/admin_dashboard/EmployeeDetail';
 import ExportDataView from '@/components/admin_dashboard/ExportDataView';
 import EditTimeView from '@/components/admin_dashboard/EditTimeView';
+import StaleSessionsView from '@/components/admin_dashboard/StaleSessionsView';
 import OvertimeRequestsView from '@/components/admin_dashboard/OvertimeRequestsView';
 import LeaveRequestsView from '@/components/admin_dashboard/LeaveRequestsView';
 import ImportScheduleView from '@/components/admin_dashboard/ImportScheduleView';
@@ -197,6 +199,14 @@ const AdminDashboard: React.FC = () => {
               onClick={() => handleNavigate('EDIT_TIME')}
             />
           )}
+          {hasEditTimeAccess() && (
+            <SidebarItem
+              icon={<AlertTriangle size={20} />}
+              label="Stale Sessions"
+              isActive={currentView === 'STALE_SESSIONS'}
+              onClick={() => handleNavigate('STALE_SESSIONS')}
+            />
+          )}
           {hasOvertimeAccess() && (
             <SidebarItem
               icon={<FileText size={20} />}
@@ -299,6 +309,14 @@ const AdminDashboard: React.FC = () => {
                   label="Edit Time"
                   isActive={currentView === 'EDIT_TIME'}
                   onClick={() => handleNavigate('EDIT_TIME')}
+                />
+              )}
+              {hasEditTimeAccess() && (
+                <SidebarItem
+                  icon={<AlertTriangle size={24} />}
+                  label="Stale Sessions"
+                  isActive={currentView === 'STALE_SESSIONS'}
+                  onClick={() => handleNavigate('STALE_SESSIONS')}
                 />
               )}
               {hasOvertimeAccess() && (
@@ -429,6 +447,24 @@ const AdminDashboard: React.FC = () => {
                       <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
                       <p className="text-slate-400">You don't have permission to edit time records.</p>
                       <p className="text-slate-500 text-sm mt-2">Only Operations Managers can access this feature.</p>
+                    </div>
+                  </div>
+                </div>
+              )
+            )}
+
+            {currentView === 'STALE_SESSIONS' && (
+              hasEditTimeAccess() ? (
+                <StaleSessionsView />
+              ) : (
+                <div className="p-6 flex items-center justify-center min-h-[400px]">
+                  <div className="text-center space-y-4">
+                    <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+                      <X className="w-8 h-8 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+                      <p className="text-slate-400">You don't have permission to manage stale sessions.</p>
                     </div>
                   </div>
                 </div>

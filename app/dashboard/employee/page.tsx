@@ -69,12 +69,10 @@ const EmployeeDashboard: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
         .eq('user_id', user.id)
-        .eq('date', today)
         .is('time_out', null)
         .single();
 
