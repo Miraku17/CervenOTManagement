@@ -9,7 +9,7 @@ import { supabase } from '@/services/supabase';
 export default function EmployeeDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const employeeId = params.id as string;
+  const employeeId = params?.id as string;
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);

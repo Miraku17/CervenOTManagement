@@ -73,10 +73,11 @@ export default function AdminLayout({
   };
 
   const isActive = (path: string) => {
+    if (!pathname) return false;
     if (path === '/dashboard/admin') {
       return pathname === path;
     }
-    return pathname?.startsWith(path);
+    return pathname.startsWith(path);
   };
 
   const getPageTitle = () => {
