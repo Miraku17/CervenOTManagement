@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { formatInTimeZone } from 'date-fns-tz';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,7 +25,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
+    // Use Philippine timezone for date calculation to ensure consistency
+    const PHILIPPINE_TZ = 'Asia/Manila';
+    const today = formatInTimeZone(now, PHILIPPINE_TZ, 'yyyy-MM-dd');
 
     // Find the most recent active attendance record (not just today's)
     const { data: existingAttendance, error: findError } = await supabase
