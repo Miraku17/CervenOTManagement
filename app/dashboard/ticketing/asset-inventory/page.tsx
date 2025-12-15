@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -34,6 +34,8 @@ export default function AssetInventoryPage() {
   const [selectedAssetForDetail, setSelectedAssetForDetail] = useState<Asset | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Access control check
   // Asset Inventory: accessible by admin OR employee role (basically everyone)
@@ -247,6 +249,100 @@ export default function AssetInventoryPage() {
     window.open(doc.output('bloburl'), '_blank');
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/assets/download-template');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'asset_inventory_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showToast('success', 'Template downloaded successfully!');
+    } catch (error: any) {
+      console.error('Error downloading template:', error);
+      showToast('error', error.message || 'Failed to download template');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast('error', 'Please upload an Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64 = e.target?.result as string;
+          const fileData = base64.split(',')[1]; // Remove data:application/... prefix
+
+          const response = await fetch('/api/assets/import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fileData }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || 'Failed to import file');
+          }
+
+          // Show success message with details
+          const { result } = data;
+          let message = `Import completed! ${result.success} items imported successfully.`;
+          if (result.failed > 0) {
+            message += ` ${result.failed} items failed.`;
+          }
+
+          showToast(result.failed > 0 ? 'error' : 'success', message);
+
+          // Log errors for debugging
+          if (result.errors && result.errors.length > 0) {
+            console.error('Import errors:', result.errors);
+          }
+
+          // Refresh assets
+          await fetchAssets();
+        } catch (error: any) {
+          console.error('Error importing file:', error);
+          showToast('error', error.message || 'Failed to import file');
+        } finally {
+          setIsImporting(false);
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Error reading file:', error);
+      showToast('error', error.message || 'Failed to read file');
+      setIsImporting(false);
+    }
+  };
+
   // Filter assets based on search term
   const filteredAssets = assets.filter((asset) => {
     const searchLower = searchTerm.toLowerCase();
@@ -346,6 +442,30 @@ export default function AssetInventoryPage() {
               <span>Add Asset</span>
             </button>
             <button
+              onClick={handleDownloadTemplate}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+            >
+              <FileSpreadsheet size={20} />
+              <span>Download Template</span>
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={isImporting}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  <span>Importing...</span>
+                </>
+              ) : (
+                <>
+                  <Upload size={20} />
+                  <span>Import XLSX</span>
+                </>
+              )}
+            </button>
+            <button
                 onClick={handlePrint}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
               >
@@ -354,6 +474,15 @@ export default function AssetInventoryPage() {
               </button>
         </div>
       </div>
+
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleFileChange}
+        className="hidden"
+      />
 
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">

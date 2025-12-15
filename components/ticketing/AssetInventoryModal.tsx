@@ -250,10 +250,10 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
+    <>
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-60 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
+        <div className={`fixed top-4 right-4 z-[9999] px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
           toast.type === 'success'
             ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
             : 'bg-red-500/10 border border-red-500/20 text-red-400'
@@ -267,16 +267,23 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
         </div>
       )}
 
-      <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700">
-        <div className="flex justify-between items-center p-4 border-b border-slate-700">
-          <h2 className="text-xl font-bold text-white">
-            {isViewingDetail ? 'Asset Details' : (editItem ? 'Edit Asset' : 'Add New Asset')}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors">
-            <X size={24} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <div
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm flex justify-center items-center z-[9998] p-4 overflow-y-auto"
+        onClick={onClose}
+      >
+        <div
+          className="bg-slate-900 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-700 my-8 max-h-[90vh] flex flex-col"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center p-4 sm:p-6 border-b border-slate-700 flex-shrink-0">
+            <h2 className="text-lg sm:text-xl font-bold text-white">
+              {isViewingDetail ? 'Asset Details' : (editItem ? 'Edit Asset' : 'Add New Asset')}
+            </h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-white transition-colors p-1">
+              <X size={24} />
+            </button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
           {/* Category Autocomplete */}
           <div ref={categoryRef} className="relative">
             <label htmlFor="category" className="block text-sm font-medium text-slate-300 mb-1">Category</label>
@@ -298,7 +305,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
               />
             )}
             {showCategoryDropdown && !isViewingDetail && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {categories
                   .filter(c => !category || c.name.toLowerCase().includes(category.toLowerCase()))
                   .map((cat) => (
@@ -343,7 +350,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
               />
             )}
             {showBrandDropdown && !isViewingDetail && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {brands
                   .filter(b => !brand || b.name.toLowerCase().includes(brand.toLowerCase()))
                   .map((brd) => (
@@ -387,7 +394,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
               />
             )}
             {showModelDropdown && !isViewingDetail && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+              <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
                 {models
                   .filter(m => !model || m.name.toLowerCase().includes(model.toLowerCase()))
                   .map((mdl) => (
@@ -485,7 +492,7 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                 id="warrantyDate"
                 value={warrantyDate}
                 onChange={(e) => setWarrantyDate(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
               />
             )}
           </div>
@@ -507,19 +514,19 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           )}
 
           {!isViewingDetail && (
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-700 mt-6 flex-shrink-0">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                className="w-full sm:w-auto px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -533,19 +540,20 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             </div>
           )}
           {isViewingDetail && (
-            <div className="flex justify-end">
+            <div className="flex justify-end pt-4 border-t border-slate-700 mt-6 flex-shrink-0">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors"
+                className="w-full sm:w-auto px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
               >
                 Close
               </button>
             </div>
           )}
         </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 
