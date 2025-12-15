@@ -14,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
 import { useRouter } from 'next/navigation';
+import { formatInTimeZone } from 'date-fns-tz';
 
 const EmployeeDashboard: React.FC = () => {
   const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
@@ -131,7 +132,9 @@ const EmployeeDashboard: React.FC = () => {
     if (!user?.id) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
+      // Use Philippine timezone for date calculation to ensure consistency
+      const PHILIPPINE_TZ = 'Asia/Manila';
+      const today = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'yyyy-MM-dd');
       const { data, error } = await supabase
         .from('overtime')
         .select('id, comment, status, attendance!inner(date, user_id)')

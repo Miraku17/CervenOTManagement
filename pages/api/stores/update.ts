@@ -8,7 +8,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, store_name, store_code, store_type, contact_no, city, location, group, managers } = req.body;
+  const { id, store_name, store_code, store_type, contact_no, city, location, group, managers, status } = req.body;
 
   if (!id) {
     return res.status(400).json({ error: 'Store ID is required.' });
@@ -30,6 +30,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         city,
         location,
         group,
+        status,
       })
       .eq('id', id)
       .select()

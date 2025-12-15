@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { formatInTimeZone } from 'date-fns-tz';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -32,7 +33,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    const today = new Date().toISOString().split('T')[0];
+    // Use Philippine timezone for date calculation to ensure consistency
+    const PHILIPPINE_TZ = 'Asia/Manila';
+    const today = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'yyyy-MM-dd');
 
     // Fetch all active sessions where date is NOT today
     const { data: staleSessions, error } = await supabase

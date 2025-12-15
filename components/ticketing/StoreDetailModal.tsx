@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Edit2, Save, Store as StoreIcon, MapPin, Phone, User, Calendar, Trash2 } from 'lucide-react';
+import { X, Edit2, Save, Store as StoreIcon, MapPin, Phone, User, Calendar, Trash2, CheckCircle } from 'lucide-react';
 import { Store } from '@/types';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
@@ -21,6 +21,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
     location: '',
     group: '',
     managers: '',
+    status: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,7 +31,7 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (store) {
+    if (store && isOpen) {
       setFormData({
         store_name: store.store_name,
         store_code: store.store_code,
@@ -40,11 +41,12 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
         location: store.location || '',
         group: store.group || '',
         managers: Array.isArray(store.managers) ? store.managers.join(', ') : store.managers || '',
+        status: store.status || '',
       });
       setIsEditing(false);
       setError(null);
     }
-  }, [store, isOpen]);
+  }, [store?.id, isOpen]);
 
   if (!isOpen || !store) return null;
 
@@ -211,15 +213,27 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-1.5">Store Type</label>
-                <input
-                    type="text"
-                    value={formData.store_type}
-                    onChange={(e) => setFormData({ ...formData, store_type: e.target.value })}
-                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                    placeholder="e.g. Retail, Warehouse"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Store Type</label>
+                    <input
+                        type="text"
+                        value={formData.store_type}
+                        onChange={(e) => setFormData({ ...formData, store_type: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        placeholder="e.g. Retail, Warehouse"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Status</label>
+                    <input
+                        type="text"
+                        value={formData.status}
+                        onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                        placeholder="e.g. Active, Inactive"
+                    />
+                  </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -284,6 +298,21 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                                     <div>
                                         <p className="text-xs text-slate-500 mb-1">Store Type</p>
                                         <p className="text-slate-300">{store.store_type || 'Not specified'}</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-start gap-3">
+                                    <CheckCircle className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">Status</p>
+                                        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium ${
+                                          store.status === 'Active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' :
+                                          store.status === 'Inactive' ? 'bg-gray-500/10 text-gray-400 border border-gray-500/20' :
+                                          store.status === 'Closed' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
+                                          store.status === 'Under Renovation' ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20' :
+                                          'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                        }`}>
+                                          {store.status || 'Not specified'}
+                                        </span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
