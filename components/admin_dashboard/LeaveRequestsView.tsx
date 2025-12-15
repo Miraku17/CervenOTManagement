@@ -3,6 +3,7 @@ import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown } fro
 import { useAuth } from '@/hooks/useAuth';
 import { differenceInDays, parseISO } from 'date-fns';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -52,6 +53,8 @@ const LeaveRequestsView: React.FC = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     fetchRequests();
@@ -326,6 +329,16 @@ const LeaveRequestsView: React.FC = () => {
     }
   };
 
+  const handleRowClick = (request: LeaveRequest) => {
+    setSelectedRequest(request);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedRequest(null);
+  };
+
   if (isLoading && requests.length === 0) {
      return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -472,7 +485,11 @@ const LeaveRequestsView: React.FC = () => {
                    const initials = `${request.employee.first_name[0]}${request.employee.last_name[0]}`;
                    
                    return (
-                  <tr key={request.id} className="hover:bg-slate-800/30 transition-colors">
+                  <tr
+                    key={request.id}
+                    className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                    onClick={() => handleRowClick(request)}
+                  >
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
@@ -526,7 +543,10 @@ const LeaveRequestsView: React.FC = () => {
                       {request.status === 'pending' && (
                         <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => handleApprove(request.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleApprove(request.id);
+                            }}
                             disabled={processingId !== null}
                             className={`p-1.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Approve"
@@ -538,7 +558,10 @@ const LeaveRequestsView: React.FC = () => {
                             )}
                           </button>
                           <button
-                            onClick={() => handleReject(request.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleReject(request.id);
+                            }}
                             disabled={processingId !== null}
                             className={`p-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
                             title="Reject"
@@ -560,6 +583,13 @@ const LeaveRequestsView: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Leave Request Detail Modal */}
+      <LeaveRequestDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseModal}
+        request={selectedRequest}
+      />
     </div>
   );
 };

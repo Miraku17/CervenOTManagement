@@ -3,6 +3,7 @@ import { Calendar, CheckCircle, XCircle, Clock, AlertCircle, Filter, CalendarDay
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 import { differenceInDays, parseISO } from 'date-fns';
+import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
 
 interface LeaveRequest {
   id: string;
@@ -29,6 +30,8 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -97,6 +100,16 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
     if (filter === 'all') return true;
     return req.status === filter;
   });
+
+  const handleRowClick = (request: LeaveRequest) => {
+    setSelectedRequest(request);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedRequest(null);
+  };
 
   if (isLoading) {
     return (
@@ -168,7 +181,11 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
                 {filteredRequests.map((request) => {
                   const duration = calculateDuration(request.start_date, request.end_date);
                   return (
-                    <tr key={request.id} className="hover:bg-slate-800/30 transition-colors">
+                    <tr
+                      key={request.id}
+                      className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                      onClick={() => handleRowClick(request)}
+                    >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-medium text-blue-300">
                           {request.leave_type}
@@ -220,9 +237,10 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
             {filteredRequests.map((request) => {
               const duration = calculateDuration(request.start_date, request.end_date);
               return (
-                <div 
+                <div
                   key={request.id}
-                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors"
+                  className="bg-slate-900/50 border border-slate-800 rounded-xl p-5 hover:border-slate-700 transition-colors cursor-pointer"
+                  onClick={() => handleRowClick(request)}
                 >
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-2">
@@ -286,6 +304,13 @@ const LeaveRequestHistory: React.FC<LeaveRequestHistoryProps> = ({ refreshTrigge
           </div>
         </>
       )}
+
+      {/* Leave Request Detail Modal */}
+      <LeaveRequestDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseModal}
+        request={selectedRequest}
+      />
     </div>
   );
 };
