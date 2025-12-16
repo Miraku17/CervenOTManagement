@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown } from 'lucide-react';
+import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { differenceInDays, parseISO } from 'date-fns';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
 import { UploadLeaveCreditsModal } from '@/components/admin_dashboard/UploadLeaveCreditsModal';
 import { QuickUpdateLeaveCreditsModal } from '@/components/admin_dashboard/QuickUpdateLeaveCreditsModal';
+import { ViewLeaveCreditsModal } from '@/components/admin_dashboard/ViewLeaveCreditsModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -59,6 +60,7 @@ const LeaveRequestsView: React.FC = () => {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isQuickUpdateModalOpen, setIsQuickUpdateModalOpen] = useState(false);
+  const [isViewCreditsModalOpen, setIsViewCreditsModalOpen] = useState(false);
   const [showLeaveCreditsDropdown, setShowLeaveCreditsDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -416,6 +418,19 @@ const LeaveRequestsView: React.FC = () => {
               <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
                 <button
                   onClick={() => {
+                    setIsViewCreditsModalOpen(true);
+                    setShowLeaveCreditsDropdown(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800 transition-colors text-white border-b border-slate-800"
+                >
+                  <Eye size={18} className="text-blue-400" />
+                  <div>
+                    <p className="font-medium">View Leave Credits</p>
+                    <p className="text-xs text-slate-400">See all employees</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
                     setIsQuickUpdateModalOpen(true);
                     setShowLeaveCreditsDropdown(false);
                   }}
@@ -678,6 +693,12 @@ const LeaveRequestsView: React.FC = () => {
         isOpen={isQuickUpdateModalOpen}
         onClose={() => setIsQuickUpdateModalOpen(false)}
         onSuccess={handleUploadSuccess}
+      />
+
+      {/* View Leave Credits Modal */}
+      <ViewLeaveCreditsModal
+        isOpen={isViewCreditsModalOpen}
+        onClose={() => setIsViewCreditsModalOpen(false)}
       />
     </div>
   );
