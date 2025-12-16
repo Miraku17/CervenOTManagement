@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { WorkLog } from '@/types';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, ArrowRight, History } from 'lucide-react';
 
 interface CalendarViewProps {
   logs: WorkLog[];
@@ -11,10 +11,6 @@ interface CalendarViewProps {
 export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, activeLog }) => {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
-  
-  // Store monthly summaries: date string -> total_minutes_final
-  const [monthlySummaries, setMonthlySummaries] = useState<Record<string, number>>({});
-  const [isLoadingMonth, setIsLoadingMonth] = useState(false);
 
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -23,44 +19,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
   useEffect(() => {
     setHasMounted(true);
   }, []);
-
-  // Fetch monthly summaries when view changes
-  useEffect(() => {
-    const fetchMonthlySummaries = async () => {
-      if (!userId) return;
-
-      setIsLoadingMonth(true);
-      
-      // Calculate start and end date of the view month
-      // Start: 1st day of month
-      const startDateObj = new Date(viewYear, viewMonth, 1);
-      const startDate = `${startDateObj.getFullYear()}-${String(startDateObj.getMonth() + 1).padStart(2, '0')}-${String(startDateObj.getDate()).padStart(2, '0')}`;
-      
-      // End: Last day of month
-      const endDateObj = new Date(viewYear, viewMonth + 1, 0);
-      const endDate = `${endDateObj.getFullYear()}-${String(endDateObj.getMonth() + 1).padStart(2, '0')}-${String(endDateObj.getDate()).padStart(2, '0')}`;
-
-      try {
-        const response = await fetch(`/api/attendance/daily-summary?userId=${userId}&startDate=${startDate}&endDate=${endDate}`);
-        
-        if (response.ok) {
-           const data = await response.json();
-           const summaries = data.summaries || [];
-           const map: Record<string, number> = {};
-           summaries.forEach((s: any) => {
-               map[s.work_date] = s.total_minutes_final;
-           });
-           setMonthlySummaries(prev => ({...prev, ...map}));
-        }
-      } catch (e) {
-        console.error("Failed to fetch monthly summaries", e);
-      } finally {
-        setIsLoadingMonth(false);
-      }
-    };
-
-    fetchMonthlySummaries();
-  }, [viewMonth, viewYear, userId]);
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay(); // 0 is Sunday
@@ -81,6 +39,19 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       return (logsByDate[date] || []).reduce((acc, log) => acc + log.durationSeconds, 0);
   };
 
+  // Apply lunch deduction: subtract 1 hour if total > 5 hours
+  const getAdjustedDailySeconds = (date: string) => {
+      const totalSeconds = getDailyTotalSeconds(date);
+      const FIVE_HOURS = 5 * 3600; // 5 hours in seconds
+      const ONE_HOUR = 3600; // 1 hour in seconds
+
+      // Deduct 1 hour for lunch if worked more than 5 hours
+      if (totalSeconds > FIVE_HOURS) {
+          return totalSeconds - ONE_HOUR;
+      }
+      return totalSeconds;
+  };
+
   const isDateActive = (date: string) => {
       return activeLog && activeLog.date === date && activeLog.status === 'IN_PROGRESS';
   };
@@ -90,19 +61,15 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       if (isDateActive(date)) {
           return 'Active';
       }
-      // Check if we have a summary from API
-      if (monthlySummaries[date] !== undefined) {
-          return (monthlySummaries[date] / 60).toFixed(1);
-      }
-      // Fallback to logs calculation
-      const totalSeconds = getDailyTotalSeconds(date);
-      return (totalSeconds / 3600).toFixed(1);
+      // Calculate from actual attendance records with lunch deduction
+      const adjustedSeconds = getAdjustedDailySeconds(date);
+      return (adjustedSeconds / 3600).toFixed(1);
   };
 
   const hasWorkForDate = (date: string) => {
        // Check if date has active session
        if (isDateActive(date)) return true;
-       if (monthlySummaries[date] !== undefined && monthlySummaries[date] > 0) return true;
+       // Check if date has any completed work logs
        return getDailyTotalSeconds(date) > 0;
   };
 
@@ -206,12 +173,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       return "Active";
     }
 
-    if (monthlySummaries[selectedDate] !== undefined) {
-      return (monthlySummaries[selectedDate] / 60).toFixed(2);
-    }
-
-    return (getDailyTotalSeconds(selectedDate) / 3600).toFixed(2);
-  }, [monthlySummaries, selectedDate, logsByDate, activeLog]);
+    // Calculate from actual attendance records with lunch deduction
+    return (getAdjustedDailySeconds(selectedDate) / 3600).toFixed(2);
+  }, [selectedDate, logsByDate, activeLog]);
 
   return (
     <>
@@ -220,7 +184,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
                 <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
                     <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
                     Work Calendar
-                    {isLoadingMonth && <Loader2 className="w-4 h-4 animate-spin text-slate-500 ml-2" />}
                 </h3>
                 <div className="flex items-center gap-3 sm:gap-4 text-slate-400 text-xs sm:text-sm w-full sm:w-auto justify-between sm:justify-start">
                    <span className="font-medium">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
@@ -372,8 +335,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
                     </div>
 
                     <div className="p-3 sm:p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
-                        <span className="text-slate-400 text-xs sm:text-sm font-medium">Total Hours</span>
-                         {/* Using data from monthly fetch, no loading spinner needed here as it should be ready if date is selectable */}
+                        <span className="text-slate-400 text-xs sm:text-sm font-medium">Actual Total Hours</span>
+                         {/* Calculated from actual attendance records */}
                          <span className={`text-lg sm:text-xl font-bold font-mono ${isDateActive(selectedDate) ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`}>
                                 {displayTotalHoursModal} {!isDateActive(selectedDate) && <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>}
                         </span>
