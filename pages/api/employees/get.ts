@@ -27,6 +27,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const formattedEmployees = (employees || []).map((emp: any) => ({
       id: emp.id,
       employee_id: emp.employee_id || 'N/A',
+      first_name: emp.first_name || '',
+      last_name: emp.last_name || '',
       firstName: emp.first_name || '',
       lastName: emp.last_name || '',
       fullName: `${emp.first_name || ''} ${emp.last_name || ''}`.trim() || emp.email,
@@ -39,6 +41,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${emp.first_name}+${emp.last_name}`,
       status: 'Active', // Default status
       role: emp.role,
+      leave_credits: emp.leave_credits || 0,
     }));
 
     return res.status(200).json({ employees: formattedEmployees });

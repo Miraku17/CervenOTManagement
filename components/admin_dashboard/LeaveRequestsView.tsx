@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { differenceInDays, parseISO } from 'date-fns';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
+import { UploadLeaveCreditsModal } from '@/components/admin_dashboard/UploadLeaveCreditsModal';
+import { QuickUpdateLeaveCreditsModal } from '@/components/admin_dashboard/QuickUpdateLeaveCreditsModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -55,9 +57,25 @@ const LeaveRequestsView: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<LeaveRequest | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isQuickUpdateModalOpen, setIsQuickUpdateModalOpen] = useState(false);
+  const [showLeaveCreditsDropdown, setShowLeaveCreditsDropdown] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchRequests();
+  }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowLeaveCreditsDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const fetchRequests = async () => {
@@ -339,6 +357,14 @@ const LeaveRequestsView: React.FC = () => {
     setSelectedRequest(null);
   };
 
+  const handleUploadSuccess = () => {
+    // Optionally refresh the page or show a success message
+    // You might want to refetch employee data if the leave credits are displayed
+  };
+
+  // Check if the current user is Operations Manager
+  const isOperationsManager = user?.position === 'Operations Manager';
+
   if (isLoading && requests.length === 0) {
      return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
@@ -367,49 +393,96 @@ const LeaveRequestsView: React.FC = () => {
         />
       </ConfirmModal>
 
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-white">Leave Requests</h2>
           <p className="text-slate-400 mt-1">Manage employee leave applications</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-            <input
-              type="text"
-              placeholder="Search employee..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-64 bg-slate-950 border border-slate-700 text-slate-200 pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-slate-500"
-            />
-          </div>
+        {isOperationsManager && (
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setShowLeaveCreditsDropdown(!showLeaveCreditsDropdown)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors shadow-lg"
+            >
+              <Upload size={18} />
+              <span className="whitespace-nowrap">Manage Leave Credits</span>
+              <ChevronDown size={18} className={`transition-transform ${showLeaveCreditsDropdown ? 'rotate-180' : ''}`} />
+            </button>
 
-          <div className="flex gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
-            {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                  filter === f
-                    ? 'bg-blue-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
-                }`}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
+            {/* Dropdown Menu */}
+            {showLeaveCreditsDropdown && (
+              <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 overflow-hidden">
+                <button
+                  onClick={() => {
+                    setIsQuickUpdateModalOpen(true);
+                    setShowLeaveCreditsDropdown(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800 transition-colors text-white border-b border-slate-800"
+                >
+                  <Edit3 size={18} className="text-emerald-400" />
+                  <div>
+                    <p className="font-medium">Quick Update</p>
+                    <p className="text-xs text-slate-400">Update single employee</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => {
+                    setIsUploadModalOpen(true);
+                    setShowLeaveCreditsDropdown(false);
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-800 transition-colors text-white"
+                >
+                  <Upload size={18} className="text-purple-400" />
+                  <div>
+                    <p className="font-medium">Bulk Upload</p>
+                    <p className="text-xs text-slate-400">Upload Excel file</p>
+                  </div>
+                </button>
+              </div>
+            )}
           </div>
+        )}
+      </div>
+
+      {/* Search and Filter Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="relative flex-1 sm:max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+          <input
+            type="text"
+            placeholder="Search employee..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-slate-950 border border-slate-700 text-slate-200 pl-9 pr-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm placeholder-slate-500"
+          />
+        </div>
+
+        <div className="flex gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
+          {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                filter === f
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {f.charAt(0).toUpperCase() + f.slice(1)}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Export Section */}
-      <div className="bg-slate-800/50 p-6 rounded-xl border border-slate-700/50">
+      <div className="bg-slate-800/50 p-4 sm:p-6 rounded-xl border border-slate-700/50">
         <div className="flex items-center gap-3 mb-4">
           <FileDown className="w-5 h-5 text-blue-500" />
-          <h3 className="text-lg font-semibold text-white">Export Leave Requests Report</h3>
+          <h3 className="text-base sm:text-lg font-semibold text-white">Export Leave Requests Report</h3>
         </div>
-        <div className="flex flex-col lg:flex-row gap-4 items-end">
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
           <div className="flex-1">
             <label className="block text-sm font-medium text-slate-400 mb-2">Start Date</label>
             <input
@@ -428,25 +501,27 @@ const LeaveRequestsView: React.FC = () => {
               className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
             />
           </div>
-          <button
-            onClick={handleExportPDF}
-            disabled={isExporting}
-            className={`px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2 shadow-lg ${
-              isExporting ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {isExporting ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Exporting...
-              </>
-            ) : (
-              <>
-                <FileDown size={18} />
-                Export PDF
-              </>
-            )}
-          </button>
+          <div className="sm:self-end">
+            <button
+              onClick={handleExportPDF}
+              disabled={isExporting}
+              className={`w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg ${
+                isExporting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="whitespace-nowrap">Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <FileDown size={18} />
+                  <span className="whitespace-nowrap">Export PDF</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -589,6 +664,20 @@ const LeaveRequestsView: React.FC = () => {
         isOpen={isDetailModalOpen}
         onClose={handleCloseModal}
         request={selectedRequest}
+      />
+
+      {/* Upload Leave Credits Modal */}
+      <UploadLeaveCreditsModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onSuccess={handleUploadSuccess}
+      />
+
+      {/* Quick Update Leave Credits Modal */}
+      <QuickUpdateLeaveCreditsModal
+        isOpen={isQuickUpdateModalOpen}
+        onClose={() => setIsQuickUpdateModalOpen(false)}
+        onSuccess={handleUploadSuccess}
       />
     </div>
   );
