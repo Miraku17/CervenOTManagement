@@ -144,10 +144,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       };
     });
 
+    // Apply lunch deduction: subtract 1 hour (60 minutes) if total > 5 hours (300 minutes)
+    let actualTotalMinutes = totalMinutes;
+    const FIVE_HOURS_IN_MINUTES = 300;
+    const ONE_HOUR_IN_MINUTES = 60;
+
+    if (totalMinutes > FIVE_HOURS_IN_MINUTES) {
+      actualTotalMinutes = totalMinutes - ONE_HOUR_IN_MINUTES;
+    }
+
     return res.status(200).json({
       date: date,
       sessions: formattedSessions,
-      totalHours: totalMinutes > 0 ? (totalMinutes / 60).toFixed(2) : null,
+      totalHours: actualTotalMinutes > 0 ? (actualTotalMinutes / 60).toFixed(2) : null,
       status: hasActiveSession ? 'In Progress' : 'Completed',
       sessionCount: formattedSessions.length
     });

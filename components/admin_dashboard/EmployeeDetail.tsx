@@ -463,7 +463,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         {/* Summary Section */}
                         <div className="grid grid-cols-3 gap-4 mb-6">
                           <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-center">
-                            <p className="text-xs text-slate-500 uppercase font-medium mb-1">Total Hours</p>
+                            <p className="text-xs text-slate-500 uppercase font-medium mb-1">Actual Total Hours</p>
                             <p className="text-2xl font-bold text-emerald-400">
                               {attendanceData.totalHours ? `${attendanceData.totalHours} hrs` : '--'}
                             </p>
