@@ -32,12 +32,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     });
   }
 
-  const { attendanceId, timeIn, timeOut, overtimeComment, overtimeStatus, overtimeRequestId, adminId } = req.body;
+  const { attendanceId, timeIn, timeOut, isMarkedAsOvertime, overtimeComment, overtimeStatus, overtimeRequestId, adminId } = req.body;
 
   console.log('Update Time Request Body:', {
     attendanceId,
     timeIn,
     timeOut,
+    isMarkedAsOvertime,
     overtimeComment,
     overtimeStatus,
     overtimeRequestId,
@@ -71,8 +72,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (error) throw error;
 
-    // Handle overtime comment and status update
-    if (overtimeComment !== undefined || overtimeStatus !== undefined) {
+    // Handle overtime marking and updates
+    if (isMarkedAsOvertime === false && overtimeRequestId) {
+      // If session is unmarked as overtime, delete the overtime request
+      console.log('Deleting overtime request:', overtimeRequestId);
+      await supabase
+        .from('overtime')
+        .delete()
+        .eq('id', overtimeRequestId);
+
+      // Reset is_overtime_approved in attendance table
+      await supabase
+        .from('attendance')
+        .update({ is_overtime_approved: false })
+        .eq('id', attendanceId);
+
+    } else if (isMarkedAsOvertime === true) {
+      // Session is marked as overtime
       if (overtimeRequestId) {
         // Update existing overtime request
         const updates: any = {
@@ -127,8 +143,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             console.log('Successfully updated is_overtime_approved:', attendanceUpdateData);
           }
         }
-      } else if (overtimeComment) {
-        // Create new overtime request if comment is provided
+      } else {
+        // Create new overtime request
         const { data: attendanceData } = await supabase
           .from('attendance')
           .select('user_id')
@@ -136,15 +152,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .single();
 
         if (attendanceData) {
-          await supabase
+          const { data: newOvertimeRequest } = await supabase
             .from('overtime')
             .insert({
               attendance_id: attendanceId,
               requested_by: attendanceData.user_id,
-              comment: overtimeComment,
+              comment: overtimeComment || null,
               status: overtimeStatus || 'pending',
               requested_at: new Date().toISOString()
-            });
+            })
+            .select()
+            .single();
+
+          console.log('Created new overtime request:', newOvertimeRequest);
+
+          // Update is_overtime_approved if status is approved
+          if (overtimeStatus === 'approved') {
+            await supabase
+              .from('attendance')
+              .update({ is_overtime_approved: true })
+              .eq('id', attendanceId);
+          }
         }
       }
     }

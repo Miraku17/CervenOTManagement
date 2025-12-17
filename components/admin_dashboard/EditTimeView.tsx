@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Clock, Save, User, AlertCircle } from "lucide-react";
+import { Search, Calendar, Clock, Save, User, AlertCircle, CheckCircle } from "lucide-react";
 import { Employee } from "@/types";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/useUser";
@@ -49,6 +49,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     timeOut: string;
     overtimeComment: string;
     overtimeStatus: 'pending' | 'approved' | 'rejected';
+    isMarkedAsOvertime: boolean;
   }>>(new Map());
 
   // Filter employees based on search
@@ -108,7 +109,8 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
             timeIn: formatDatetimeLocal(session.time_in),
             timeOut: formatDatetimeLocal(session.time_out),
             overtimeComment: session.overtimeRequest?.comment || "",
-            overtimeStatus: session.overtimeRequest?.status || 'pending'
+            overtimeStatus: session.overtimeRequest?.status || 'pending',
+            isMarkedAsOvertime: !!session.overtimeRequest
           });
         });
         setEditedSessions(newEditedSessions);
@@ -143,8 +145,9 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
           attendanceId: sessionId,
           timeIn: editedData.timeIn,
           timeOut: editedData.timeOut || null,
-          overtimeComment: editedData.overtimeComment || null,
-          overtimeStatus: editedData.overtimeStatus,
+          isMarkedAsOvertime: editedData.isMarkedAsOvertime,
+          overtimeComment: editedData.isMarkedAsOvertime ? (editedData.overtimeComment || null) : null,
+          overtimeStatus: editedData.isMarkedAsOvertime ? editedData.overtimeStatus : null,
           overtimeRequestId: session.overtimeRequest?.id || null,
           adminId: user?.id || null,
         }),
@@ -173,11 +176,49 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
         timeIn: "",
         timeOut: "",
         overtimeComment: "",
-        overtimeStatus: 'pending' as const
+        overtimeStatus: 'pending' as const,
+        isMarkedAsOvertime: false
       };
       newMap.set(sessionId, { ...session, [field]: value });
       return newMap;
     });
+  };
+
+  const handleToggleOvertime = (sessionId: string, currentValue: boolean) => {
+    // If trying to mark as overtime, check if another session is already marked
+    if (!currentValue) {
+      const hasOtherOvertimeSession = Array.from(editedSessions.entries()).some(
+        ([id, data]) => id !== sessionId && data.isMarkedAsOvertime
+      );
+
+      if (hasOtherOvertimeSession) {
+        setMessage({
+          type: "error",
+          text: "Only one session per day can be marked as overtime. Please unmark the other session first."
+        });
+        return;
+      }
+    }
+
+    // Toggle the overtime marking
+    setEditedSessions(prev => {
+      const newMap = new Map(prev);
+      const session = newMap.get(sessionId);
+      if (session) {
+        newMap.set(sessionId, {
+          ...session,
+          isMarkedAsOvertime: !currentValue,
+          // Reset overtime fields if unmarking
+          ...(!currentValue ? {} : { overtimeComment: "", overtimeStatus: 'pending' as const })
+        });
+      }
+      return newMap;
+    });
+
+    // Clear any error messages when successfully toggling
+    if (!currentValue) {
+      setMessage(null);
+    }
   };
 
   return (
@@ -378,6 +419,38 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                         )}
 
                         <div className="space-y-4">
+                          {/* Mark as Overtime Toggle */}
+                          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <Clock className="w-4 h-4 text-amber-400" />
+                                  <h4 className="text-sm font-semibold text-white">Mark as Overtime</h4>
+                                </div>
+                                <p className="text-xs text-slate-400">
+                                  Only one session per day can be marked as overtime
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleToggleOvertime(session.id, editedData.isMarkedAsOvertime)}
+                                disabled={!hasTimeOut}
+                                className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
+                                  editedData.isMarkedAsOvertime ? 'bg-amber-500' : 'bg-slate-700'
+                                }`}
+                              >
+                                <span
+                                  className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                                    editedData.isMarkedAsOvertime ? 'translate-x-7' : 'translate-x-1'
+                                  }`}
+                                >
+                                  {editedData.isMarkedAsOvertime && (
+                                    <CheckCircle className="w-4 h-4 text-amber-500 m-1" />
+                                  )}
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+
                           {/* Time In */}
                           <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -407,7 +480,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                           </div>
 
                           {/* Overtime Status */}
-                          {session.overtimeRequest && (
+                          {editedData.isMarkedAsOvertime && (
                             <div>
                               <label className="block text-sm font-medium text-slate-300 mb-2">
                                 Overtime Status
@@ -416,7 +489,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                                 value={editedData.overtimeStatus}
                                 onChange={(e) => updateSessionField(session.id, 'overtimeStatus', e.target.value)}
                                 disabled={!hasTimeOut}
-                                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.5rem] bg-[right_0.5rem_center] bg-no-repeat pr-12"
                               >
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
@@ -426,24 +499,26 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                           )}
 
                           {/* Overtime Comment */}
-                          <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                              Overtime Comment
-                            </label>
-                            <textarea
-                              value={editedData.overtimeComment}
-                              onChange={(e) => updateSessionField(session.id, 'overtimeComment', e.target.value)}
-                              disabled={!hasTimeOut}
-                              placeholder="Add overtime comment..."
-                              rows={3}
-                              className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
-                            />
-                            {!session.overtimeRequest && editedData.overtimeComment && (
-                              <p className="text-xs text-slate-500 mt-1">
-                                Adding a comment will create a new overtime request
-                              </p>
-                            )}
-                          </div>
+                          {editedData.isMarkedAsOvertime && (
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Overtime Comment
+                              </label>
+                              <textarea
+                                value={editedData.overtimeComment}
+                                onChange={(e) => updateSessionField(session.id, 'overtimeComment', e.target.value)}
+                                disabled={!hasTimeOut}
+                                placeholder="Add overtime comment..."
+                                rows={3}
+                                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+                              />
+                              {!session.overtimeRequest && editedData.overtimeComment && (
+                                <p className="text-xs text-slate-500 mt-1">
+                                  This will create a new overtime request
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Save Button */}
                           <button
