@@ -23,6 +23,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         warranty_date,
         created_at,
         updated_at,
+        created_by,
+        updated_by,
         categories:category_id (
           id,
           name
@@ -36,13 +38,46 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           name
         )
       `)
+      .is('deleted_at', null) // Only fetch non-deleted assets
       .order('created_at', { ascending: false });
 
     if (error) throw error;
 
+    // Fetch user details separately for created_by and updated_by
+    const assetsWithUsers = await Promise.all(
+      (assets || []).map(async (asset) => {
+        let created_by_user = null;
+        let updated_by_user = null;
+
+        if (asset.created_by) {
+          const { data: creator } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', asset.created_by)
+            .single();
+          created_by_user = creator;
+        }
+
+        if (asset.updated_by) {
+          const { data: updater } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', asset.updated_by)
+            .single();
+          updated_by_user = updater;
+        }
+
+        return {
+          ...asset,
+          created_by_user,
+          updated_by_user,
+        };
+      })
+    );
+
     return res.status(200).json({
-      assets: assets || [],
-      count: assets?.length || 0,
+      assets: assetsWithUsers || [],
+      count: assetsWithUsers?.length || 0,
     });
   } catch (error: any) {
     console.error('Error fetching assets:', error);

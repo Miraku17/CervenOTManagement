@@ -9,9 +9,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const { id, category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status } = req.body;
+  let userId = req.user?.id;
+
+  // Debug logging
+  console.log('Update - Auth user:', req.user);
+  console.log('Update - User ID:', userId);
 
   if (!id || !category_id || !brand_id) {
     return res.status(400).json({ error: 'ID, category, and brand are required' });
+  }
+
+  if (!userId) {
+    console.error('Update - No user ID found in request');
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   try {
@@ -20,24 +30,45 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    
-    const { data: asset, error: updateError } = await supabaseAdmin
+    const updateData = {
+      category_id,
+      brand_id,
+      model_id: model_id || null,
+      serial_number: serial_number || null,
+      under_warranty: under_warranty !== undefined ? under_warranty : false,
+      warranty_date: warranty_date || null,
+      status: status || undefined, // Only update if provided
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    };
+
+    console.log('Updating asset with data:', updateData);
+
+    const { error: updateError } = await supabaseAdmin
       .from('asset_inventory')
-      .update({
-        category_id,
-        brand_id,
-        model_id: model_id || null,
-        serial_number: serial_number || null,
-        under_warranty: under_warranty !== undefined ? under_warranty : false,
-        warranty_date: warranty_date || null,
-        status: status || undefined, // Only update if provided
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
+      .eq('id', id);
+
+    if (updateError) {
+      console.error('Update error:', updateError);
+      throw updateError;
+    }
+
+    console.log('Asset updated, fetching complete record...');
+
+    // Fetch the complete asset record including audit fields
+    const { data: asset, error: fetchError } = await supabaseAdmin
+      .from('asset_inventory')
+      .select('*')
       .eq('id', id)
-      .select()
       .single();
 
-    if (updateError) throw updateError;
+    if (fetchError) {
+      console.error('Fetch error:', fetchError);
+      throw fetchError;
+    }
+
+    console.log('Asset updated with full data:', asset);
 
     return res.status(200).json({
       message: 'Asset updated successfully',

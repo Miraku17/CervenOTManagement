@@ -9,9 +9,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const { id } = req.body;
+  const userId = req.user?.id;
 
   if (!id) {
     return res.status(400).json({ error: 'Asset ID is required' });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   try {
@@ -20,23 +25,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    
-    // First, delete any references in store_inventory (Manual Cascade)
-    const { error: storeDeleteError } = await supabaseAdmin
-      .from('store_inventory')
-      .delete()
-      .eq('asset_id', id);
 
-    if (storeDeleteError) {
-      console.error('Error deleting associated store inventory items:', storeDeleteError);
-      throw new Error('Failed to clean up store inventory associations');
-    }
-
-    // Then delete the asset itself
+    // Soft delete: Update the asset with deleted_at and deleted_by
     const { error } = await supabaseAdmin
       .from('asset_inventory')
-      .delete()
-      .eq('id', id);
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+      })
+      .eq('id', id)
+      .is('deleted_at', null); // Only soft delete if not already deleted
 
     if (error) throw error;
 
