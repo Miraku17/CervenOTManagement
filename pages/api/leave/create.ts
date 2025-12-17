@@ -31,22 +31,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'End date must be after start date.' });
     }
 
-    // 2. Check Leave Credits
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('leave_credits')
-      .eq('id', userId)
-      .single();
+    // 2. Check Leave Credits (skip for Leave Without Pay)
+    if (type !== 'Leave Without Pay') {
+      const { data: profile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .select('leave_credits')
+        .eq('id', userId)
+        .single();
 
-    if (profileError) {
-      throw new Error('Failed to fetch user profile.');
-    }
+      if (profileError) {
+        throw new Error('Failed to fetch user profile.');
+      }
 
-    const currentCredits = profile.leave_credits || 0;
-    if (currentCredits < duration) {
-      return res.status(400).json({ 
-        error: `Insufficient leave credits. You have ${currentCredits} credits but requested ${duration} days.` 
-      });
+      const currentCredits = profile.leave_credits || 0;
+      if (currentCredits < duration) {
+        return res.status(400).json({
+          error: `Insufficient leave credits. You have ${currentCredits} credits but requested ${duration} days. You can leave without pay.`
+        });
+      }
     }
 
     // 3. Check for Overlapping Approved Requests

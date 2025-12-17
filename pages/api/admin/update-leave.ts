@@ -42,10 +42,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Request is already processed.' });
     }
 
-    // 2. If approving, deduct leave credits
-    if (newStatus === 'approved') {
+    // 2. If approving, deduct leave credits (skip for Leave Without Pay)
+    if (newStatus === 'approved' && request.leave_type !== 'Leave Without Pay') {
       const duration = differenceInDays(parseISO(request.end_date), parseISO(request.start_date)) + 1;
-      
+
       // Fetch current credits
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('profiles')
@@ -56,7 +56,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (profileError) throw profileError;
 
       const currentCredits = profile.leave_credits || 0;
-      
+
       // Deduct credits
       const { error: updateProfileError } = await supabaseAdmin
         .from('profiles')
