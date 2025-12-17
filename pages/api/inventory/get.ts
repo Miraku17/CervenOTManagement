@@ -21,6 +21,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         id,
         created_at,
         updated_at,
+        created_by,
+        updated_by,
         stores:store_id (
           id,
           store_name,
@@ -50,6 +52,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           )
         )
       `)
+      .is('deleted_at', null) // Only fetch non-deleted items
       .order('created_at', { ascending: false });
 
     // Apply filters if provided
@@ -61,7 +64,41 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.eq('station_id', station_id);
     }
 
-    const { data: inventoryItems, error } = await query;
+    const { data: items, error } = await query;
+
+    if (error) throw error;
+
+    // Fetch user details for created_by and updated_by
+    const inventoryItems = await Promise.all(
+      (items || []).map(async (item) => {
+        let created_by_user = null;
+        let updated_by_user = null;
+
+        if (item.created_by && supabaseAdmin) {
+          const { data: creator } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', item.created_by)
+            .single();
+          created_by_user = creator;
+        }
+
+        if (item.updated_by && supabaseAdmin) {
+          const { data: updater } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name, email')
+            .eq('id', item.updated_by)
+            .single();
+          updated_by_user = updater;
+        }
+
+        return {
+          ...item,
+          created_by_user,
+          updated_by_user,
+        };
+      })
+    );
 
     if (error) throw error;
 

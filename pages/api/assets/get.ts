@@ -49,7 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         let created_by_user = null;
         let updated_by_user = null;
 
-        if (asset.created_by) {
+        if (asset.created_by && supabaseAdmin) {
           const { data: creator } = await supabaseAdmin
             .from('profiles')
             .select('id, first_name, last_name, email')
@@ -58,7 +58,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           created_by_user = creator;
         }
 
-        if (asset.updated_by) {
+        if (asset.updated_by && supabaseAdmin) {
           const { data: updater } = await supabaseAdmin
             .from('profiles')
             .select('id, first_name, last_name, email')

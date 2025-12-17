@@ -1,11 +1,23 @@
 import React from 'react';
-import { X, Package, Store, Tag, Box, MapPin, Calendar, CheckCircle, XCircle, Shield } from 'lucide-react';
+import { X, Package, Store, Tag, Box, MapPin, Calendar, CheckCircle, XCircle, Shield, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface InventoryItem {
   id: string;
   created_at: string;
   updated_at: string;
+  created_by_user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  updated_by_user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
   stores: {
     id: string;
     store_name: string;
@@ -146,6 +158,52 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
           <DetailSection title="Record Information" icon={Calendar}>
             <LabelValue label="Created At" value={formatDate(item.created_at)} />
             <LabelValue label="Updated At" value={formatDate(item.updated_at)} />
+          </DetailSection>
+
+          <DetailSection title="Audit Information" icon={User}>
+            {item.created_by_user ? (
+              <>
+                <div className="col-span-full">
+                  <span className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Created By</span>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-lg p-3">
+                    <p className="text-sm font-semibold text-slate-200">
+                      {item.created_by_user.first_name} {item.created_by_user.last_name}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">{item.created_by_user.email}</p>
+                    <p className="text-xs text-slate-500 mt-2">
+                      {format(new Date(item.created_at), 'PPpp')}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-full">
+                <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Created By</span>
+                <span className="text-slate-600 italic text-sm">N/A</span>
+              </div>
+            )}
+
+            {item.updated_by_user ? (
+              <>
+                <div className="col-span-full">
+                  <span className="block text-xs font-medium text-slate-500 mb-2 uppercase tracking-wider">Last Updated By</span>
+                  <div className="bg-slate-900/70 border border-slate-800 rounded-lg p-3">
+                    <p className="text-sm font-semibold text-slate-200">
+                      {item.updated_by_user.first_name} {item.updated_by_user.last_name}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-1">{item.updated_by_user.email}</p>
+                    <p className="text-xs text-slate-500 mt-2">
+                      {format(new Date(item.updated_at), 'PPpp')}
+                    </p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="col-span-full">
+                <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Last Updated By</span>
+                <span className="text-slate-600 italic text-sm">N/A</span>
+              </div>
+            )}
           </DetailSection>
 
         </div>
