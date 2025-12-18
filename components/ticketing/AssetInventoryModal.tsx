@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, CheckCircle, AlertCircle } from 'lucide-react';
+import { X, CheckCircle, AlertCircle, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface AutocompleteOption {
@@ -20,6 +20,18 @@ interface Asset {
   models: { id: string; name: string } | null;
   created_at: string;
   updated_at: string;
+  created_by_user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
+  updated_by_user?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+  } | null;
 }
 
 interface AssetInventoryModalProps {
@@ -290,19 +302,22 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             {isViewingDetail ? (
               <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.categories?.name || 'N/A'}</p>
             ) : (
-              <input
-                type="text"
-                id="category"
-                value={category}
-                onChange={(e) => {
-                  setCategory(e.target.value);
-                  setSelectedCategoryId(null);
-                }}
-                onFocus={() => setShowCategoryDropdown(true)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Type or select category..."
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="category"
+                  value={category}
+                  onChange={(e) => {
+                    setCategory(e.target.value);
+                    setSelectedCategoryId(null);
+                  }}
+                  onFocus={() => setShowCategoryDropdown(true)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type or select category..."
+                  required
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             )}
             {showCategoryDropdown && !isViewingDetail && (
               <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
@@ -335,19 +350,22 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             {isViewingDetail ? (
               <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.brands?.name || 'N/A'}</p>
             ) : (
-              <input
-                type="text"
-                id="brand"
-                value={brand}
-                onChange={(e) => {
-                  setBrand(e.target.value);
-                  setSelectedBrandId(null);
-                }}
-                onFocus={() => setShowBrandDropdown(true)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Type or select brand..."
-                required
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="brand"
+                  value={brand}
+                  onChange={(e) => {
+                    setBrand(e.target.value);
+                    setSelectedBrandId(null);
+                  }}
+                  onFocus={() => setShowBrandDropdown(true)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type or select brand..."
+                  required
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             )}
             {showBrandDropdown && !isViewingDetail && (
               <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
@@ -380,18 +398,21 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             {isViewingDetail ? (
               <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.models?.name || 'N/A'}</p>
             ) : (
-              <input
-                type="text"
-                id="model"
-                value={model}
-                onChange={(e) => {
-                  setModel(e.target.value);
-                  setSelectedModelId(null);
-                }}
-                onFocus={() => setShowModelDropdown(true)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Type or select model..."
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  id="model"
+                  value={model}
+                  onChange={(e) => {
+                    setModel(e.target.value);
+                    setSelectedModelId(null);
+                  }}
+                  onFocus={() => setShowModelDropdown(true)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type or select model..."
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             )}
             {showModelDropdown && !isViewingDetail && (
               <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
@@ -448,18 +469,21 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                 {editItem?.status || 'Available'}
               </div>
             ) : (
-              <select
-                id="status"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Available">Available</option>
-                <option value="In Use">In Use</option>
-                <option value="Under Repair">Under Repair</option>
-                <option value="Broken">Broken</option>
-                <option value="Retired">Retired</option>
-              </select>
+              <div className="relative">
+                <select
+                  id="status"
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="Available">Available</option>
+                  <option value="In Use">In Use</option>
+                  <option value="Under Repair">Under Repair</option>
+                  <option value="Broken">Broken</option>
+                  <option value="Retired">Retired</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             )}
           </div>
 
@@ -469,15 +493,18 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             {isViewingDetail ? (
               <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.under_warranty ? 'Yes' : 'No'}</p>
             ) : (
-              <select
-                id="underWarranty"
-                value={underWarranty ? 'yes' : 'no'}
-                onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
+              <div className="relative">
+                <select
+                  id="underWarranty"
+                  value={underWarranty ? 'yes' : 'no'}
+                  onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                >
+                  <option value="no">No</option>
+                  <option value="yes">Yes</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
             )}
           </div>
 
@@ -497,19 +524,48 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             )}
           </div>
 
-          {/* Created At */}
-          {isViewingDetail && editItem?.created_at && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Created At</label>
-              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.created_at), 'PPP p')}</p>
-            </div>
-          )}
+          {/* Audit Information */}
+          {isViewingDetail && (
+            <div className="space-y-4 pt-4 border-t border-slate-700 mt-4">
+              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Audit Information</h3>
 
-          {/* Updated At */}
-          {isViewingDetail && editItem?.updated_at && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">Last Updated</label>
-              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.updated_at), 'PPP p')}</p>
+              {/* Created At */}
+              {editItem?.created_at && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Created At</label>
+                  <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.created_at), 'PPP p')}</p>
+                </div>
+              )}
+
+              {/* Created By */}
+              {editItem?.created_by_user && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Created By</label>
+                  <div className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">
+                    <p className="font-medium">{editItem.created_by_user.first_name} {editItem.created_by_user.last_name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{editItem.created_by_user.email}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Updated At */}
+              {editItem?.updated_at && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Last Updated</label>
+                  <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{format(new Date(editItem.updated_at), 'PPP p')}</p>
+                </div>
+              )}
+
+              {/* Updated By */}
+              {editItem?.updated_by_user && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Last Updated By</label>
+                  <div className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">
+                    <p className="font-medium">{editItem.updated_by_user.first_name} {editItem.updated_by_user.last_name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">{editItem.updated_by_user.email}</p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

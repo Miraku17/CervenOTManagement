@@ -9,9 +9,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const { id } = req.body;
+  const userId = req.user?.id;
 
   if (!id) {
     return res.status(400).json({ error: "Inventory item ID is required" });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   if (!supabaseAdmin) {
@@ -19,20 +24,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // First, fetch the item to get the asset_id before deleting
+    // First, fetch the item to get the asset_id before soft deleting
     const { data: itemToDelete, error: fetchError } = await supabaseAdmin
       .from('store_inventory')
       .select('asset_id')
       .eq('id', id)
+      .is('deleted_at', null)
       .single();
 
     if (fetchError) throw fetchError;
 
-    // Delete the inventory item
+    // Soft delete: Update with deleted_at and deleted_by
     const { error: deleteError } = await supabaseAdmin
       .from("store_inventory")
-      .delete()
-      .eq("id", id);
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+      })
+      .eq("id", id)
+      .is('deleted_at', null); // Only soft delete if not already deleted
 
     if (deleteError) throw deleteError;
 
@@ -40,9 +50,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (itemToDelete?.asset_id) {
       const { error: updateError } = await supabaseAdmin
         .from('asset_inventory')
-        .update({ status: 'Available' })
+        .update({
+          status: 'Available',
+          updated_by: userId
+        })
         .eq('id', itemToDelete.asset_id);
-      
+
       if (updateError) {
         console.warn('Failed to revert asset status to Available:', updateError);
       }

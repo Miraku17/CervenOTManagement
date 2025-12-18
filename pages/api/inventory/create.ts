@@ -9,9 +9,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   const { store_id, station_id, asset_id } = req.body;
+  const userId = req.user?.id;
 
   if (!store_id || !asset_id) {
     return res.status(400).json({ error: 'Store and Asset are required' });
+  }
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   try {
@@ -19,26 +24,39 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
-    
-    // Create the inventory item with foreign keys
-    const { data: inventoryItem, error: insertError } = await supabaseAdmin
+
+    // Create the inventory item with foreign keys and audit fields
+    const { data: insertedItem, error: insertError } = await supabaseAdmin
       .from('store_inventory')
       .insert([
         {
           store_id,
           station_id: station_id || null,
           asset_id,
+          created_by: userId,
         },
       ])
-      .select()
+      .select('id')
       .single();
 
     if (insertError) throw insertError;
 
+    // Fetch the complete record
+    const { data: inventoryItem, error: fetchError } = await supabaseAdmin
+      .from('store_inventory')
+      .select('*')
+      .eq('id', insertedItem.id)
+      .single();
+
+    if (fetchError) throw fetchError;
+
     // Automatically update the asset status to 'In Use'
     const { error: updateError } = await supabaseAdmin
       .from('asset_inventory')
-      .update({ status: 'In Use' })
+      .update({
+        status: 'In Use',
+        updated_by: userId
+      })
       .eq('id', asset_id);
 
     if (updateError) {

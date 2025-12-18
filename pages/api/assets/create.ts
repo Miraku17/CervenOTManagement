@@ -10,8 +10,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status } = req.body;
 
+  // Get user ID from the authenticated request
+  let userId = req.user?.id;
+
+  // Debug logging
+  console.log('Auth user:', req.user);
+  console.log('User ID:', userId);
+
   if (!category_id || !brand_id) {
     return res.status(400).json({ error: 'Category and brand are required' });
+  }
+
+  if (!userId) {
+    console.error('No user ID found in request');
+    return res.status(401).json({ error: 'User not authenticated' });
   }
 
   try {
@@ -19,24 +31,46 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
-    
-    const { data: asset, error } = await supabaseAdmin
+
+    const insertData = {
+      category_id,
+      brand_id,
+      model_id: model_id || null,
+      serial_number: serial_number || null,
+      under_warranty: under_warranty || false,
+      warranty_date: warranty_date || null,
+      status: status || 'Available',
+      created_by: userId,
+    };
+
+    console.log('Inserting asset with data:', insertData);
+
+    const { data: insertedAsset, error } = await supabaseAdmin
       .from('asset_inventory')
-      .insert([
-        {
-          category_id,
-          brand_id,
-          model_id: model_id || null,
-          serial_number: serial_number || null,
-          under_warranty: under_warranty || false,
-          warranty_date: warranty_date || null,
-          status: status || 'Available',
-        },
-      ])
-      .select()
+      .insert([insertData])
+      .select('id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Insert error:', error);
+      throw error;
+    }
+
+    console.log('Asset inserted with ID:', insertedAsset?.id);
+
+    // Fetch the complete asset record including audit fields
+    const { data: asset, error: fetchError } = await supabaseAdmin
+      .from('asset_inventory')
+      .select('*')
+      .eq('id', insertedAsset.id)
+      .single();
+
+    if (fetchError) {
+      console.error('Fetch error:', fetchError);
+      throw fetchError;
+    }
+
+    console.log('Asset created with full data:', asset);
 
     return res.status(201).json({
       message: 'Asset created successfully',
