@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft } from 'lucide-react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/services/supabase';
@@ -104,7 +104,7 @@ export default function TicketingLayout({
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <LayoutDashboard size={20} />
+            <PieChart size={20} />
             <span className="font-medium">Overview</span>
           </button>
         )}
