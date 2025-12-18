@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronDown, CheckCircle, AlertCircle } from 'lucide-react';
-import { format } from 'date-fns';
 
 interface Store {
   id: string;
@@ -15,20 +14,27 @@ interface Station {
   name: string;
 }
 
-interface Asset {
+interface Category {
   id: string;
-  serial_number: string | null;
-  status: string | null;
-  under_warranty: boolean | null;
-  warranty_date: string | null;
-  categories: { id: string; name: string } | null;
-  brands: { id: string; name: string } | null;
-  models: { id: string; name: string } | null;
+  name: string;
+}
+
+interface Brand {
+  id: string;
+  name: string;
+}
+
+interface Model {
+  id: string;
+  name: string;
 }
 
 // Updated InventoryItem interface to reflect the new database schema
 interface InventoryItem {
   id: string;
+  serial_number: string;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   stores: {
     id: string;
     store_name: string;
@@ -37,8 +43,19 @@ interface InventoryItem {
   stations: {
     id: string;
     name: string;
+  };
+  categories: {
+    id: string;
+    name: string;
   } | null;
-  assets: Asset | null; // Now links to the Asset
+  brands: {
+    id: string;
+    name: string;
+  } | null;
+  models: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 interface StoreInventoryModalProps {
@@ -57,14 +74,31 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
 
-  // New state for assets
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
-
   const [station, setStation] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [showStationDropdown, setShowStationDropdown] = useState(false);
+
+  // New states for category, brand, model
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [category, setCategory] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [brand, setBrand] = useState('');
+  const [selectedBrandId, setSelectedBrandId] = useState<string | null>(null);
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+
+  const [models, setModels] = useState<Model[]>([]);
+  const [model, setModel] = useState('');
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+
+  // New states for product details
+  const [serialNumber, setSerialNumber] = useState('');
+  const [underWarranty, setUnderWarranty] = useState(false);
+  const [warrantyDate, setWarrantyDate] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -77,6 +111,9 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
 
   const dropdownRef = useRef<HTMLDivElement>(null); // For store dropdown
   const stationRef = useRef<HTMLDivElement>(null); // For station dropdown
+  const categoryRef = useRef<HTMLDivElement>(null); // For category dropdown
+  const brandRef = useRef<HTMLDivElement>(null); // For brand dropdown
+  const modelRef = useRef<HTMLDivElement>(null); // For model dropdown
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -86,12 +123,14 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     }, 3000);
   };
 
-  // Fetch stores, stations and assets when modal opens
+  // Fetch stores, stations, categories, brands, and models when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchStores();
       fetchStations();
-      fetchAssets();
+      fetchCategories();
+      fetchBrands();
+      fetchModels();
     }
   }, [isOpen]);
 
@@ -117,38 +156,74 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         setSelectedStationId(editItem.stations.id);
       }
 
-      // Set asset
-      if (editItem.assets) {
-        setSelectedAssetId(editItem.assets.id);
+      // Set category, brand, model
+      if (editItem.categories) {
+        setCategory(editItem.categories.name);
+        setSelectedCategoryId(editItem.categories.id);
       }
+      if (editItem.brands) {
+        setBrand(editItem.brands.name);
+        setSelectedBrandId(editItem.brands.id);
+      }
+      if (editItem.models) {
+        setModel(editItem.models.name);
+        setSelectedModelId(editItem.models.id);
+      }
+
+      // Set product details
+      setSerialNumber(editItem.serial_number || '');
+      setUnderWarranty(editItem.under_warranty || false);
+      setWarrantyDate(editItem.warranty_date || '');
     } else if (isOpen && !editItem) {
       // Reset form when opening for new item
       setSelectedStore(null);
       setStoreName('');
       setStoreCode('');
       setStoreSearchTerm('');
-      setSelectedAssetId(null);
       setStation('');
       setSelectedStationId(null);
+      setCategory('');
+      setSelectedCategoryId(null);
+      setBrand('');
+      setSelectedBrandId(null);
+      setModel('');
+      setSelectedModelId(null);
+      setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
     }
   }, [isOpen, editItem]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (dropdownRef.current && !dropdownRef.current.contains(target)) {
         setShowStoreDropdown(false);
       }
-      if (stationRef.current && !stationRef.current.contains(event.target as Node)) {
+      if (stationRef.current && !stationRef.current.contains(target)) {
         setShowStationDropdown(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(target)) {
+        setShowCategoryDropdown(false);
+      }
+      if (brandRef.current && !brandRef.current.contains(target)) {
+        setShowBrandDropdown(false);
+      }
+      if (modelRef.current && !modelRef.current.contains(target)) {
+        setShowModelDropdown(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, []);
+  }, [isOpen]);
 
   const fetchStores = async () => {
     try {
@@ -176,17 +251,39 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     }
   };
 
-  const fetchAssets = async () => {
+  const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/assets/get'); // Use the new API endpoint
+      const response = await fetch('/api/categories/get');
       const data = await response.json();
       if (response.ok) {
-        setAssets(data.assets || []);
-      } else {
-        console.error('Failed to fetch assets:', data.error);
+        setCategories(data.categories || []);
       }
     } catch (error) {
-      console.error('Error fetching assets:', error);
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  const fetchBrands = async () => {
+    try {
+      const response = await fetch('/api/brands/get');
+      const data = await response.json();
+      if (response.ok) {
+        setBrands(data.brands || []);
+      }
+    } catch (error) {
+      console.error('Error fetching brands:', error);
+    }
+  };
+
+  const fetchModels = async () => {
+    try {
+      const response = await fetch('/api/models/get');
+      const data = await response.json();
+      if (response.ok) {
+        setModels(data.models || []);
+      }
+    } catch (error) {
+      console.error('Error fetching models:', error);
     }
   };
 
@@ -212,6 +309,24 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     setShowStationDropdown(false);
   };
 
+  const handleCategorySelect = (selected: Category) => {
+    setCategory(selected.name);
+    setSelectedCategoryId(selected.id);
+    setShowCategoryDropdown(false);
+  };
+
+  const handleBrandSelect = (selected: Brand) => {
+    setBrand(selected.name);
+    setSelectedBrandId(selected.id);
+    setShowBrandDropdown(false);
+  };
+
+  const handleModelSelect = (selected: Model) => {
+    setModel(selected.name);
+    setSelectedModelId(selected.id);
+    setShowModelDropdown(false);
+  };
+
   const filteredStores = stores.filter(store =>
     store.store_name.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
     store.store_code.toLowerCase().includes(storeSearchTerm.toLowerCase())
@@ -219,6 +334,18 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
 
   const filteredStations = stations.filter(s =>
     !station || s.name.toLowerCase().includes(station.toLowerCase())
+  );
+
+  const filteredCategories = categories.filter(c =>
+    !category || c.name.toLowerCase().includes(category.toLowerCase())
+  );
+
+  const filteredBrands = brands.filter(b =>
+    !brand || b.name.toLowerCase().includes(brand.toLowerCase())
+  );
+
+  const filteredModels = models.filter(m =>
+    !model || m.name.toLowerCase().includes(model.toLowerCase())
   );
 
   // Helper function to get or create an autocomplete value
@@ -242,8 +369,24 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       showToast('error', 'Please select a store');
       return;
     }
-    if (!selectedAssetId) {
-      showToast('error', 'Please select an asset');
+    if (!station && !selectedStationId) {
+      showToast('error', 'Please select or enter a station');
+      return;
+    }
+    if (!serialNumber) {
+      showToast('error', 'Please enter a serial number');
+      return;
+    }
+    if (!category) {
+      showToast('error', 'Please enter or select a category');
+      return;
+    }
+    if (!brand) {
+      showToast('error', 'Please enter or select a brand');
+      return;
+    }
+    if (!model) {
+      showToast('error', 'Please enter or select a model');
       return;
     }
 
@@ -254,14 +397,35 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       let finalStationId = selectedStationId;
       if (station && !finalStationId) {
         finalStationId = await getOrCreateAutocompleteId('stations', station);
-      } else if (!station) {
-        finalStationId = null; // Ensure it's null if the text is empty
+      }
+
+      // Get or create category ID
+      let finalCategoryId = selectedCategoryId;
+      if (category && !finalCategoryId) {
+        finalCategoryId = await getOrCreateAutocompleteId('categories', category);
+      }
+
+      // Get or create brand ID
+      let finalBrandId = selectedBrandId;
+      if (brand && !finalBrandId) {
+        finalBrandId = await getOrCreateAutocompleteId('brands', brand);
+      }
+
+      // Get or create model ID
+      let finalModelId = selectedModelId;
+      if (model && !finalModelId) {
+        finalModelId = await getOrCreateAutocompleteId('models', model);
       }
 
       const payload = {
         store_id: selectedStore.id,
         station_id: finalStationId,
-        asset_id: selectedAssetId,
+        category_id: finalCategoryId,
+        brand_id: finalBrandId,
+        model_id: finalModelId,
+        serial_number: serialNumber,
+        under_warranty: underWarranty,
+        warranty_date: warrantyDate || null,
       };
 
       const response = await fetch(
@@ -288,10 +452,18 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setStoreName('');
       setStoreCode('');
       setStoreSearchTerm('');
-      setSelectedAssetId(null);
       setStation('');
       setSelectedStationId(null);
-      
+      setCategory('');
+      setSelectedCategoryId(null);
+      setBrand('');
+      setSelectedBrandId(null);
+      setModel('');
+      setSelectedModelId(null);
+      setSerialNumber('');
+      setUnderWarranty(false);
+      setWarrantyDate('');
+
       showToast('success', `Inventory item ${isEditMode ? 'updated' : 'created'} successfully!`);
 
       if (onSuccess) {
@@ -327,7 +499,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         </div>
       )}
 
-      <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-2xl border border-slate-700 max-h-[90vh] overflow-y-auto">
+      <div className="bg-slate-900 rounded-lg shadow-xl w-full max-w-4xl border border-slate-700 max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-slate-900 z-[55] flex justify-between items-center p-4 border-b border-slate-700">
           <h2 className="text-xl font-bold text-white">
             {isEditMode ? 'Edit Store Inventory Item' : 'Add New Store Inventory Item'}
@@ -340,7 +512,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
           {/* Store Selector with Dropdown */}
           <div ref={dropdownRef} className="relative">
             <label htmlFor="storeSearch" className="block text-sm font-medium text-slate-300 mb-1">
-              Select Store {selectedStore && <span className="text-xs text-slate-500">(Selected: {selectedStore.store_name})</span>}
+              Select Store <span className="text-red-500">*</span> {selectedStore && <span className="text-xs text-slate-500">(Selected: {selectedStore.store_name})</span>}
             </label>
             <div className="relative">
               <input
@@ -424,7 +596,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
           {/* Station Selector with Dropdown */}
           <div ref={stationRef} className="relative">
             <label htmlFor="stationSearch" className="block text-sm font-medium text-slate-300 mb-1">
-              Select Station {selectedStationId && <span className="text-xs text-slate-500">(Selected: {stations.find(s => s.id === selectedStationId)?.name})</span>}
+              Select Station <span className="text-red-500">*</span> {selectedStationId && <span className="text-xs text-slate-500">(Selected: {stations.find(s => s.id === selectedStationId)?.name})</span>}
             </label>
             <div className="relative">
               <input
@@ -437,7 +609,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                 }}
                 onFocus={() => setShowStationDropdown(true)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Search for a station..."
+                placeholder="Enter or search for a station..."
+                required
               />
               {selectedStationId && (
                 <button
@@ -475,97 +648,238 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
             )}
           </div>
 
-          {/* Asset Selection Dropdown */}
-          <div>
-            <label htmlFor="assetSelect" className="block text-sm font-medium text-slate-300 mb-1">
-              Select Asset <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <select
-                id="assetSelect"
-                value={selectedAssetId || ''}
-                onChange={(e) => setSelectedAssetId(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
-                required
-              >
-                <option value="">Select an Asset</option>
-                {assets
-                  .filter(asset => asset.status === 'Available' || (isEditMode && asset.id === editItem?.assets?.id))
-                  .map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {[
-                        asset.categories?.name,
-                        asset.brands?.name,
-                        asset.models?.name,
-                        asset.serial_number ? `(SN: ${asset.serial_number})` : ''
-                      ].filter(Boolean).join(' ')}
-                    </option>
-                  ))}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
-            </div>
-            {(() => {
-              const availableAssetsForSelection = assets.filter(asset => asset.status === 'Available' || (isEditMode && asset.id === editItem?.assets?.id));
-              if (assets.length === 0) {
-                return (
-                  <p className="text-xs text-red-400 mt-1">No assets found in Asset Inventory. Please add some first.</p>
-                );
-              } else if (availableAssetsForSelection.length === 0 && !isEditMode) {
-                return (
-                  <p className="text-xs text-red-400 mt-1">No available assets to assign. All assets are currently in use or have another status.</p>
-                );
-              } else if (availableAssetsForSelection.length === 0 && isEditMode && !editItem?.assets?.id) {
-                return (
-                  <p className="text-xs text-red-400 mt-1">No available assets to assign. The current asset is not found or is unavailable.</p>
-                );
-              }
-              return null;
-            })()}
+          {/* Product Details Section */}
+          <div className="border-t border-slate-700 pt-4 mt-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Product Details</h3>
 
-            {/* Selected Asset Details (Read-only) */}
-            {selectedAssetId && (() => {
-              const selectedAsset = assets.find(a => a.id === selectedAssetId);
-              if (!selectedAsset) return null;
-              return (
-                <div className="grid grid-cols-2 gap-4 mt-4 p-4 bg-slate-800/50 rounded-lg border border-slate-700">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Category</label>
-                    <div className="text-sm text-slate-200">{selectedAsset.categories?.name || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Brand</label>
-                    <div className="text-sm text-slate-200">{selectedAsset.brands?.name || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Model</label>
-                    <div className="text-sm text-slate-200">{selectedAsset.models?.name || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Serial Number</label>
-                    <div className="text-sm text-slate-200 font-mono">{selectedAsset.serial_number || 'N/A'}</div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-400 mb-1">Warranty Status</label>
-                     <div className={`text-sm inline-flex px-2 py-0.5 rounded ${
-                        selectedAsset.under_warranty 
-                          ? 'bg-emerald-500/10 text-emerald-400' 
-                          : 'bg-slate-700 text-slate-400'
-                      }`}>
-                      {selectedAsset.under_warranty ? 'Under Warranty' : 'Expired / None'}
-                    </div>
-                  </div>
-                  {selectedAsset.warranty_date && (
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Warranty Date</label>
-                      <div className="text-sm text-slate-200">{format(new Date(selectedAsset.warranty_date), 'PPP')}</div>
-                    </div>
+            {/* Category, Brand, Model Row */}
+            <div className="grid grid-cols-3 gap-4">
+              {/* Category Input with Dropdown */}
+              <div ref={categoryRef} className="relative">
+                <label htmlFor="categorySearch" className="block text-sm font-medium text-slate-300 mb-1">
+                  Category <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="categorySearch"
+                    value={category}
+                    onChange={(e) => {
+                      setCategory(e.target.value);
+                      setShowCategoryDropdown(true);
+                      setSelectedCategoryId(null);
+                    }}
+                    onFocus={() => setShowCategoryDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowCategoryDropdown(false), 200);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter or search category..."
+                    required
+                  />
+                  {selectedCategoryId && (
+                    <button
+                      type="button"
+                      onClick={() => { setCategory(''); setSelectedCategoryId(null); setShowCategoryDropdown(false); }}
+                      className="absolute right-9 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                      title="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
                   )}
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
                 </div>
-              );
-            })()}
+
+                {/* Category Dropdown */}
+                {showCategoryDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                    {filteredCategories.length > 0 ? (
+                      filteredCategories.map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => handleCategorySelect(cat)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-0"
+                        >
+                          <div className="text-sm font-medium text-white">{cat.name}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        No categories found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Brand Input with Dropdown */}
+              <div ref={brandRef} className="relative">
+                <label htmlFor="brandSearch" className="block text-sm font-medium text-slate-300 mb-1">
+                  Brand <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="brandSearch"
+                    value={brand}
+                    onChange={(e) => {
+                      setBrand(e.target.value);
+                      setShowBrandDropdown(true);
+                      setSelectedBrandId(null);
+                    }}
+                    onFocus={() => setShowBrandDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowBrandDropdown(false), 200);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter or search brand..."
+                    required
+                  />
+                  {selectedBrandId && (
+                    <button
+                      type="button"
+                      onClick={() => { setBrand(''); setSelectedBrandId(null); setShowBrandDropdown(false); }}
+                      className="absolute right-9 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                      title="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
+                </div>
+
+                {/* Brand Dropdown */}
+                {showBrandDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                    {filteredBrands.length > 0 ? (
+                      filteredBrands.map((b) => (
+                        <button
+                          key={b.id}
+                          type="button"
+                          onClick={() => handleBrandSelect(b)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-0"
+                        >
+                          <div className="text-sm font-medium text-white">{b.name}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        No brands found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Model Input with Dropdown */}
+              <div ref={modelRef} className="relative">
+                <label htmlFor="modelSearch" className="block text-sm font-medium text-slate-300 mb-1">
+                  Model <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="modelSearch"
+                    value={model}
+                    onChange={(e) => {
+                      setModel(e.target.value);
+                      setShowModelDropdown(true);
+                      setSelectedModelId(null);
+                    }}
+                    onFocus={() => setShowModelDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => setShowModelDropdown(false), 200);
+                    }}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter or search model..."
+                    required
+                  />
+                  {selectedModelId && (
+                    <button
+                      type="button"
+                      onClick={() => { setModel(''); setSelectedModelId(null); setShowModelDropdown(false); }}
+                      className="absolute right-9 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                      title="Clear selection"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
+                </div>
+
+                {/* Model Dropdown */}
+                {showModelDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                    {filteredModels.length > 0 ? (
+                      filteredModels.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          onClick={() => handleModelSelect(m)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-0"
+                        >
+                          <div className="text-sm font-medium text-white">{m.name}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        No models found
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Serial Number Row */}
+            <div className="mt-4">
+              <label htmlFor="serialNumber" className="block text-sm font-medium text-slate-300 mb-1">
+                Serial Number <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                id="serialNumber"
+                value={serialNumber}
+                onChange={(e) => setSerialNumber(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter serial number..."
+                required
+              />
+            </div>
+
+            {/* Warranty Row */}
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-300 mb-1">
+                  <input
+                    type="checkbox"
+                    checked={underWarranty}
+                    onChange={(e) => setUnderWarranty(e.target.checked)}
+                    className="w-4 h-4 bg-slate-800 border border-slate-700 rounded focus:ring-2 focus:ring-blue-500"
+                  />
+                  Under Warranty
+                </label>
+              </div>
+
+              {underWarranty && (
+                <div>
+                  <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">
+                    Warranty Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    id="warrantyDate"
+                    value={warrantyDate}
+                    onChange={(e) => setWarrantyDate(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
             <button
               type="button"
               onClick={onClose}

@@ -8,11 +8,32 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { store_id, station_id, asset_id } = req.body;
+  const {
+    store_id,
+    station_id,
+    category_id,
+    brand_id,
+    model_id,
+    serial_number,
+    under_warranty,
+    warranty_date
+  } = req.body;
   const userId = req.user?.id;
 
-  if (!store_id || !asset_id) {
-    return res.status(400).json({ error: 'Store and Asset are required' });
+  if (!store_id) {
+    return res.status(400).json({ error: 'Store is required' });
+  }
+
+  if (!station_id) {
+    return res.status(400).json({ error: 'Station is required' });
+  }
+
+  if (!serial_number) {
+    return res.status(400).json({ error: 'Serial number is required' });
+  }
+
+  if (!category_id || !brand_id || !model_id) {
+    return res.status(400).json({ error: 'Category, Brand, and Model are required' });
   }
 
   if (!userId) {
@@ -31,8 +52,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .insert([
         {
           store_id,
-          station_id: station_id || null,
-          asset_id,
+          station_id,
+          category_id,
+          brand_id,
+          model_id,
+          serial_number,
+          under_warranty: under_warranty || false,
+          warranty_date: warranty_date || null,
           created_by: userId,
         },
       ])
@@ -49,20 +75,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     if (fetchError) throw fetchError;
-
-    // Automatically update the asset status to 'In Use'
-    const { error: updateError } = await supabaseAdmin
-      .from('asset_inventory')
-      .update({
-        status: 'In Use',
-        updated_by: userId
-      })
-      .eq('id', asset_id);
-
-    if (updateError) {
-      console.warn('Failed to update asset status to In Use:', updateError);
-      // We don't throw here to avoid failing the main creation, but it's worth noting.
-    }
 
     return res.status(200).json({
       message: 'Inventory item created successfully',

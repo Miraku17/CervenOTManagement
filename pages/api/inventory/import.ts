@@ -15,14 +15,13 @@ export const config = {
 interface ImportRow {
   'Store Name': string;
   'Store Code': string;
-  'Station Name'?: string;
+  'Station Name': string;
   'Category': string;
   'Brand': string;
   'Model': string;
   'Serial Number': string;
   'Under Warranty': string;
   'Warranty Date'?: string;
-  'Status': string;
 }
 
 interface ImportResult {
@@ -88,6 +87,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const { fileData } = req.body;
+    const userId = req.user?.id;
 
     if (!fileData) {
       return res.status(400).json({ error: 'No file data provided' });
@@ -121,8 +121,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       try {
         // Skip completely empty rows
-        const isEmpty = !row['Store Name'] && !row['Store Code'] && !row['Category'] &&
-                        !row['Brand'] && !row['Model'] && !row['Serial Number'];
+        const isEmpty = !row['Store Name'] && !row['Store Code'] && !row['Station Name'] &&
+                        !row['Category'] && !row['Brand'] && !row['Model'] && !row['Serial Number'];
         if (isEmpty) {
           continue; // Skip this row without counting it as success or failure
         }
@@ -130,6 +130,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         // Validate required fields
         if (!row['Store Name'] || !row['Store Code']) {
           throw new Error('Store Name and Store Code are required');
+        }
+        if (!row['Station Name']) {
+          throw new Error('Station Name is required');
         }
         if (!row['Category']) {
           throw new Error('Category is required');
@@ -143,24 +146,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (!row['Serial Number']) {
           throw new Error('Serial Number is required');
         }
-        if (!row['Under Warranty']) {
-          throw new Error('Under Warranty is required');
-        }
-        if (!row['Status']) {
-          throw new Error('Status is required');
-        }
 
-        // Validate warranty fields
-        const underWarranty = row['Under Warranty'].toLowerCase() === 'yes';
-        if (underWarranty && !row['Warranty Date']) {
-          throw new Error('Warranty Date is required when Under Warranty is Yes');
-        }
-
-        // Validate status
-        const validStatuses = ['Available', 'In Use', 'available', 'in use'];
-        if (!validStatuses.includes(row['Status'])) {
-          throw new Error('Status must be "Available" or "In Use"');
-        }
+        // Parse warranty information
+        const underWarranty = row['Under Warranty']?.toLowerCase() === 'yes';
+        const warrantyDate = underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null;
 
         // Get or create store
         let storeId: string | null = null;
@@ -187,10 +176,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           storeId = newStore.id;
         }
 
-        // Get or create station (optional)
-        let stationId: string | null = null;
-        if (row['Station Name']) {
-          stationId = await getOrCreateRecord('stations', 'name', row['Station Name']);
+        // Get or create station (required)
+        const stationId = await getOrCreateRecord('stations', 'name', row['Station Name']);
+        if (!stationId) {
+          throw new Error('Failed to create or find station');
         }
 
         // Get or create category, brand, model
@@ -202,58 +191,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           throw new Error('Failed to create or find category, brand, or model');
         }
 
-        // Check if asset with same serial number already exists
-        const { data: existingAsset } = await supabaseAdmin
-          .from('asset_inventory')
+        // Check if inventory entry with same serial number already exists in this store
+        const { data: existingInventory } = await supabaseAdmin
+          .from('store_inventory')
           .select('id')
+          .eq('store_id', storeId)
           .ilike('serial_number', row['Serial Number'].trim())
+          .is('deleted_at', null)
           .single();
 
-        let assetId: string;
-
-        if (existingAsset) {
-          // Use existing asset
-          assetId = existingAsset.id;
-        } else {
-          // Create new asset
-          const { data: newAsset, error: assetError } = await supabaseAdmin
-            .from('asset_inventory')
-            .insert({
+        if (existingInventory) {
+          // Update existing inventory
+          const { error: updateError } = await supabaseAdmin
+            .from('store_inventory')
+            .update({
+              station_id: stationId,
               category_id: categoryId,
               brand_id: brandId,
               model_id: modelId,
               serial_number: row['Serial Number'].trim(),
               under_warranty: underWarranty,
-              warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
-              status: row['Status'].trim(),
+              warranty_date: warrantyDate,
+              updated_at: new Date().toISOString(),
+              updated_by: userId,
             })
-            .select('id')
-            .single();
-
-          if (assetError) throw new Error(`Failed to create asset: ${assetError.message}`);
-          assetId = newAsset.id;
-        }
-
-        // Check if inventory entry already exists
-        const { data: existingInventory } = await supabaseAdmin
-          .from('store_inventory')
-          .select('id')
-          .eq('store_id', storeId)
-          .eq('asset_id', assetId)
-          .single();
-
-        if (existingInventory) {
-          // Update existing inventory
-          const updateData: any = {
-            updated_at: new Date().toISOString(),
-          };
-          if (stationId) {
-            updateData.station_id = stationId;
-          }
-
-          const { error: updateError } = await supabaseAdmin
-            .from('store_inventory')
-            .update(updateData)
             .eq('id', existingInventory.id);
 
           if (updateError) throw new Error(`Failed to update inventory: ${updateError.message}`);
@@ -264,16 +225,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             .insert({
               store_id: storeId,
               station_id: stationId,
-              asset_id: assetId,
+              category_id: categoryId,
+              brand_id: brandId,
+              model_id: modelId,
+              serial_number: row['Serial Number'].trim(),
+              under_warranty: underWarranty,
+              warranty_date: warrantyDate,
+              created_by: userId,
             });
 
           if (inventoryError) throw new Error(`Failed to create inventory: ${inventoryError.message}`);
-
-          // Update asset status to 'In Use'
-          await supabaseAdmin
-            .from('asset_inventory')
-            .update({ status: 'In Use' })
-            .eq('id', assetId);
         }
 
         result.success++;

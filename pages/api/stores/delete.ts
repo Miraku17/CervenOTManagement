@@ -14,27 +14,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Store ID is required.' });
   }
 
+  const userId = req.user?.id;
+
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
+
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
 
-    // Delete managers first (if cascade delete is not set up)
-    const { error: managersError } = await supabaseAdmin
-      .from('store_managers')
-      .delete()
-      .eq('store_id', id);
-
-    if (managersError) {
-      console.error('Error deleting managers:', managersError);
-      // Continue anyway as the store deletion might cascade
-    }
-
-    // Delete the store
+    // Soft delete the store
     const { error } = await supabaseAdmin
       .from('stores')
-      .delete()
-      .eq('id', id);
+      .update({
+        deleted_at: new Date().toISOString(),
+        deleted_by: userId,
+      })
+      .eq('id', id)
+      .is('deleted_at', null); // Only soft delete if not already deleted
 
     if (error) {
       throw error;
