@@ -8,11 +8,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, store_id, station_id, asset_id } = req.body;
+  const {
+    id,
+    store_id,
+    station_id,
+    category_id,
+    brand_id,
+    model_id,
+    serial_number,
+    under_warranty,
+    warranty_date
+  } = req.body;
   const userId = req.user?.id;
 
-  if (!id || !store_id || !asset_id) {
-    return res.status(400).json({ error: 'ID, store, and Asset are required' });
+  if (!id || !store_id) {
+    return res.status(400).json({ error: 'ID and store are required' });
+  }
+
+  if (!station_id) {
+    return res.status(400).json({ error: 'Station is required' });
+  }
+
+  if (!serial_number) {
+    return res.status(400).json({ error: 'Serial number is required' });
+  }
+
+  if (!category_id || !brand_id || !model_id) {
+    return res.status(400).json({ error: 'Category, Brand, and Model are required' });
   }
 
   if (!userId) {
@@ -30,8 +52,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .from('store_inventory')
       .update({
         store_id,
-        station_id: station_id || null,
-        asset_id,
+        station_id,
+        category_id,
+        brand_id,
+        model_id,
+        serial_number,
+        under_warranty: under_warranty || false,
+        warranty_date: warranty_date || null,
         updated_at: new Date().toISOString(),
         updated_by: userId,
       })

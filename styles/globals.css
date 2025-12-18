@@ -131,6 +131,9 @@
   animation: text-glow 1.5s ease-in-out infinite;
 }
 
+
+
+
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);

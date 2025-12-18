@@ -12,7 +12,8 @@ import {
   Calendar,
   FileUp,
   Ticket,
-  AlertTriangle
+  AlertTriangle,
+  BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -93,6 +94,7 @@ export default function AdminLayout({
     if (pathname.startsWith('/dashboard/admin/leave-requests')) return 'Leave Requests';
     if (pathname.startsWith('/dashboard/admin/import-schedule')) return 'Import Schedule';
     if (pathname.startsWith('/dashboard/admin/employee-schedule')) return 'Employee Schedule';
+    if (pathname.startsWith('/dashboard/knowledge-base')) return 'Knowledge Base';
 
     return 'Dashboard';
   };
@@ -177,6 +179,12 @@ export default function AdminLayout({
             isActive={isActive('/dashboard/admin/reports')}
             onClick={() => handleNavigate('/dashboard/admin/reports')}
           />
+          <SidebarItem
+            icon={<BookOpen size={20} />}
+            label="Knowledge Base"
+            isActive={isActive('/dashboard/knowledge-base')}
+            onClick={() => handleNavigate('/dashboard/knowledge-base')}
+          />
         </nav>
 
         <div className="p-4 border-t border-slate-800">
@@ -234,6 +242,12 @@ export default function AdminLayout({
               label="Reports"
               isActive={isActive('/dashboard/admin/reports')}
               onClick={() => handleNavigate('/dashboard/admin/reports')}
+            />
+            <SidebarItem
+              icon={<BookOpen size={24} />}
+              label="Knowledge Base"
+              isActive={isActive('/dashboard/knowledge-base')}
+              onClick={() => handleNavigate('/dashboard/knowledge-base')}
             />
             {hasEditTimeAccess() && (
               <SidebarItem

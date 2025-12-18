@@ -6,6 +6,9 @@ interface InventoryItem {
   id: string;
   created_at: string;
   updated_at: string;
+  serial_number: string;
+  under_warranty: boolean | null;
+  warranty_date: string | null;
   created_by_user?: {
     id: string;
     first_name: string;
@@ -26,25 +29,18 @@ interface InventoryItem {
   stations: {
     id: string;
     name: string;
-  } | null;
-  assets: {
+  };
+  categories: {
     id: string;
-    serial_number: string | null;
-    status: string | null;
-    under_warranty: boolean | null;
-    warranty_date: string | null;
-    categories: {
-      id: string;
-      name: string;
-    } | null;
-    brands: {
-      id: string;
-      name: string;
-    } | null;
-    models: {
-      id: string;
-      name: string;
-    } | null;
+    name: string;
+  } | null;
+  brands: {
+    id: string;
+    name: string;
+  } | null;
+  models: {
+    id: string;
+    name: string;
   } | null;
 }
 
@@ -93,7 +89,7 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
         <div className="flex items-start justify-between p-6 border-b border-slate-800 bg-slate-900 sticky top-0 rounded-t-2xl z-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              {item.assets?.under_warranty ? (
+              {item.under_warranty ? (
                 <span className="px-2.5 py-0.5 rounded-md text-xs font-medium border bg-green-500/10 text-green-400 border-green-500/20 uppercase flex items-center gap-1">
                   <Shield size={12} />
                   Under Warranty
@@ -105,8 +101,8 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
               )}
             </div>
             <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
-              {item.assets?.categories?.name} - {item.assets?.brands?.name}
-              {item.assets?.models && <span className="text-slate-500 text-lg font-normal">{item.assets.models.name}</span>}
+              {item.categories?.name} - {item.brands?.name}
+              {item.models && <span className="text-slate-500 text-lg font-normal">{item.models.name}</span>}
             </h2>
           </div>
           <button
@@ -127,18 +123,18 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
           </DetailSection>
 
           <DetailSection title="Product Information" icon={Package}>
-            <LabelValue label="Category" value={item.assets?.categories?.name} />
-            <LabelValue label="Brand" value={item.assets?.brands?.name} />
-            <LabelValue label="Model" value={item.assets?.models?.name} />
-            <LabelValue label="Serial Number" value={item.assets?.serial_number} fullWidth />
+            <LabelValue label="Category" value={item.categories?.name} />
+            <LabelValue label="Brand" value={item.brands?.name} />
+            <LabelValue label="Model" value={item.models?.name} />
+            <LabelValue label="Serial Number" value={item.serial_number} fullWidth />
           </DetailSection>
 
           <DetailSection title="Warranty Information" icon={Shield}>
             <LabelValue
               label="Under Warranty"
               value={
-                <span className={`flex items-center gap-1 ${item.assets?.under_warranty ? 'text-green-400' : 'text-slate-500'}`}>
-                  {item.assets?.under_warranty ? (
+                <span className={`flex items-center gap-1 ${item.under_warranty ? 'text-green-400' : 'text-slate-500'}`}>
+                  {item.under_warranty ? (
                     <>
                       <CheckCircle size={16} />
                       Yes
@@ -152,7 +148,7 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
                 </span>
               }
             />
-            <LabelValue label="Warranty Date" value={formatDate(item.assets?.warranty_date ?? null)} />
+            <LabelValue label="Warranty Date" value={formatDate(item.warranty_date ?? null)} />
           </DetailSection>
 
           <DetailSection title="Record Information" icon={Calendar}>

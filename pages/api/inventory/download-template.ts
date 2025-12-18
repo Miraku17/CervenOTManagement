@@ -20,8 +20,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': 'OptiPlex 7090',
         'Serial Number': 'SN123456789',
         'Under Warranty': 'Yes',
-        'Warranty Date': '2025-12-31',
-        'Status': 'Available'
+        'Warranty Date': '2025-12-31'
       },
       {
         'Store Name': '',
@@ -32,8 +31,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': '',
         'Serial Number': '',
         'Under Warranty': '',
-        'Warranty Date': '',
-        'Status': ''
+        'Warranty Date': ''
       }
     ];
 
@@ -51,8 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 20 }, // Model
       { wch: 20 }, // Serial Number
       { wch: 15 }, // Under Warranty
-      { wch: 15 }, // Warranty Date
-      { wch: 12 }  // Status
+      { wch: 15 }  // Warranty Date
     ];
 
     // Add worksheet to workbook
@@ -62,14 +59,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const instructions = [
       { 'Field': 'Store Name', 'Description': 'Name of the store (Required)', 'Example': 'Main Branch Store' },
       { 'Field': 'Store Code', 'Description': 'Unique store code (Required)', 'Example': 'ST001' },
-      { 'Field': 'Station Name', 'Description': 'Station name (Optional)', 'Example': 'Station A' },
+      { 'Field': 'Station Name', 'Description': 'Station name (Required)', 'Example': 'Station A' },
       { 'Field': 'Category', 'Description': 'Product category (Required)', 'Example': 'Desktop, Laptop, Monitor' },
       { 'Field': 'Brand', 'Description': 'Brand name (Required)', 'Example': 'Dell, HP, Lenovo' },
       { 'Field': 'Model', 'Description': 'Model name (Required)', 'Example': 'OptiPlex 7090' },
       { 'Field': 'Serial Number', 'Description': 'Unique serial number (Required)', 'Example': 'SN123456789' },
-      { 'Field': 'Under Warranty', 'Description': 'Warranty status - Yes or No (Required)', 'Example': 'Yes' },
-      { 'Field': 'Warranty Date', 'Description': 'Warranty expiration date (Required if under warranty)', 'Example': '2025-12-31' },
-      { 'Field': 'Status', 'Description': 'Asset status - Available or In Use (Required)', 'Example': 'Available' }
+      { 'Field': 'Under Warranty', 'Description': 'Warranty status - Yes or No (Optional, defaults to No)', 'Example': 'Yes' },
+      { 'Field': 'Warranty Date', 'Description': 'Warranty expiration date (Optional, format: YYYY-MM-DD)', 'Example': '2025-12-31' }
     ];
     const wsInstructions = XLSX.utils.json_to_sheet(instructions);
     wsInstructions['!cols'] = [

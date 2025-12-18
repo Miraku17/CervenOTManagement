@@ -23,6 +23,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         updated_at,
         created_by,
         updated_by,
+        serial_number,
+        under_warranty,
+        warranty_date,
         stores:store_id (
           id,
           store_name,
@@ -32,24 +35,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           id,
           name
         ),
-        assets:asset_id (
+        categories:category_id (
           id,
-          serial_number,
-          status,
-          under_warranty,
-          warranty_date,
-          categories:category_id (
-            id,
-            name
-          ),
-          brands:brand_id (
-            id,
-            name
-          ),
-          models:model_id (
-            id,
-            name
-          )
+          name
+        ),
+        brands:brand_id (
+          id,
+          name
+        ),
+        models:model_id (
+          id,
+          name
         )
       `)
       .is('deleted_at', null) // Only fetch non-deleted items

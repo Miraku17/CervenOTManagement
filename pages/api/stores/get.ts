@@ -13,10 +13,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    // Fetch stores
+    // Fetch stores (exclude soft-deleted)
     const { data: stores, error: storesError } = await supabaseAdmin
       .from('stores')
       .select('*')
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (storesError) {

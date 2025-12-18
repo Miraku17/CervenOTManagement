@@ -38,7 +38,9 @@ export default function AssetInventoryPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Access control check
-  // Asset Inventory: accessible by admin OR employee role (basically everyone)
+  // Asset Inventory: accessible only by positions "asset" and "operations manager"
+  const [userPosition, setUserPosition] = useState<string | null>(null);
+
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
@@ -46,12 +48,13 @@ export default function AssetInventoryPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('positions(name)')
           .eq('id', user.id)
           .single();
 
-        const userRole = profile?.role;
-        const hasAccess = userRole === 'admin' || userRole === 'employee';
+        const position = (profile?.positions as any)?.name?.toLowerCase();
+        setUserPosition(position || null);
+        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager';
 
         if (!hasAccess) {
           router.push('/dashboard/ticketing/tickets');
@@ -612,16 +615,19 @@ export default function AssetInventoryPage() {
                                 >
                                   <Edit2 size={16} />
                                 </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setDeleteId(asset.id);
-                                  }}
-                                  className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
-                                  title="Delete asset"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
+                                {/* Only operations manager can delete */}
+                                {userPosition === 'operations manager' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteId(asset.id);
+                                    }}
+                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    title="Delete asset"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                )}
                               </div>
                             </td>
                         </tr>

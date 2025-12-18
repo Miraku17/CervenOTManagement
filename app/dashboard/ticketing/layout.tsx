@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft } from 'lucide-react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/services/supabase';
@@ -56,9 +56,14 @@ export default function TicketingLayout({
   // Stores: ONLY admin role (no position requirement)
   const hasStoresAccess = isAdmin;
 
-  // Check if user has access to inventory sections (store inventory & asset inventory)
-  // Inventory: admin OR employee role (basically everyone)
-  const hasInventoryAccess = isAdmin || user !== null; // Everyone who is logged in
+  // Check if user has access to store inventory
+  // Store Inventory: admin OR employee role (basically everyone)
+  const hasStoreInventoryAccess = isAdmin || user !== null; // Everyone who is logged in
+
+  // Check if user has access to asset inventory
+  // Asset Inventory: ONLY positions "asset", "assets", or "operations manager"
+  const userPositionLower = userPosition?.toLowerCase();
+  const hasAssetInventoryAccess = userPositionLower === 'asset' || userPositionLower === 'assets' || userPositionLower === 'operations manager';
 
   const SidebarContent = () => (
     <>
@@ -99,7 +104,7 @@ export default function TicketingLayout({
                 : 'text-slate-400 hover:bg-slate-800 hover:text-white'
             }`}
           >
-            <LayoutDashboard size={20} />
+            <PieChart size={20} />
             <span className="font-medium">Overview</span>
           </button>
         )}
@@ -118,32 +123,32 @@ export default function TicketingLayout({
           </button>
         )}
 
-        {hasInventoryAccess && (
-          <>
-            <button
-              onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                pathname === '/dashboard/ticketing/store-inventory'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <Package size={20} />
-              <span className="font-medium">Store Inventory</span>
-            </button>
+        {hasStoreInventoryAccess && (
+          <button
+            onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              pathname === '/dashboard/ticketing/store-inventory'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Package size={20} />
+            <span className="font-medium">Store Inventory</span>
+          </button>
+        )}
 
-            <button
-              onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-                pathname === '/dashboard/ticketing/asset-inventory'
-                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <Monitor size={20} />
-              <span className="font-medium">Asset Inventory</span>
-            </button>
-          </>
+        {hasAssetInventoryAccess && (
+          <button
+            onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
+            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+              pathname === '/dashboard/ticketing/asset-inventory'
+                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
+                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            }`}
+          >
+            <Monitor size={20} />
+            <span className="font-medium">Asset Inventory</span>
+          </button>
         )}
 
 
