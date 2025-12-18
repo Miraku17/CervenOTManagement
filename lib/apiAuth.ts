@@ -145,7 +145,10 @@ export const withAuth = (
         }
 
         if (hasPositionRestriction) {
-          if (!(position && allowedPositions.includes(position))) {
+          // Case-insensitive position comparison
+          const userPositionLower = position?.toLowerCase();
+          const allowedPositionsLower = allowedPositions.map(p => p.toLowerCase());
+          if (!(userPositionLower && allowedPositionsLower.includes(userPositionLower))) {
             isAuthorized = false;
           }
         }
