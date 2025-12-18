@@ -52,17 +52,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (error) throw error;
 
     // Transform the data to include category name
-    const transformedArticles = articles?.map(article => ({
-      id: article.id,
-      title: article.title,
-      slug: article.slug,
-      content: article.content,
-      category_id: article.category_id,
-      category: article.kb_categories?.name || 'Uncategorized',
-      created_at: article.created_at,
-      updated_at: article.updated_at,
-      published: article.published
-    }));
+    const transformedArticles = articles?.map(article => {
+      const categoryData = article.kb_categories as any;
+      return {
+        id: article.id,
+        title: article.title,
+        slug: article.slug,
+        content: article.content,
+        category_id: article.category_id,
+        category: categoryData?.name || 'Uncategorized',
+        created_at: article.created_at,
+        updated_at: article.updated_at,
+        published: article.published
+      };
+    });
 
     return res.status(200).json({ articles: transformedArticles || [] });
   } catch (error: any) {

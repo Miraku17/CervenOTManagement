@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Search,
@@ -88,7 +88,7 @@ export default function KnowledgeBasePage() {
 
   // Helper function to get category icon and color
   const getCategoryIcon = (categoryName: string) => {
-    const iconMap: Record<string, JSX.Element> = {
+    const iconMap: Record<string, ReactElement> = {
       'Getting Started': <Briefcase className="w-6 h-6 text-blue-400" />,
       'Hardware Support': <Terminal className="w-6 h-6 text-purple-400" />,
       'Software & Applications': <Database className="w-6 h-6 text-cyan-400" />,

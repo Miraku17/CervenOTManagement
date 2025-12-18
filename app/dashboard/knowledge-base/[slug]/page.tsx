@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, ReactElement } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -74,7 +74,7 @@ export default function ArticlePage() {
     }
   };
 
-  const renderNode = (node: any, index: number): JSX.Element | null => {
+  const renderNode = (node: any, index: number): ReactElement | null => {
     if (!node) return null;
 
     const key = `${node.type}-${index}`;
@@ -166,7 +166,7 @@ export default function ArticlePage() {
     return null;
   };
 
-  const renderTextNode = (node: any, index?: number): JSX.Element | string => {
+  const renderTextNode = (node: any, index?: number): ReactElement | string => {
     if (!node || node.type !== 'text') {
       return '';
     }

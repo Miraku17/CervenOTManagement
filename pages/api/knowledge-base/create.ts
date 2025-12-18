@@ -44,6 +44,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Get author_id from authenticated user
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
     const author_id = req.user.id;
 
     // Generate slug from title

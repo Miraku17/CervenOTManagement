@@ -24,7 +24,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get counts for each category
     const categoriesWithCounts = await Promise.all(
       (categories || []).map(async (category) => {
-        const { count, error: countError } = await supabaseAdmin
+        const { count, error: countError } = await supabaseAdmin!
           .from('knowledge_base')
           .select('id', { count: 'exact', head: true })
           .eq('category_id', category.id)
