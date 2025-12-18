@@ -67,120 +67,144 @@ export default function TicketingLayout({
 
   const SidebarContent = () => (
     <>
-      <div className="p-6 flex items-center gap-3">
+      <div className="p-4 flex items-center gap-3 border-b border-slate-800/50">
         <img
           src="/cerventech.png"
           alt="Cerventech Logo"
-          className="w-10 h-10 rounded-full object-cover shadow-lg border-2 border-gray-300"
+          className="w-8 h-8 rounded-full object-cover shadow-lg border-2 border-gray-300"
         />
-        <h1 className="text-xl font-bold tracking-tight text-white">Cerventech Ticketing</h1>
+        <h1 className="text-lg font-bold tracking-tight text-white">Cerventech Ticketing</h1>
       </div>
 
-      <nav className="flex-1 px-4 space-y-2 py-4">
-        {isAdmin ? (
-          <button
-            onClick={() => handleNavigate('/dashboard/admin')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white"
-          >
-            <LayoutDashboard size={20} />
-            <span className="font-medium">Back to Admin</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => handleNavigate('/dashboard/employee')}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white"
-          >
-            <ArrowLeft size={20} />
-            <span className="font-medium">Back to Dashboard</span>
-          </button>
-        )}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar space-y-6">
+        {/* Navigation Section */}
+        <div>
+          <SidebarLabel>Navigation</SidebarLabel>
+          <div className="space-y-1">
+            {isAdmin ? (
+              <button
+                onClick={() => handleNavigate('/dashboard/admin')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white group"
+              >
+                <LayoutDashboard size={18} className="text-slate-400 group-hover:text-white transition-colors" />
+                <span className="font-medium text-sm">Back to Admin</span>
+              </button>
+            ) : (
+              <button
+                onClick={() => handleNavigate('/dashboard/employee')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 text-slate-400 hover:bg-slate-800 hover:text-white group"
+              >
+                <ArrowLeft size={18} className="text-slate-400 group-hover:text-white transition-colors" />
+                <span className="font-medium text-sm">Back to Dashboard</span>
+              </button>
+            )}
+          </div>
+        </div>
 
+        {/* Analytics Section */}
         {isAdmin && (
-          <button
-            onClick={() => handleNavigate('/dashboard/ticketing/overview')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-              pathname === '/dashboard/ticketing/overview'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <PieChart size={20} />
-            <span className="font-medium">Overview</span>
-          </button>
+          <div>
+            <SidebarLabel>Analytics</SidebarLabel>
+            <div className="space-y-1">
+              <button
+                onClick={() => handleNavigate('/dashboard/ticketing/overview')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                  pathname === '/dashboard/ticketing/overview'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <PieChart size={18} className={pathname === '/dashboard/ticketing/overview' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                <span className="font-medium text-sm">Overview</span>
+              </button>
+            </div>
+          </div>
         )}
 
-        {hasStoresAccess && (
-          <button
-            onClick={() => handleNavigate('/dashboard/ticketing/stores')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-              pathname === '/dashboard/ticketing/stores'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Store size={20} />
-            <span className="font-medium">Stores</span>
-          </button>
+        {/* Inventory Section */}
+        {(hasStoresAccess || hasStoreInventoryAccess || hasAssetInventoryAccess) && (
+          <div>
+            <SidebarLabel>Inventory</SidebarLabel>
+            <div className="space-y-1">
+              {hasStoresAccess && (
+                <button
+                  onClick={() => handleNavigate('/dashboard/ticketing/stores')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    pathname === '/dashboard/ticketing/stores'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Store size={18} className={pathname === '/dashboard/ticketing/stores' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                  <span className="font-medium text-sm">Stores</span>
+                </button>
+              )}
+
+              {hasStoreInventoryAccess && (
+                <button
+                  onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    pathname === '/dashboard/ticketing/store-inventory'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Package size={18} className={pathname === '/dashboard/ticketing/store-inventory' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                  <span className="font-medium text-sm">Store Inventory</span>
+                </button>
+              )}
+
+              {hasAssetInventoryAccess && (
+                <button
+                  onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                    pathname === '/dashboard/ticketing/asset-inventory'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Monitor size={18} className={pathname === '/dashboard/ticketing/asset-inventory' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                  <span className="font-medium text-sm">Asset Inventory</span>
+                </button>
+              )}
+            </div>
+          </div>
         )}
 
-        {hasStoreInventoryAccess && (
-          <button
-            onClick={() => handleNavigate('/dashboard/ticketing/store-inventory')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-              pathname === '/dashboard/ticketing/store-inventory'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Package size={20} />
-            <span className="font-medium">Store Inventory</span>
-          </button>
-        )}
-
-        {hasAssetInventoryAccess && (
-          <button
-            onClick={() => handleNavigate('/dashboard/ticketing/asset-inventory')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-              pathname === '/dashboard/ticketing/asset-inventory'
-                ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-                : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-            }`}
-          >
-            <Monitor size={20} />
-            <span className="font-medium">Asset Inventory</span>
-          </button>
-        )}
-
-
-
-        <button
-          onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
-          className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
-            pathname === '/dashboard/ticketing/tickets'
-              ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/40'
-              : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-          }`}
-        >
-          <FileText size={20} />
-          <span className="font-medium">Tickets</span>
-        </button>
+        {/* Work Section */}
+        <div>
+          <SidebarLabel>Work</SidebarLabel>
+          <div className="space-y-1">
+            <button
+              onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                pathname === '/dashboard/ticketing/tickets'
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              <FileText size={18} className={pathname === '/dashboard/ticketing/tickets' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+              <span className="font-medium text-sm">Tickets</span>
+            </button>
+          </div>
+        </div>
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
+      <div className="p-3 border-t border-slate-800">
         <button
           onClick={logout}
           disabled={isLoggingOut}
-          className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
         >
           {isLoggingOut ? (
             <>
-              <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-              <span>Logging out...</span>
+              <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-sm font-medium">Logging out...</span>
             </>
           ) : (
             <>
-              <LogOut size={20} />
-              <span>Logout</span>
+              <LogOut size={18} />
+              <span className="text-sm font-medium">Logout</span>
             </>
           )}
         </button>
@@ -244,7 +268,7 @@ export default function TicketingLayout({
       )}
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 bg-slate-900 border-r border-slate-800">
+      <aside className="hidden md:flex flex-col w-56 bg-slate-900 border-r border-slate-800 transition-all duration-300">
         <SidebarContent />
       </aside>
 
@@ -259,3 +283,10 @@ export default function TicketingLayout({
     </div>
   );
 }
+
+// Helper Component for Sidebar Section Labels
+const SidebarLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <div className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+    {children}
+  </div>
+);
