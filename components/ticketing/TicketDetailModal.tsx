@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
@@ -619,7 +619,17 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                   {ticket.kb_id ? (
                     (() => {
                       const linkedArticle = kbArticles.find(a => a.id === ticket.kb_id);
-                      return linkedArticle ? `${linkedArticle.kb_code} - ${linkedArticle.title}` : ticket.kb_id;
+                      const displayText = linkedArticle ? `${linkedArticle.kb_code} - ${linkedArticle.title}` : ticket.kb_id;
+
+                      return (
+                        <button
+                          onClick={() => window.open(`/dashboard/knowledge-base/${ticket.kb_id}`, '_blank')}
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:underline transition-colors cursor-pointer group"
+                        >
+                          <span>{displayText}</span>
+                          <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      );
                     })()
                   ) : (
                     <span className="text-slate-600 italic">N/A</span>

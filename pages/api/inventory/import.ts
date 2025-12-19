@@ -49,7 +49,7 @@ async function getOrCreateRecord(
     .from(table)
     .select('id')
     .ilike(nameField, trimmedValue)
-    .single();
+    .maybeSingle();
 
   if (existing) {
     return existing.id;
@@ -153,11 +153,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         // Get or create store
         let storeId: string | null = null;
-        const { data: existingStore } = await supabaseAdmin
+        const { data: existingStore, error: findStoreError } = await supabaseAdmin
           .from('stores')
           .select('id')
           .or(`store_name.ilike.${row['Store Name'].trim()},store_code.ilike.${row['Store Code'].trim()}`)
-          .single();
+          .maybeSingle();
 
         if (existingStore) {
           storeId = existingStore.id;

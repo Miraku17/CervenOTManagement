@@ -38,7 +38,7 @@ interface Article {
 export default function EditArticlePage() {
   const router = useRouter();
   const params = useParams();
-  const slug = params?.slug as string;
+  const id = params?.id as string;
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
@@ -59,10 +59,10 @@ export default function EditArticlePage() {
   // Fetch article data
   useEffect(() => {
     async function fetchArticle() {
-      if (!slug) return;
+      if (!id) return;
 
       try {
-        const response = await fetch(`/api/knowledge-base/${slug}`);
+        const response = await fetch(`/api/knowledge-base/${id}`);
         const data = await response.json();
 
         if (response.ok && data.article) {
@@ -88,7 +88,7 @@ export default function EditArticlePage() {
     }
 
     fetchArticle();
-  }, [slug]);
+  }, [id]);
 
   // Fetch categories
   useEffect(() => {

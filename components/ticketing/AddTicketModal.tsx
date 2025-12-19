@@ -228,25 +228,16 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     fetchManagers();
   }, [selectedStore]);
 
-  // Fetch inventory
+  // Fetch inventory based on selected store only
   useEffect(() => {
     const fetchInventory = async () => {
-      try {
-        let url = `/api/inventory/get`;
-        const params = [];
-        
-        if (selectedStore) {
-          params.push(`store_id=${selectedStore.id}`);
-        }
-        if (formData.station_id) {
-          params.push(`station_id=${formData.station_id}`);
-        }
-        
-        if (params.length > 0) {
-          url += `?${params.join('&')}`;
-        }
+      if (!selectedStore) {
+        setInventoryItems([]);
+        return;
+      }
 
-        const response = await fetch(url);
+      try {
+        const response = await fetch(`/api/inventory/get?store_id=${selectedStore.id}`);
         const data = await response.json();
         if (response.ok) {
           setInventoryItems(data.items || []);
@@ -258,7 +249,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     };
 
     fetchInventory();
-  }, [selectedStore, formData.station_id]);
+  }, [selectedStore]);
 
   const handleStoreSelect = (store: Store) => {
     setSelectedStore(store);
@@ -266,13 +257,12 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setStoreCode(store.store_code);
     setStoreSearchTerm(store.store_name);
     setShowStoreDropdown(false);
-    setFormData({ 
-      ...formData, 
-      store_id: store.id, 
-      mod_id: '', 
-      station_id: '', // Reset station
+    setFormData({
+      ...formData,
+      store_id: store.id,
+      mod_id: '',
+      station_id: '', // Reset station (will be auto-filled from device)
       device: '', // Reset device
-      problem_category: '' // Reset category
     });
     setSelectedInventoryItem(null);
   };
@@ -330,27 +320,26 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       setFormData(prev => ({
         ...prev,
         device: '',
-        problem_category: ''
+        station_id: '',
       }));
       return;
     }
 
     const item = inventoryItems.find(i => i.id === itemId);
-    if (item && item.assets) { // Ensure item and item.assets exist
+    if (item) {
       setSelectedInventoryItem(item);
-      
-      const categoryName = item.assets.categories?.name || '';
-      const brandName = item.assets.brands?.name || '';
-      const modelName = item.assets.models?.name || '';
-      const serial = item.assets.serial_number || '';
-      
+
+      const categoryName = item.categories?.name || '';
+      const brandName = item.brands?.name || '';
+      const modelName = item.models?.name || '';
+      const serial = item.serial_number || '';
+
       const deviceString = [categoryName, brandName, modelName, serial].filter(Boolean).join(' ');
-      
+
       setFormData(prev => ({
         ...prev,
         device: deviceString,
-        // problem_category: categoryName, // Removed: no longer auto-populated
-        station_id: item.stations?.id || prev.station_id // Auto-fill station if available from inventory item
+        station_id: item.stations?.id || '', // Auto-populate station from device
       }));
     }
   };
@@ -389,13 +378,18 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setLoading(true);
     setError(null);
 
-    if (!selectedInventoryItem && !formData.device) { // Check if no inventory item is selected AND device is not manually entered
-        setError('Device is required');
+    if (!selectedInventoryItem) {
+        setError('Please select a device from inventory');
         setLoading(false);
         return;
     }
     if (!formData.serviced_by) {
         setError('Serviced By is required');
+        setLoading(false);
+        return;
+    }
+    if (!formData.station_id) {
+        setError('Station is required (auto-filled from device selection)');
         setLoading(false);
         return;
     }
@@ -691,29 +685,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-400 mb-1">
-                Station <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <select
-                  required
-                  value={formData.station_id}
-                  onChange={(e) => setFormData({ ...formData, station_id: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={!selectedStore}
-                >
-                  <option value="">Select Station</option>
-                  {stations.map((station) => (
-                    <option key={station.id} value={station.id}>
-                      {station.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-              </div>
-            </div>
-
             {/* Device Selection from Inventory */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1">
@@ -730,12 +701,12 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                   <option value="">Select Device from Inventory</option>
                   {inventoryItems.map((item) => {
                     const label = [
-                      item.assets?.categories?.name,
-                      item.assets?.brands?.name,
-                      item.assets?.models?.name,
-                      item.assets?.serial_number ? `(${item.assets.serial_number})` : ''
+                      item.categories?.name,
+                      item.brands?.name,
+                      item.models?.name,
+                      item.serial_number ? `(${item.serial_number})` : ''
                     ].filter(Boolean).join(' ');
-                    
+
                     return (
                       <option key={item.id} value={item.id}>
                         {label}
@@ -746,8 +717,32 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
               </div>
               {inventoryItems.length === 0 && selectedStore && (
-                <p className="text-xs text-slate-500 mt-1">No devices found for this store/station.</p>
+                <p className="text-xs text-slate-500 mt-1">No devices found for this store.</p>
               )}
+            </div>
+
+            {/* Station - Auto-populated from device */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Station <span className="text-red-500">*</span> <span className="text-xs text-slate-500">(Auto-filled from device)</span>
+              </label>
+              <div className="relative">
+                <select
+                  required
+                  value={formData.station_id}
+                  onChange={(e) => setFormData({ ...formData, station_id: e.target.value })}
+                  className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 pr-10 rounded-lg cursor-not-allowed appearance-none"
+                  disabled={true}
+                >
+                  <option value="">Station will be auto-filled when you select a device</option>
+                  {stations.map((station) => (
+                    <option key={station.id} value={station.id}>
+                      {station.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

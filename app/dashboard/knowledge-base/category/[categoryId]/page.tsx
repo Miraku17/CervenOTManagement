@@ -227,7 +227,7 @@ export default function CategoryPage() {
             {filteredArticles.map((article) => (
               <article
                 key={article.id}
-                onClick={() => router.push(`/dashboard/knowledge-base/${article.slug}`)}
+                onClick={() => router.push(`/dashboard/knowledge-base/${article.id}`)}
                 className="group bg-slate-900/50 border border-slate-800/60 hover:border-blue-500/30 rounded-2xl p-6 transition-all duration-300 cursor-pointer hover:shadow-xl hover:shadow-blue-900/20 backdrop-blur-sm relative overflow-hidden"
               >
                 {/* Hover gradient */}

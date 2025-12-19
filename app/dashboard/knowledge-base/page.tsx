@@ -393,7 +393,7 @@ export default function KnowledgeBasePage() {
                   {searchResults.map((article) => (
                     <div
                       key={article.id}
-                      onClick={() => router.push(`/dashboard/knowledge-base/${article.slug}`)}
+                      onClick={() => router.push(`/dashboard/knowledge-base/${article.id}`)}
                       className="group bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600/50 rounded-xl p-4 cursor-pointer transition-all"
                     >
                       <div className="flex items-start justify-between mb-2">
@@ -490,7 +490,7 @@ export default function KnowledgeBasePage() {
               recentArticles.map((article) => (
                 <a
                   key={article.id}
-                  href={`/dashboard/knowledge-base/${article.slug}`}
+                  href={`/dashboard/knowledge-base/${article.id}`}
                   className="block group bg-slate-950/40 hover:bg-slate-800/60 border border-slate-800/40 hover:border-slate-700/60 rounded-2xl p-4 transition-all duration-200"
                 >
                   <div className="flex items-center justify-between gap-4">
