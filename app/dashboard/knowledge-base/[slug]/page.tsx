@@ -66,9 +66,9 @@ export default function ArticlePage() {
         if (profile) {
           const position = (profile?.positions as any)?.name || null;
           setUserPosition(position);
-          console.log('User position from database:', position);
-          console.log('Allowed delete positions:', ALLOWED_DELETE_POSITIONS);
-          console.log('Can delete:', ALLOWED_DELETE_POSITIONS.includes(position));
+          // console.log('User position from database:', position);
+          // console.log('Allowed delete positions:', ALLOWED_DELETE_POSITIONS);
+          // console.log('Can delete:', ALLOWED_DELETE_POSITIONS.includes(position));
           setCanDelete(ALLOWED_DELETE_POSITIONS.includes(position));
         }
       }
