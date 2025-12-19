@@ -8,10 +8,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { slug } = req.query;
+  const { id } = req.query;
 
-  if (!slug || typeof slug !== 'string') {
-    return res.status(400).json({ error: 'Slug is required' });
+  if (!id || typeof id !== 'string') {
+    return res.status(400).json({ error: 'ID is required' });
   }
 
   try {
@@ -38,7 +38,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           name
         )
       `)
-      .eq('slug', slug)
+      .eq('id', id)
       .eq('published', true)
       .is('deleted_at', null)
       .single();

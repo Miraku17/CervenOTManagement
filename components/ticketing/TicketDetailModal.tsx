@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
@@ -12,6 +12,7 @@ interface Ticket {
   reported_by: string;
   serviced_by: string;
   rcc_reference_number: string;
+  kb_id?: string | null;
   date_reported: string;
   time_reported: string; // HH:mm:ss or similar
   date_responded: string | null;
@@ -52,6 +53,12 @@ interface TicketDetailModalProps {
   onClose: () => void;
   ticket: Ticket | null;
   onUpdate?: (updatedTicket: Ticket) => void;
+}
+
+interface KBArticle {
+  id: string;
+  title: string;
+  kb_code: string;
 }
 
 const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
@@ -307,6 +314,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [editData, setEditData] = useState<Partial<Ticket>>({});
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [kbArticles, setKbArticles] = useState<KBArticle[]>([]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -340,6 +348,25 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     checkUserRole();
   }, [user?.id]);
 
+  // Fetch KB articles when modal opens
+  useEffect(() => {
+    const fetchKBArticles = async () => {
+      try {
+        const response = await fetch('/api/knowledge-base/get?limit=1000');
+        const data = await response.json();
+        if (response.ok) {
+          setKbArticles(data.articles || []);
+        }
+      } catch (error) {
+        console.error('Error fetching KB articles:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchKBArticles();
+    }
+  }, [isOpen]);
+
   // Reset edit data when ticket changes
   useEffect(() => {
     if (ticket) {
@@ -363,6 +390,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         time_responded: ticket.time_responded || '',
         pause_time_start: ticket.pause_time_start || '',
         pause_time_end: ticket.pause_time_end || '',
+        kb_id: ticket.kb_id || '',
       });
     }
   }, [ticket]);
@@ -431,6 +459,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         time_responded: ticket.time_responded || '',
         pause_time_start: ticket.pause_time_start || '',
         pause_time_end: ticket.pause_time_end || '',
+        kb_id: ticket.kb_id || '',
       });
     }
   };
@@ -466,13 +495,11 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   const getSeverityColor = (sev: string) => {
     switch (sev.toLowerCase()) {
-      case 'critical':
+      case 'sev3':
         return 'text-red-400';
-      case 'high':
-        return 'text-orange-400';
-      case 'medium':
+      case 'sev2':
         return 'text-yellow-400';
-      case 'low':
+      case 'sev1':
         return 'text-blue-400';
       default:
         return 'text-slate-400';
@@ -567,6 +594,49 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             <LabelValue label="Problem Category" value={ticket.problem_category} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Device" value={ticket.device} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Request Detail" value={ticket.request_detail} fullWidth isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+
+            {/* KB Article Dropdown */}
+            <div className="col-span-full">
+              <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">
+                Related KB Article <span className="text-slate-600 text-xs normal-case">(Optional)</span>
+              </span>
+              {isEditMode ? (
+                <select
+                  disabled={isSaving}
+                  value={editData.kb_id || ''}
+                  onChange={(e) => setEditData({ ...editData, kb_id: e.target.value })}
+                  className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">No KB article selected</option>
+                  {kbArticles.map((article) => (
+                    <option key={article.id} value={article.id}>
+                      {article.kb_code} - {article.title}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="text-sm text-slate-300 font-medium break-words">
+                  {ticket.kb_id ? (
+                    (() => {
+                      const linkedArticle = kbArticles.find(a => a.id === ticket.kb_id);
+                      const displayText = linkedArticle ? `${linkedArticle.kb_code} - ${linkedArticle.title}` : ticket.kb_id;
+
+                      return (
+                        <button
+                          onClick={() => window.open(`/dashboard/knowledge-base/${ticket.kb_id}`, '_blank')}
+                          className="flex items-center gap-2 text-blue-400 hover:text-blue-300 hover:underline transition-colors cursor-pointer group"
+                        >
+                          <span>{displayText}</span>
+                          <ExternalLink size={14} className="opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      );
+                    })()
+                  ) : (
+                    <span className="text-slate-600 italic">N/A</span>
+                  )}
+                </div>
+              )}
+            </div>
           </DetailSection>
 
           <DetailSection title="Location & Contact" icon={MapPin}>

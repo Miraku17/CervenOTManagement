@@ -31,7 +31,7 @@ interface Article {
 export default function ArticlePage() {
   const router = useRouter();
   const params = useParams();
-  const slug = params?.slug as string;
+  const id = params?.id as string;
 
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,9 +66,6 @@ export default function ArticlePage() {
         if (profile) {
           const position = (profile?.positions as any)?.name || null;
           setUserPosition(position);
-          // console.log('User position from database:', position);
-          // console.log('Allowed delete positions:', ALLOWED_DELETE_POSITIONS);
-          // console.log('Can delete:', ALLOWED_DELETE_POSITIONS.includes(position));
           setCanDelete(ALLOWED_DELETE_POSITIONS.includes(position));
         }
       }
@@ -84,11 +81,11 @@ export default function ArticlePage() {
   }, [article, currentUserId]);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!id) return;
 
     async function fetchArticle() {
       try {
-        const response = await fetch(`/api/knowledge-base/${slug}`);
+        const response = await fetch(`/api/knowledge-base/${id}`);
         const data = await response.json();
 
         if (response.ok) {
@@ -105,7 +102,7 @@ export default function ArticlePage() {
     }
 
     fetchArticle();
-  }, [slug]);
+  }, [id]);
 
   // Render Lexical content
   const renderLexicalContent = (content: string) => {
@@ -367,7 +364,7 @@ export default function ArticlePage() {
           <div className="flex items-center gap-3">
             {isAuthor && (
               <button
-                onClick={() => router.push(`/dashboard/knowledge-base/edit/${article?.slug}`)}
+                onClick={() => router.push(`/dashboard/knowledge-base/edit/${article?.id}`)}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20"
               >
                 <Edit className="w-4 h-4" />
