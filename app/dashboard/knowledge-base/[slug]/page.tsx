@@ -25,6 +25,7 @@ interface Article {
   author_id: string;
   created_at: string;
   updated_at: string;
+  tags?: string[];
 }
 
 export default function ArticlePage() {
@@ -401,6 +402,20 @@ export default function ArticlePage() {
           <h1 className="text-4xl font-bold text-white mb-6 leading-tight">
             {article.title}
           </h1>
+
+          {/* Tags Display */}
+          {article.tags && article.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {article.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
             <div className="flex items-center gap-2">

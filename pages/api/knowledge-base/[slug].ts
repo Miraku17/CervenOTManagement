@@ -29,6 +29,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         category_id,
         author_id,
         kb_code,
+        tags,
         created_at,
         updated_at,
         published,
@@ -75,6 +76,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       kb_code: article.kb_code,
       author: authorName,
       author_id: article.author_id,
+      tags: article.tags || [],
       created_at: article.created_at,
       updated_at: article.updated_at,
       published: article.published

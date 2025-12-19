@@ -13,7 +13,8 @@ import {
   ChevronDown,
   CheckCircle,
   AlertCircle,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 
 interface Category {
@@ -49,6 +50,8 @@ export default function EditArticlePage() {
     description: '',
     content: ''
   });
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -70,6 +73,7 @@ export default function EditArticlePage() {
             description: data.article.description || '',
             content: data.article.content
           });
+          setTags(data.article.tags || []);
         } else {
           setErrorMessage('Article not found or you do not have permission to edit it');
           setShowErrorModal(true);
@@ -148,7 +152,7 @@ export default function EditArticlePage() {
           content: formData.content,
           category_id: categoryId,
           published: article.published,
-          tags: article.tags || [],
+          tags: tags,
         }),
       });
 
@@ -169,6 +173,25 @@ export default function EditArticlePage() {
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddTag = () => {
+    const trimmedTag = tagInput.trim();
+    if (trimmedTag && !tags.includes(trimmedTag)) {
+      setTags([...tags, trimmedTag]);
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
     }
   };
 
@@ -337,21 +360,55 @@ export default function EditArticlePage() {
               </div>
             </div>
 
-            {/* Tags (Placeholder) */}
+            {/* Tags */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-purple-500" />
                 Tags
               </h3>
-              <div className="flex flex-wrap gap-2">
-                {article.tags && article.tags.length > 0 ? (
-                  article.tags.map((tag, index) => (
-                    <span key={index} className="px-3 py-1 bg-slate-800 text-slate-300 text-xs rounded-full border border-slate-700">
-                      {tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="px-3 py-1 bg-slate-800 text-slate-400 text-xs rounded-full border border-slate-700 cursor-pointer hover:border-blue-500 hover:text-blue-400 transition-colors">+ Add Tag</span>
+              <div className="space-y-3">
+                {/* Tag Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    placeholder="Add a tag..."
+                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddTag}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {/* Display Tags */}
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="group px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20 flex items-center gap-2"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-purple-100 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {tags.length === 0 && (
+                  <p className="text-slate-500 text-xs">No tags added yet. Tags help users find your article.</p>
                 )}
               </div>
             </div>

@@ -32,19 +32,44 @@ export default function CreateArticlePage() {
     description: '',
     content: ''
   });
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Generate KB code on mount
+  // Fetch next KB code on mount
   useEffect(() => {
-    const generateKbCode = () => {
-      const timestamp = Date.now();
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-      return `KB-${timestamp}-${random}`;
-    };
+    async function fetchNextKbCode() {
+      try {
+        const response = await fetch('/api/knowledge-base/next-code');
+        const data = await response.json();
 
-    setKbCode(generateKbCode());
+        if (response.ok && data.kb_code) {
+          setKbCode(data.kb_code);
+        } else {
+          // Fallback if API fails - generate random code client-side
+          console.error('Failed to fetch KB code:', data.error);
+          const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+          let code = '';
+          for (let i = 0; i < 4; i++) {
+            code += chars.charAt(Math.floor(Math.random() * chars.length));
+          }
+          setKbCode(`KB-${code}`);
+        }
+      } catch (error) {
+        console.error('Error fetching KB code:', error);
+        // Fallback - generate random code client-side
+        const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+        let code = '';
+        for (let i = 0; i < 4; i++) {
+          code += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        setKbCode(`KB-${code}`);
+      }
+    }
+
+    fetchNextKbCode();
   }, []);
 
   useEffect(() => {
@@ -102,7 +127,7 @@ export default function CreateArticlePage() {
           category: formData.category,
           description: formData.description,
           published: true,
-          tags: [],
+          tags: tags,
           kb_code: kbCode,
         }),
       });
@@ -124,6 +149,25 @@ export default function CreateArticlePage() {
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAddTag = () => {
+    const trimmedTag = tagInput.trim();
+    if (trimmedTag && !tags.includes(trimmedTag)) {
+      setTags([...tags, trimmedTag]);
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTag();
     }
   };
 
@@ -226,9 +270,9 @@ export default function CreateArticlePage() {
                     KB Code
                   </label>
                   <div className="block w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-slate-300 text-sm font-mono">
-                    {kbCode || 'Generating...'}
+                    {kbCode || 'Loading...'}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Auto-generated knowledge base identifier</p>
+                  <p className="text-xs text-slate-500 mt-1">Auto-generated unique code for easy reference (e.g., KB-A7X2, KB-P4M9)</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -264,14 +308,56 @@ export default function CreateArticlePage() {
               </div>
             </div>
 
-            {/* Tags (Placeholder) */}
+            {/* Tags */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <Tag className="w-5 h-5 text-purple-500" />
                 Tags
               </h3>
-              <div className="flex flex-wrap gap-2">
-                 <span className="px-3 py-1 bg-slate-800 text-slate-400 text-xs rounded-full border border-slate-700 cursor-pointer hover:border-blue-500 hover:text-blue-400 transition-colors">+ Add Tag</span>
+              <div className="space-y-3">
+                {/* Tag Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={handleTagInputKeyDown}
+                    placeholder="Add a tag..."
+                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddTag}
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {/* Display Tags */}
+                {tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="group px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20 flex items-center gap-2"
+                      >
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTag(tag)}
+                          className="hover:text-purple-100 transition-colors"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {tags.length === 0 && (
+                  <p className="text-slate-500 text-xs">No tags added yet. Tags help users find your article.</p>
+                )}
               </div>
             </div>
           </div>
