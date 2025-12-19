@@ -2,12 +2,16 @@
 
 import React, { useState, useEffect, ReactElement } from 'react';
 import { useRouter, useParams } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 import {
   ArrowLeft,
   Clock,
   User,
   Calendar,
-  Tag
+  Tag,
+  Edit,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 
 interface Article {
@@ -18,8 +22,10 @@ interface Article {
   category: string;
   kb_code: string;
   author: string;
+  author_id: string;
   created_at: string;
   updated_at: string;
+  tags?: string[];
 }
 
 export default function ArticlePage() {
@@ -30,6 +36,52 @@ export default function ArticlePage() {
   const [article, setArticle] = useState<Article | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthor, setIsAuthor] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
+  const [canDelete, setCanDelete] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const ALLOWED_DELETE_POSITIONS = [
+    'Operations Manager',
+    'Technical Support Engineer',
+    'Operations Technical Lead'
+  ];
+
+  // Get current user and their position
+  useEffect(() => {
+    async function getCurrentUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+
+        // Fetch user's position from profiles (with positions table relationship)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        if (profile) {
+          const position = (profile?.positions as any)?.name || null;
+          setUserPosition(position);
+          // console.log('User position from database:', position);
+          // console.log('Allowed delete positions:', ALLOWED_DELETE_POSITIONS);
+          // console.log('Can delete:', ALLOWED_DELETE_POSITIONS.includes(position));
+          setCanDelete(ALLOWED_DELETE_POSITIONS.includes(position));
+        }
+      }
+    }
+    getCurrentUser();
+  }, []);
+
+  // Check if current user is the author
+  useEffect(() => {
+    if (article && currentUserId) {
+      setIsAuthor(article.author_id === currentUserId);
+    }
+  }, [article, currentUserId]);
 
   useEffect(() => {
     if (!slug) return;
@@ -232,6 +284,39 @@ export default function ArticlePage() {
     });
   };
 
+  const handleDelete = async () => {
+    if (!article) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch('/api/knowledge-base/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: article.id,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Redirect to knowledge base main page
+        router.push('/dashboard/knowledge-base');
+      } else {
+        alert(data.error || 'Failed to delete article');
+      }
+    } catch (error) {
+      console.error('Error deleting article:', error);
+      alert('Failed to delete article. Please try again.');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-200 flex items-center justify-center">
@@ -269,14 +354,38 @@ export default function ArticlePage() {
       </div>
 
       <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Back Button */}
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors mb-8 group"
-        >
-          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
-          <span className="font-medium">Back</span>
-        </button>
+        {/* Header with Back Button and Action Buttons */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
+          >
+            <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+            <span className="font-medium">Back</span>
+          </button>
+
+          <div className="flex items-center gap-3">
+            {isAuthor && (
+              <button
+                onClick={() => router.push(`/dashboard/knowledge-base/edit/${article?.slug}`)}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20"
+              >
+                <Edit className="w-4 h-4" />
+                <span>Edit Article</span>
+              </button>
+            )}
+
+            {canDelete && (
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-red-900/20"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete</span>
+              </button>
+            )}
+          </div>
+        </div>
 
         {/* Article Header */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 mb-6 backdrop-blur-sm">
@@ -293,6 +402,20 @@ export default function ArticlePage() {
           <h1 className="text-4xl font-bold text-white mb-6 leading-tight">
             {article.title}
           </h1>
+
+          {/* Tags Display */}
+          {article.tags && article.tags.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-6">
+              {article.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-400">
             <div className="flex items-center gap-2">
@@ -319,6 +442,49 @@ export default function ArticlePage() {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-4">
+                <AlertTriangle className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-white mb-2">Delete Article?</h3>
+              <p className="text-slate-400 mb-6">
+                Are you sure you want to delete &quot;{article?.title}&quot;? This action will soft delete the article and it will no longer be visible to users.
+              </p>
+              <div className="flex gap-3 w-full">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="flex-1 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-6 py-2 rounded-lg font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2"
+                >
+                  {isDeleting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      <span>Delete</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

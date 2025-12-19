@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, ReactElement } from 'react';
 import { useRouter } from 'next/navigation';
+import { supabase } from '@/services/supabase';
 import {
   Search,
   FileText,
@@ -29,6 +30,8 @@ interface Article {
   slug: string;
   content: string;
   category: string;
+  kb_code: string;
+  tags?: string[];
   created_at: string;
 }
 
@@ -37,10 +40,38 @@ export default function KnowledgeBasePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
   const [recentArticles, setRecentArticles] = useState<Article[]>([]);
+  const [searchResults, setSearchResults] = useState<Article[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [isCategoriesLoading, setIsCategoriesLoading] = useState(true);
   const [isArticlesLoading, setIsArticlesLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>('employee');
 
   const isLoading = isCategoriesLoading || isArticlesLoading;
+
+  // Fetch user role
+  useEffect(() => {
+    async function fetchUserRole() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single();
+
+          if (profile) {
+            setUserRole(profile.role || 'employee');
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+      }
+    }
+
+    fetchUserRole();
+  }, []);
 
   // Fetch categories with article counts
   useEffect(() => {
@@ -85,6 +116,60 @@ export default function KnowledgeBasePage() {
 
     fetchRecentArticles();
   }, []);
+
+  // Handle back button navigation based on role
+  const handleBack = () => {
+    if (userRole === 'admin') {
+      router.push('/dashboard/admin');
+    } else {
+      router.push('/dashboard/employee');
+    }
+  };
+
+  // Handle search
+  const handleSearch = async (query: string) => {
+    const trimmedQuery = query.trim();
+
+    if (!trimmedQuery) {
+      setShowSearchResults(false);
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    setShowSearchResults(true);
+
+    try {
+      const response = await fetch(`/api/knowledge-base/search?q=${encodeURIComponent(trimmedQuery)}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setSearchResults(data.articles || []);
+      } else {
+        console.error('Search error:', data.error);
+        setSearchResults([]);
+      }
+    } catch (error) {
+      console.error('Error searching:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounce search input
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (searchQuery) {
+        handleSearch(searchQuery);
+      } else {
+        setShowSearchResults(false);
+        setSearchResults([]);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   // Helper function to get category icon and color
   const getCategoryIcon = (categoryName: string) => {
@@ -227,8 +312,8 @@ export default function KnowledgeBasePage() {
       {/* Hero Section */}
       <div className="relative z-10 bg-gradient-to-b from-slate-900/80 to-slate-950/80 border-b border-slate-800/60 pb-16 pt-8 px-4 sm:px-6 lg:px-8 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto mb-8 flex items-center justify-between">
-          <button 
-            onClick={() => router.back()} 
+          <button
+            onClick={handleBack}
             className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors group"
           >
             <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
@@ -279,9 +364,75 @@ export default function KnowledgeBasePage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 -mt-8 relative z-20 pb-20">
-        
+
+        {/* Search Results */}
+        {showSearchResults && (
+          <div className="mb-12">
+            <div className="bg-slate-900/50 border border-slate-800/60 rounded-3xl p-6 md:p-8 backdrop-blur-sm">
+              <h2 className="text-2xl font-bold text-white mb-2">
+                Search Results
+              </h2>
+              <p className="text-slate-400 mb-6">
+                {isSearching ? (
+                  'Searching...'
+                ) : (
+                  `Found ${searchResults.length} ${searchResults.length === 1 ? 'article' : 'articles'} matching "${searchQuery}"`
+                )}
+              </p>
+
+              {isSearching ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              ) : searchResults.length === 0 ? (
+                <div className="text-center py-12">
+                  <p className="text-slate-400">No articles found. Try different keywords or search by KB code.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {searchResults.map((article) => (
+                    <div
+                      key={article.id}
+                      onClick={() => router.push(`/dashboard/knowledge-base/${article.slug}`)}
+                      className="group bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600/50 rounded-xl p-4 cursor-pointer transition-all"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <h3 className="font-semibold text-white group-hover:text-blue-400 transition-colors line-clamp-2">
+                          {article.title}
+                        </h3>
+                        <span className="text-xs font-mono text-slate-400 bg-slate-900/50 px-2 py-1 rounded border border-slate-700/50 ml-2 shrink-0">
+                          {article.kb_code}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded border border-blue-500/20">
+                          {article.category}
+                        </span>
+                        <span>{new Date(article.created_at).toLocaleDateString()}</span>
+                      </div>
+                      {article.tags && article.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {article.tags.slice(0, 3).map((tag: string, index: number) => (
+                            <span key={index} className="text-xs px-2 py-0.5 bg-purple-500/10 text-purple-300 rounded border border-purple-500/20">
+                              {tag}
+                            </span>
+                          ))}
+                          {article.tags.length > 3 && (
+                            <span className="text-xs text-slate-500">+{article.tags.length - 3} more</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+        {!showSearchResults && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
           {categories.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <p className="text-slate-400">No categories available</p>
@@ -316,10 +467,12 @@ export default function KnowledgeBasePage() {
               </div>
             ))
           )}
-        </div>
+          </div>
+        )}
 
         {/* Recent Articles Section */}
-        <div className="bg-slate-900/50 border border-slate-800/60 rounded-3xl p-6 md:p-8 backdrop-blur-sm relative overflow-hidden">
+        {!showSearchResults && (
+          <div className="bg-slate-900/50 border border-slate-800/60 rounded-3xl p-6 md:p-8 backdrop-blur-sm relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-900/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
 
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3 relative">
@@ -364,7 +517,8 @@ export default function KnowledgeBasePage() {
               ))
             )}
           </div>
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );

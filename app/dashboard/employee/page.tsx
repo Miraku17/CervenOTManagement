@@ -9,7 +9,7 @@ import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHis
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock } from 'lucide-react';
+import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -769,6 +769,16 @@ const EmployeeDashboard: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
+                          router.push('/dashboard/knowledge-base');
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                      >
+                        <BookOpen className="w-4 h-4" />
+                        <span>Knowledge Base</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           router.push('/dashboard/ticketing');
                           setIsActionsMenuOpen(false);
                         }}
@@ -835,6 +845,17 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <CalendarDays size={20} />
                 <span className="font-medium">File a Leave</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  router.push('/dashboard/knowledge-base');
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+              >
+                <BookOpen size={20} />
+                <span className="font-medium">Knowledge Base</span>
               </button>
 
               <button

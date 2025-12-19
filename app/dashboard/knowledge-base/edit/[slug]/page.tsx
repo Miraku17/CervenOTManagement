@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import LexicalEditor from '@/components/LexicalEditor';
 
 import {
@@ -11,9 +11,10 @@ import {
   Folder,
   Type,
   ChevronDown,
-  X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  X
 } from 'lucide-react';
 
 interface Category {
@@ -21,11 +22,28 @@ interface Category {
   name: string;
 }
 
-export default function CreateArticlePage() {
+interface Article {
+  id: string;
+  title: string;
+  slug: string;
+  content: string;
+  category_id: string;
+  kb_code: string;
+  published: boolean;
+  tags: string[];
+  description?: string;
+  author_id: string;
+}
+
+export default function EditArticlePage() {
   const router = useRouter();
+  const params = useParams();
+  const slug = params?.slug as string;
+
   const [isLoading, setIsLoading] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [kbCode, setKbCode] = useState('');
+  const [article, setArticle] = useState<Article | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     category: '',
@@ -38,40 +56,41 @@ export default function CreateArticlePage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  // Fetch next KB code on mount
+  // Fetch article data
   useEffect(() => {
-    async function fetchNextKbCode() {
+    async function fetchArticle() {
+      if (!slug) return;
+
       try {
-        const response = await fetch('/api/knowledge-base/next-code');
+        const response = await fetch(`/api/knowledge-base/${slug}`);
         const data = await response.json();
 
-        if (response.ok && data.kb_code) {
-          setKbCode(data.kb_code);
+        if (response.ok && data.article) {
+          setArticle(data.article);
+          setFormData({
+            title: data.article.title,
+            category: data.article.category,
+            description: data.article.description || '',
+            content: data.article.content
+          });
+          setTags(data.article.tags || []);
         } else {
-          // Fallback if API fails - generate random code client-side
-          console.error('Failed to fetch KB code:', data.error);
-          const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-          let code = '';
-          for (let i = 0; i < 4; i++) {
-            code += chars.charAt(Math.floor(Math.random() * chars.length));
-          }
-          setKbCode(`KB-${code}`);
+          setErrorMessage('Article not found or you do not have permission to edit it');
+          setShowErrorModal(true);
         }
       } catch (error) {
-        console.error('Error fetching KB code:', error);
-        // Fallback - generate random code client-side
-        const chars = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-        let code = '';
-        for (let i = 0; i < 4; i++) {
-          code += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-        setKbCode(`KB-${code}`);
+        console.error('Error fetching article:', error);
+        setErrorMessage('Failed to load article');
+        setShowErrorModal(true);
+      } finally {
+        setIsFetching(false);
       }
     }
 
-    fetchNextKbCode();
-  }, []);
+    fetchArticle();
+  }, [slug]);
 
+  // Fetch categories
   useEffect(() => {
     async function fetchCategories() {
       try {
@@ -93,6 +112,8 @@ export default function CreateArticlePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!article) return;
 
     // Validate required fields
     if (!formData.title.trim()) {
@@ -116,19 +137,22 @@ export default function CreateArticlePage() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/knowledge-base/create', {
-        method: 'POST',
+      // Find category ID from category name
+      const category = categories.find(cat => cat.name === formData.category);
+      const categoryId = category?.id || article.category_id;
+
+      const response = await fetch('/api/knowledge-base/update', {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          id: article.id,
           title: formData.title,
           content: formData.content,
-          category: formData.category,
-          description: formData.description,
-          published: true,
+          category_id: categoryId,
+          published: article.published,
           tags: tags,
-          kb_code: kbCode,
         }),
       });
 
@@ -137,15 +161,15 @@ export default function CreateArticlePage() {
       if (response.ok) {
         setShowSuccessModal(true);
         setTimeout(() => {
-          router.push('/dashboard/knowledge-base');
+          router.push(`/dashboard/knowledge-base/${data.article.slug}`);
         }, 1500);
       } else {
-        setErrorMessage(data.error || 'Failed to create article');
+        setErrorMessage(data.error || 'Failed to update article');
         setShowErrorModal(true);
       }
     } catch (error) {
-      console.error('Error creating article:', error);
-      setErrorMessage('Failed to create article. Please try again.');
+      console.error('Error updating article:', error);
+      setErrorMessage('Failed to update article. Please try again.');
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
@@ -171,6 +195,34 @@ export default function CreateArticlePage() {
     }
   };
 
+  if (isFetching) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <p className="text-slate-400">Loading article...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!article) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <p className="text-slate-400">Article not found or access denied</p>
+          <button
+            onClick={() => router.push('/dashboard/knowledge-base')}
+            className="mt-4 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg"
+          >
+            Back to Knowledge Base
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
       {/* Background Gradients */}
@@ -183,22 +235,22 @@ export default function CreateArticlePage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-4">
-            <button 
-              onClick={() => router.back()} 
+            <button
+              onClick={() => router.back()}
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-all"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-2xl font-bold text-white">Create New Article</h1>
+            <h1 className="text-2xl font-bold text-white">Edit Article</h1>
           </div>
           <div className="flex items-center gap-3">
-            <button 
+            <button
               onClick={() => router.back()}
               className="px-4 py-2 text-slate-400 hover:text-white font-medium transition-colors"
             >
               Cancel
             </button>
-            <button 
+            <button
               onClick={handleSubmit}
               disabled={isLoading}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2 rounded-lg font-medium transition-all shadow-lg shadow-blue-900/20"
@@ -211,7 +263,7 @@ export default function CreateArticlePage() {
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  <span>Publish Article</span>
+                  <span>Update Article</span>
                 </>
               )}
             </button>
@@ -247,9 +299,9 @@ export default function CreateArticlePage() {
                 Content <span className="text-red-500">*</span>
               </label>
               <div className="flex-1">
-                <LexicalEditor 
+                <LexicalEditor
                   initialValue={formData.content}
-                  onChange={(content) => setFormData({ ...formData, content })} 
+                  onChange={(content) => setFormData({ ...formData, content })}
                 />
               </div>
             </div>
@@ -270,9 +322,9 @@ export default function CreateArticlePage() {
                     KB Code
                   </label>
                   <div className="block w-full px-4 py-2.5 bg-slate-950/50 border border-slate-800 rounded-xl text-slate-300 text-sm font-mono">
-                    {kbCode || 'Loading...'}
+                    {article.kb_code}
                   </div>
-                  <p className="text-xs text-slate-500 mt-1">Auto-generated unique code for easy reference (e.g., KB-A7X2, KB-P4M9)</p>
+                  <p className="text-xs text-slate-500 mt-1">Knowledge base identifier (cannot be changed)</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">
@@ -280,15 +332,15 @@ export default function CreateArticlePage() {
                   </label>
                   <div className="relative">
                     <select
-                                      required
-                                      value={formData.category}
-                                      onChange={e => setFormData({...formData, category: e.target.value})}
-                                      className="block w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all appearance-none pr-10"
-                                    >
-                                      <option value="" disabled>Select a category</option>
-                                      {categories.map(cat => (
-                                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                                      ))}
+                      required
+                      value={formData.category}
+                      onChange={e => setFormData({...formData, category: e.target.value})}
+                      className="block w-full px-4 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all appearance-none pr-10"
+                    >
+                      <option value="" disabled>Select a category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.name}>{cat.name}</option>
+                      ))}
                     </select>
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
                   </div>
@@ -372,9 +424,9 @@ export default function CreateArticlePage() {
               <div className="w-16 h-16 bg-green-500/10 rounded-full flex items-center justify-center mb-4">
                 <CheckCircle className="w-8 h-8 text-green-500" />
               </div>
-              <h3 className="text-xl font-semibold text-white mb-2">Article Created Successfully!</h3>
+              <h3 className="text-xl font-semibold text-white mb-2">Article Updated Successfully!</h3>
               <p className="text-slate-400">
-                Your knowledge base article has been published and is now available.
+                Your changes have been saved and published.
               </p>
             </div>
           </div>
