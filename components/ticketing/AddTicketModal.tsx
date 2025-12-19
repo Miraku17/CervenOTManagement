@@ -329,10 +329,10 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     if (item) {
       setSelectedInventoryItem(item);
 
-      const categoryName = item.categories?.name || '';
-      const brandName = item.brands?.name || '';
-      const modelName = item.models?.name || '';
-      const serial = item.serial_number || '';
+      const categoryName = item.assets?.categories?.name || '';
+      const brandName = item.assets?.brands?.name || '';
+      const modelName = item.assets?.models?.name || '';
+      const serial = item.assets?.serial_number || '';
 
       const deviceString = [categoryName, brandName, modelName, serial].filter(Boolean).join(' ');
 
@@ -701,10 +701,10 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                   <option value="">Select Device from Inventory</option>
                   {inventoryItems.map((item) => {
                     const label = [
-                      item.categories?.name,
-                      item.brands?.name,
-                      item.models?.name,
-                      item.serial_number ? `(${item.serial_number})` : ''
+                      item.assets?.categories?.name,
+                      item.assets?.brands?.name,
+                      item.assets?.models?.name,
+                      item.assets?.serial_number ? `(${item.assets.serial_number})` : ''
                     ].filter(Boolean).join(' ');
 
                     return (
