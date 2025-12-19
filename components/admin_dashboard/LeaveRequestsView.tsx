@@ -162,7 +162,7 @@ const LeaveRequestsView: React.FC = () => {
 
     setIsExporting(true);
     try {
-      const doc = new jsPDF();
+      const doc = new jsPDF({ orientation: 'landscape' });
       const pageWidth = doc.internal.pageSize.getWidth();
 
       // Filter requests by date range
@@ -263,12 +263,12 @@ const LeaveRequestsView: React.FC = () => {
           fillColor: [248, 250, 252],
         },
         columnStyles: {
-          0: { cellWidth: 35 }, // Employee
-          1: { cellWidth: 25 }, // Leave Type
-          2: { cellWidth: 25 }, // Start Date
-          3: { cellWidth: 25 }, // End Date
-          4: { cellWidth: 18 }, // Days
-          5: { cellWidth: 22 }, // Status
+          0: { cellWidth: 50 }, // Employee
+          1: { cellWidth: 35 }, // Leave Type
+          2: { cellWidth: 35 }, // Start Date
+          3: { cellWidth: 35 }, // End Date
+          4: { cellWidth: 25 }, // Days
+          5: { cellWidth: 30 }, // Status
           6: { cellWidth: 'auto' }, // Reviewer
         },
         margin: { left: 14, right: 14 },

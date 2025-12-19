@@ -72,7 +72,7 @@ export default function StoresPage() {
   };
 
   const handlePrintAllStoresPDF = async () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     try {

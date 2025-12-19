@@ -155,7 +155,7 @@ export default function AssetInventoryPage() {
   };
 
   const handlePrint = async () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Sort assets alphabetically by category name

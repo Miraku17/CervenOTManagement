@@ -303,7 +303,7 @@ export default function StoreInventoryPage() {
   };
 
   const handlePrint = async () => {
-    const doc = new jsPDF();
+    const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
     // Sort inventory alphabetically by brand name
@@ -385,13 +385,13 @@ export default function StoreInventoryPage() {
         fillColor: [248, 250, 252], // Light gray
       },
       columnStyles: {
-        0: { cellWidth: 30 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 25 },
-        3: { cellWidth: 25 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 30 },
-        6: { cellWidth: 20 },
+        0: { cellWidth: 40 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 35 },
+        3: { cellWidth: 35 },
+        4: { cellWidth: 35 },
+        5: { cellWidth: 45 },
+        6: { cellWidth: 30 },
       },
     });
 

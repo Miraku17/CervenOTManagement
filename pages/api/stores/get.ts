@@ -18,7 +18,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .from('stores')
       .select('*')
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('store_code', { ascending: true });
 
     if (storesError) {
       throw storesError;
