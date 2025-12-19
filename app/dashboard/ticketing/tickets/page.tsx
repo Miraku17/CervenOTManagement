@@ -208,10 +208,9 @@ export default function TicketsPage() {
 
   const getSeverityColor = (sev: string) => {
     switch (sev.toLowerCase()) {
-      case 'critical': return 'text-red-400 bg-red-400/10 border-red-400/20';
-      case 'high': return 'text-orange-400 bg-orange-400/10 border-orange-400/20';
-      case 'medium': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
-      case 'low': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+      case 'sev3': return 'text-red-400 bg-red-400/10 border-red-400/20';
+      case 'sev2': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
+      case 'sev1': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
       default: return 'text-slate-400 bg-slate-400/10 border-slate-400/20';
     }
   };

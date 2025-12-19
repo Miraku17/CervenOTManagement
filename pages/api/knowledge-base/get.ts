@@ -23,6 +23,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         slug,
         content,
         category_id,
+        kb_code,
+        tags,
         created_at,
         updated_at,
         published,
@@ -61,6 +63,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         content: article.content,
         category_id: article.category_id,
         category: categoryData?.name || 'Uncategorized',
+        kb_code: article.kb_code,
+        tags: article.tags || [],
         created_at: article.created_at,
         updated_at: article.updated_at,
         published: article.published
