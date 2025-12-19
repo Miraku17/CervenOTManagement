@@ -74,6 +74,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       category: categoryData?.name || 'Uncategorized',
       kb_code: article.kb_code,
       author: authorName,
+      author_id: article.author_id,
       created_at: article.created_at,
       updated_at: article.updated_at,
       published: article.published
