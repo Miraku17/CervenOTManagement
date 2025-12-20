@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart } from 'lucide-react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/services/supabase';
@@ -188,6 +188,26 @@ export default function TicketingLayout({
             </button>
           </div>
         </div>
+
+        {/* Management Section */}
+        {isAdmin && (
+          <div>
+            <SidebarLabel>Management</SidebarLabel>
+            <div className="space-y-1">
+              <button
+                onClick={() => handleNavigate('/dashboard/ticketing/audit-logs')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                  pathname === '/dashboard/ticketing/audit-logs'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <History size={18} className={pathname === '/dashboard/ticketing/audit-logs' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                <span className="font-medium text-sm">Audit Logs</span>
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       <div className="p-3 border-t border-slate-800">
