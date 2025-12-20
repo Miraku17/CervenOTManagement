@@ -84,6 +84,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    const userId = req.user.id;
     const { fileData } = req.body;
 
     if (!fileData) {
@@ -183,7 +188,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
               status: row['Status'].trim(),
               updated_at: new Date().toISOString(),
-              updated_by: req.user.id,
+              updated_by: userId,
             })
             .eq('id', existingAsset.id);
 
@@ -200,7 +205,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               under_warranty: underWarranty,
               warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
               status: row['Status'].trim(),
-              created_by: req.user.id,
+              created_by: userId,
             });
 
           if (assetError) throw new Error(`Failed to create asset: ${assetError.message}`);

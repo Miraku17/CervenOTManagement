@@ -22,16 +22,22 @@ interface Asset {
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
   created_by_user?: {
+    id: string;
     first_name: string;
     last_name: string;
+    email: string;
   } | null;
   updated_by_user?: {
+    id: string;
     first_name: string;
     last_name: string;
+    email: string;
   } | null;
   deleted_by_user?: {
+    id: string;
     first_name: string;
     last_name: string;
+    email: string;
   } | null;
 }
 
