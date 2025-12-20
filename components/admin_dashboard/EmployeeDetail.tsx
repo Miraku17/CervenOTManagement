@@ -194,40 +194,43 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   };
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex items-center justify-between mb-2">
+    <div className="animate-fade-in space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
         <button
           onClick={onBack}
           className="flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
         >
           <ArrowLeft size={20} />
-          <span>Back to Directory</span>
+          <span className="text-sm sm:text-base">Back to Directory</span>
         </button>
 
         {!isEditMode && (
-          <div className="flex gap-3">
+          <div className="flex flex-wrap gap-2 sm:gap-3">
             <button
               onClick={() => setIsScheduleModalOpen(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700"
+              className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors border border-slate-700 text-sm"
             >
               <CalendarDays size={18} />
-              <span>View Schedule</span>
+              <span className="hidden sm:inline">View Schedule</span>
+              <span className="sm:hidden">Schedule</span>
             </button>
             {isOperationsManager && (
               <>
                 <button
                   onClick={() => setIsPasswordModalOpen(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors text-sm"
                 >
                   <Key size={18} />
-                  <span>Update Password</span>
+                  <span className="hidden sm:inline">Update Password</span>
+                  <span className="sm:hidden">Password</span>
                 </button>
                 <button
                   onClick={() => setIsEditMode(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                  className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm"
                 >
                   <Edit2 size={18} />
-                  <span>Edit Employee</span>
+                  <span className="hidden sm:inline">Edit Employee</span>
+                  <span className="sm:hidden">Edit</span>
                 </button>
               </>
             )}
@@ -236,65 +239,65 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       </div>
 
       {error && (
-        <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400">
+        <div className="p-3 sm:p-4 bg-red-500/10 border border-red-500/20 rounded-lg sm:rounded-xl text-red-400 text-sm sm:text-base">
           {error}
         </div>
       )}
 
       {/* Top Profile Card */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 md:p-8 shadow-xl relative overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl md:rounded-3xl p-4 sm:p-6 md:p-8 shadow-xl relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-r from-blue-900/40 to-slate-900/0"></div>
 
-        <div className="relative flex flex-col md:flex-row gap-8 items-start">
-            <div className="shrink-0">
+        <div className="relative flex flex-col md:flex-row gap-4 md:gap-8 items-start">
+            <div className="shrink-0 mx-auto md:mx-0">
                 <img
                     src={employee.avatarUrl}
                     alt={employee.fullName}
-                    className="w-32 h-32 rounded-2xl border-4 border-slate-800 shadow-2xl object-cover"
+                    className="w-24 h-24 sm:w-32 sm:h-32 rounded-2xl border-4 border-slate-800 shadow-2xl object-cover"
                 />
             </div>
 
-            <div className="flex-1 space-y-4">
+            <div className="flex-1 space-y-3 md:space-y-4 w-full">
                 {isEditMode ? (
                   // Edit Mode
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-3 sm:space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <label className="text-sm text-slate-400 mb-2 block">First Name</label>
+                        <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block">First Name</label>
                         <input
                           type="text"
                           value={editFormData.firstName}
                           onChange={(e) => setEditFormData({ ...editFormData, firstName: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                         />
                       </div>
                       <div>
-                        <label className="text-sm text-slate-400 mb-2 block">Last Name</label>
+                        <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block">Last Name</label>
                         <input
                           type="text"
                           value={editFormData.lastName}
                           onChange={(e) => setEditFormData({ ...editFormData, lastName: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400 mb-2 block">Employee ID</label>
+                      <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block">Employee ID</label>
                       <input
                         type="text"
                         value={editFormData.employee_id}
                         onChange={(e) => setEditFormData({ ...editFormData, employee_id: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                       />
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400 mb-2 block">Position</label>
+                      <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block">Position</label>
                       <select
                         value={editFormData.positionId}
                         onChange={(e) => setEditFormData({ ...editFormData, positionId: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                       >
                         <option value="">Select Position</option>
                         {positions.map((pos) => (
@@ -304,62 +307,62 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400 mb-2 block">Role</label>
+                      <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block">Role</label>
                       <select
                         value={editFormData.role}
                         onChange={(e) => setEditFormData({ ...editFormData, role: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                       >
                         <option value="employee">Employee</option>
                         <option value="admin">Admin</option>
                       </select>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div>
-                        <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
-                          <Mail size={16} />
+                        <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block flex items-center gap-2">
+                          <Mail size={14} className="sm:w-4 sm:h-4" />
                           Email
                         </label>
                         <input
                           type="email"
                           value={editFormData.email}
                           onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                         />
                       </div>
                       <div>
-                        <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
-                          <Phone size={16} />
+                        <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block flex items-center gap-2">
+                          <Phone size={14} className="sm:w-4 sm:h-4" />
                           Contact Number
                         </label>
                         <input
                           type="text"
                           value={editFormData.contact_number}
                           onChange={(e) => setEditFormData({ ...editFormData, contact_number: e.target.value })}
-                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="text-sm text-slate-400 mb-2 block flex items-center gap-2">
-                        <MapPin size={16} />
+                      <label className="text-xs sm:text-sm text-slate-400 mb-1.5 sm:mb-2 block flex items-center gap-2">
+                        <MapPin size={14} className="sm:w-4 sm:h-4" />
                         Address
                       </label>
                       <input
                         type="text"
                         value={editFormData.address}
                         onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
-                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm sm:text-base"
                       />
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
                       <button
                         onClick={handleSaveEdit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                       >
                         {isSaving ? (
                           <>
@@ -368,7 +371,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                           </>
                         ) : (
                           <>
-                            <Save size={18} />
+                            <Save size={16} className="sm:w-[18px] sm:h-[18px]" />
                             <span>Save Changes</span>
                           </>
                         )}
@@ -376,9 +379,9 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                       <button
                         onClick={handleCancelEdit}
                         disabled={isSaving}
-                        className="flex items-center gap-2 px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50"
+                        className="flex items-center justify-center gap-2 px-4 sm:px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors disabled:opacity-50 text-sm sm:text-base"
                       >
-                        <X size={18} />
+                        <X size={16} className="sm:w-[18px] sm:h-[18px]" />
                         <span>Cancel</span>
                       </button>
                     </div>
@@ -386,26 +389,26 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                 ) : (
                   // View Mode
                   <>
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">{employee.fullName}</h1>
-                        <p className="text-lg text-blue-400 font-medium">{employee.position}</p>
+                    <div className="text-center md:text-left">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-white">{employee.fullName}</h1>
+                        <p className="text-base sm:text-lg text-blue-400 font-medium">{employee.position}</p>
                         {employee.employee_id && (
-                          <p className="text-sm text-slate-500 mt-1">ID: {employee.employee_id}</p>
+                          <p className="text-xs sm:text-sm text-slate-500 mt-1">ID: {employee.employee_id}</p>
                         )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-slate-300">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-sm sm:text-base text-slate-300">
                         <div className="flex items-center gap-3">
-                            <Mail className="w-5 h-5 text-slate-500" />
-                            <span>{employee.email}</span>
+                            <Mail className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
+                            <span className="truncate">{employee.email}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                            <Phone className="w-5 h-5 text-slate-500" />
-                        <span>{employee.contact_number || "N/A"}</span>
+                            <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
+                            <span>{employee.contact_number || "N/A"}</span>
                         </div>
-                        <div className="flex items-center gap-3">
-                            <MapPin className="w-5 h-5 text-slate-500" />
-                            <span>{employee.address}</span>
+                        <div className="flex items-center gap-3 sm:col-span-2">
+                            <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-slate-500 shrink-0" />
+                            <span className="break-words">{employee.address}</span>
                         </div>
                     </div>
                   </>
@@ -413,8 +416,8 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
             </div>
 
             {!isEditMode && (
-              <div className="flex flex-col gap-3">
-                  <span className="px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-sm font-medium text-center">
+              <div className="flex flex-row md:flex-col gap-3 justify-center md:justify-start w-full md:w-auto">
+                  <span className="px-3 sm:px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs sm:text-sm font-medium text-center">
                       {employee.status}
                   </span>
                   {/* <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span> */}
@@ -424,36 +427,39 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
       </div>
 
       {/* Attendance Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Date Selector */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Calendar className="text-blue-400" size={20} />
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl">
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-3 sm:mb-4 flex items-center gap-2">
+                <Calendar className="text-blue-400" size={18} />
                 Select Date
             </h3>
-            <p className="text-slate-400 text-sm mb-4">Choose a date to view entry and exit logs.</p>
+            <p className="text-slate-400 text-xs sm:text-sm mb-3 sm:mb-4">Choose a date to view entry and exit logs.</p>
             <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer hover:bg-slate-900 transition-colors [color-scheme:dark]"
+                className="w-full bg-slate-950 border border-slate-700 text-white px-3 sm:px-4 py-2 sm:py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer hover:bg-slate-900 transition-colors text-sm sm:text-base scheme-dark"
             />
         </div>
 
         {/* Log Details */}
-        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative">
-            <h3 className="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                <Clock className="text-blue-400" size={20} />
-                Attendance Log: <span className="text-blue-300">{formatInTimeZone(parseISO(selectedDate), PHILIPPINE_TZ, 'MMMM dd, yyyy')}</span>
+        <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative">
+            <h3 className="text-base sm:text-lg font-semibold text-white mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                <span className="flex items-center gap-2">
+                  <Clock className="text-blue-400" size={18} />
+                  Attendance Log:
+                </span>
+                <span className="text-blue-300 text-sm sm:text-base">{formatInTimeZone(parseISO(selectedDate), PHILIPPINE_TZ, 'MMMM dd, yyyy')}</span>
             </h3>
 
             {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                    <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-3" />
-                    <p className="text-slate-400">Loading attendance data...</p>
+                <div className="flex flex-col items-center justify-center py-8 sm:py-12">
+                    <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400 animate-spin mb-2 sm:mb-3" />
+                    <p className="text-slate-400 text-sm sm:text-base">Loading attendance data...</p>
                 </div>
             ) : error ? (
-                <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-center text-rose-400">
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg sm:rounded-xl text-center text-rose-400 text-sm sm:text-base">
                     {error}
                 </div>
             ) : (
@@ -461,20 +467,21 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                     {attendanceData?.sessions && attendanceData.sessions.length > 0 ? (
                       <>
                         {/* Summary Section */}
-                        <div className="grid grid-cols-3 gap-4 mb-6">
-                          <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-center">
-                            <p className="text-xs text-slate-500 uppercase font-medium mb-1">Actual Total Hours</p>
-                            <p className="text-2xl font-bold text-emerald-400">
-                              {attendanceData.totalHours ? `${attendanceData.totalHours} hrs` : '--'}
+                        <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                          <div className="bg-slate-950 border border-slate-800 p-2 sm:p-4 rounded-lg sm:rounded-xl text-center">
+                            <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium mb-0.5 sm:mb-1">Total Hours</p>
+                            <p className="text-lg sm:text-2xl font-bold text-emerald-400">
+                              {attendanceData.totalHours ? `${attendanceData.totalHours}` : '--'}
                             </p>
+                            <p className="text-[9px] sm:text-xs text-slate-500">hrs</p>
                           </div>
-                          <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-center">
-                            <p className="text-xs text-slate-500 uppercase font-medium mb-1">Sessions</p>
-                            <p className="text-2xl font-bold text-blue-400">{attendanceData.sessionCount}</p>
+                          <div className="bg-slate-950 border border-slate-800 p-2 sm:p-4 rounded-lg sm:rounded-xl text-center">
+                            <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium mb-0.5 sm:mb-1">Sessions</p>
+                            <p className="text-lg sm:text-2xl font-bold text-blue-400">{attendanceData.sessionCount}</p>
                           </div>
-                          <div className="bg-slate-950 border border-slate-800 p-4 rounded-xl text-center">
-                            <p className="text-xs text-slate-500 uppercase font-medium mb-1">Status</p>
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                          <div className="bg-slate-950 border border-slate-800 p-2 sm:p-4 rounded-lg sm:rounded-xl text-center">
+                            <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium mb-0.5 sm:mb-1">Status</p>
+                            <span className={`inline-block px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
                               attendanceData.status === 'In Progress'
                                 ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                                 : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
@@ -485,12 +492,12 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         </div>
 
                         {/* Sessions List */}
-                        <div className="space-y-3">
+                        <div className="space-y-2 sm:space-y-3">
                           {attendanceData.sessions.map((session: any, index: number) => (
-                            <div key={session.id} className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
-                              <div className="flex items-center gap-2 mb-3">
-                                <span className="text-sm font-semibold text-slate-300">Session {index + 1}</span>
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            <div key={session.id} className="bg-slate-950/50 border border-slate-800 rounded-lg sm:rounded-xl p-3 sm:p-4">
+                              <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3 flex-wrap">
+                                <span className="text-xs sm:text-sm font-semibold text-slate-300">Session {index + 1}</span>
+                                <span className={`text-[10px] sm:text-xs font-medium px-1.5 sm:px-2 py-0.5 rounded-full ${
                                   session.status === 'Active'
                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                     : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
@@ -498,12 +505,12 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                                   {session.status}
                                 </span>
                                 {session.duration && (
-                                  <span className="text-xs text-emerald-400 font-medium ml-auto">
+                                  <span className="text-[10px] sm:text-xs text-emerald-400 font-medium ml-auto">
                                     {session.duration} hrs
                                   </span>
                                 )}
                                 {session.overtimeRequest && (
-                                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                  <span className={`px-1.5 sm:px-2 py-0.5 rounded text-[9px] sm:text-[10px] font-bold uppercase ${
                                     session.overtimeRequest.status === 'approved'
                                       ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
                                       : session.overtimeRequest.status === 'rejected'
@@ -515,19 +522,19 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                                 )}
                               </div>
 
-                              <div className="grid grid-cols-2 gap-4">
+                              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                 <div>
-                                  <p className="text-xs text-slate-500 uppercase font-medium mb-1">Clock In</p>
-                                  <p className="text-lg font-semibold text-white mb-1">{session.timeIn || '--:--'}</p>
-                                  <p className="text-xs text-slate-400 truncate" title={session.clockInLocation?.address || 'No address'}>
+                                  <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium mb-0.5 sm:mb-1">Clock In</p>
+                                  <p className="text-base sm:text-lg font-semibold text-white mb-0.5 sm:mb-1">{session.timeIn || '--:--'}</p>
+                                  <p className="text-[10px] sm:text-xs text-slate-400 truncate" title={session.clockInLocation?.address || 'No address'}>
                                     {session.clockInLocation?.address || 'No address'}
                                   </p>
                                 </div>
                                 <div>
-                                  <p className="text-xs text-slate-500 uppercase font-medium mb-1">Clock Out</p>
-                                  <p className="text-lg font-semibold text-white mb-1">{session.timeOut || '--:--'}</p>
+                                  <p className="text-[10px] sm:text-xs text-slate-500 uppercase font-medium mb-0.5 sm:mb-1">Clock Out</p>
+                                  <p className="text-base sm:text-lg font-semibold text-white mb-0.5 sm:mb-1">{session.timeOut || '--:--'}</p>
                                   {session.timeOut && (
-                                    <p className="text-xs text-slate-400 truncate" title={session.clockOutLocation?.address || 'No address'}>
+                                    <p className="text-[10px] sm:text-xs text-slate-400 truncate" title={session.clockOutLocation?.address || 'No address'}>
                                       {session.clockOutLocation?.address || 'No address'}
                                     </p>
                                   )}
@@ -536,14 +543,14 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
 
                               {/* Overtime Request Details */}
                               {session.overtimeRequest && (
-                                <div className="mt-3 pt-3 border-t border-slate-800/50">
+                                <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-800/50">
                                   {session.overtimeRequest.comment && (
                                     <div className="mb-2">
-                                      <p className="text-xs text-slate-500 mb-1">Overtime Comment:</p>
-                                      <p className="text-xs text-slate-300 italic">"{session.overtimeRequest.comment}"</p>
+                                      <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5 sm:mb-1">Overtime Comment:</p>
+                                      <p className="text-[10px] sm:text-xs text-slate-300 italic">"{session.overtimeRequest.comment}"</p>
                                     </div>
                                   )}
-                                  <div className="grid grid-cols-2 gap-2 text-xs text-slate-400">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 text-[10px] sm:text-xs text-slate-400">
                                     {session.overtimeRequest.requestedAt && (
                                       <div>
                                         <span className="text-slate-500">Requested:</span> {formatInTimeZone(new Date(session.overtimeRequest.requestedAt), PHILIPPINE_TZ, 'MMM dd, hh:mm a')}
@@ -555,7 +562,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                                       </div>
                                     )}
                                     {session.overtimeRequest.reviewer && (
-                                      <div className="col-span-2">
+                                      <div className="sm:col-span-2">
                                         <span className="text-slate-500">Reviewed by:</span> {session.overtimeRequest.reviewer.first_name} {session.overtimeRequest.reviewer.last_name}
                                       </div>
                                     )}
@@ -567,7 +574,7 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
                         </div>
                       </>
                     ) : (
-                        <div className="mt-6 p-4 bg-slate-800/50 rounded-xl border border-slate-800 text-center text-slate-400">
+                        <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-800 text-center text-slate-400 text-sm sm:text-base">
                             No records found for this date (possibly weekend or absent).
                         </div>
                     )}
