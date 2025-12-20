@@ -183,6 +183,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
               status: row['Status'].trim(),
               updated_at: new Date().toISOString(),
+              updated_by: req.user.id,
             })
             .eq('id', existingAsset.id);
 
@@ -199,6 +200,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               under_warranty: underWarranty,
               warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
               status: row['Status'].trim(),
+              created_by: req.user.id,
             });
 
           if (assetError) throw new Error(`Failed to create asset: ${assetError.message}`);

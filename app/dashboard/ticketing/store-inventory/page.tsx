@@ -15,6 +15,7 @@ interface InventoryItem {
   id: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   serial_number: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
@@ -38,6 +39,18 @@ interface InventoryItem {
   models: {
     id: string;
     name: string;
+  } | null;
+  created_by_user?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+  updated_by_user?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+  deleted_by_user?: {
+    first_name: string;
+    last_name: string;
   } | null;
 }
 
@@ -306,8 +319,22 @@ export default function StoreInventoryPage() {
     const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Fetch ALL inventory items including deleted ones for the PDF
+    let allItems: InventoryItem[] = [];
+    try {
+      const response = await fetch('/api/inventory/get-all');
+      const data = await response.json();
+      if (response.ok) {
+        allItems = data.items || [];
+      }
+    } catch (error) {
+      console.error('Error fetching all inventory:', error);
+      // Fallback to current items if fetch fails
+      allItems = filteredItems;
+    }
+
     // Sort inventory alphabetically by brand name
-    const sortedItems = [...filteredItems].sort((a, b) => {
+    const sortedItems = [...allItems].sort((a, b) => {
       const nameA = a.brands?.name || '';
       const nameB = b.brands?.name || '';
       return nameA.localeCompare(nameB);
@@ -343,8 +370,10 @@ export default function StoreInventoryPage() {
       month: 'long',
       day: 'numeric',
     });
+    const activeCount = sortedItems.filter(item => !item.deleted_at).length;
+    const deletedCount = sortedItems.filter(item => item.deleted_at).length;
     doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Items: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
+    doc.text(`Active: ${activeCount} | Deleted: ${deletedCount} | Total: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
 
     // Prepare table data
     const tableColumn = [
@@ -355,6 +384,12 @@ export default function StoreInventoryPage() {
       'Model',
       'Store',
       'Station',
+      'Created By',
+      'Created At',
+      'Updated By',
+      'Updated At',
+      'Deleted By',
+      'Deleted At',
     ];
 
     const tableRows = sortedItems.map((item) => [
@@ -365,6 +400,12 @@ export default function StoreInventoryPage() {
       item.models?.name || 'N/A',
       `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
       item.stations?.name || 'N/A',
+      item.created_by_user ? `${item.created_by_user.first_name} ${item.created_by_user.last_name}` : 'N/A',
+      item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A',
+      item.updated_by_user ? `${item.updated_by_user.first_name} ${item.updated_by_user.last_name}` : 'N/A',
+      item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
+      item.deleted_by_user ? `${item.deleted_by_user.first_name} ${item.deleted_by_user.last_name}` : 'N/A',
+      item.deleted_at ? new Date(item.deleted_at).toLocaleDateString() : 'N/A',
     ]);
 
     // Add table
@@ -373,8 +414,8 @@ export default function StoreInventoryPage() {
       body: tableRows,
       startY: 54,
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        fontSize: 7,
+        cellPadding: 2,
       },
       headStyles: {
         fillColor: [15, 23, 42], // Slate 900
@@ -385,13 +426,29 @@ export default function StoreInventoryPage() {
         fillColor: [248, 250, 252], // Light gray
       },
       columnStyles: {
-        0: { cellWidth: 40 },
-        1: { cellWidth: 35 },
-        2: { cellWidth: 35 },
-        3: { cellWidth: 35 },
-        4: { cellWidth: 35 },
-        5: { cellWidth: 45 },
-        6: { cellWidth: 30 },
+        0: { cellWidth: 22 },  // Item Details
+        1: { cellWidth: 20 },  // Serial Number
+        2: { cellWidth: 20 },  // Category
+        3: { cellWidth: 20 },  // Brand
+        4: { cellWidth: 20 },  // Model
+        5: { cellWidth: 22 },  // Store
+        6: { cellWidth: 20 },  // Station
+        7: { cellWidth: 24 },  // Created By
+        8: { cellWidth: 20 },  // Created At
+        9: { cellWidth: 24 },  // Updated By
+        10: { cellWidth: 20 }, // Updated At
+        11: { cellWidth: 24 }, // Deleted By
+        12: { cellWidth: 20 }, // Deleted At
+      },
+      didParseCell: function(data) {
+        // Highlight deleted rows in red (only body rows, not headers)
+        if (data.section === 'body') {
+          const rowIndex = data.row.index;
+          if (sortedItems[rowIndex]?.deleted_at) {
+            data.cell.styles.fillColor = [255, 230, 230]; // Light red background
+            data.cell.styles.textColor = [180, 0, 0]; // Dark red text
+          }
+        }
       },
     });
 
@@ -408,8 +465,7 @@ export default function StoreInventoryPage() {
       );
     }
 
-    // Open print dialog
-    doc.autoPrint();
+    // Open PDF in new tab (without print dialog)
     window.open(doc.output('bloburl'), '_blank');
   };
 

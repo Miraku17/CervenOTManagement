@@ -15,11 +15,24 @@ interface Asset {
   status: string;
   created_at: string;
   updated_at: string;
+  deleted_at?: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
+  created_by_user?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+  updated_by_user?: {
+    first_name: string;
+    last_name: string;
+  } | null;
+  deleted_by_user?: {
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 export default function AssetInventoryPage() {
@@ -158,8 +171,22 @@ export default function AssetInventoryPage() {
     const doc = new jsPDF({ orientation: 'landscape' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
+    // Fetch ALL assets including deleted ones for the PDF
+    let allAssets: Asset[] = [];
+    try {
+      const response = await fetch('/api/assets/get-all');
+      const data = await response.json();
+      if (response.ok) {
+        allAssets = data.assets || [];
+      }
+    } catch (error) {
+      console.error('Error fetching all assets:', error);
+      // Fallback to current assets if fetch fails
+      allAssets = filteredAssets;
+    }
+
     // Sort assets alphabetically by category name
-    const sortedAssets = [...filteredAssets].sort((a, b) => {
+    const sortedAssets = [...allAssets].sort((a, b) => {
       const nameA = a.categories?.name || '';
       const nameB = b.categories?.name || '';
       return nameA.localeCompare(nameB);
@@ -195,8 +222,10 @@ export default function AssetInventoryPage() {
       month: 'long',
       day: 'numeric',
     });
+    const activeCount = sortedAssets.filter(asset => !asset.deleted_at).length;
+    const deletedCount = sortedAssets.filter(asset => asset.deleted_at).length;
     doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Assets: ${sortedAssets.length}`, pageWidth - 14, 46, { align: 'right' });
+    doc.text(`Active: ${activeCount} | Deleted: ${deletedCount} | Total: ${sortedAssets.length}`, pageWidth - 14, 46, { align: 'right' });
 
     // Prepare table data
     const tableColumn = [
@@ -204,7 +233,13 @@ export default function AssetInventoryPage() {
       'Brand',
       'Model',
       'Serial Number',
+      'Status',
+      'Created By',
       'Created At',
+      'Updated By',
+      'Updated At',
+      'Deleted By',
+      'Deleted At',
     ];
 
     const tableRows = sortedAssets.map((asset) => [
@@ -212,7 +247,13 @@ export default function AssetInventoryPage() {
       asset.brands?.name || 'N/A',
       asset.models?.name || 'N/A',
       asset.serial_number || 'N/A',
-      new Date(asset.created_at).toLocaleDateString(),
+      asset.status || 'Available',
+      asset.created_by_user ? `${asset.created_by_user.first_name} ${asset.created_by_user.last_name}` : 'N/A',
+      asset.created_at ? new Date(asset.created_at).toLocaleDateString() : 'N/A',
+      asset.updated_by_user ? `${asset.updated_by_user.first_name} ${asset.updated_by_user.last_name}` : 'N/A',
+      asset.updated_at ? new Date(asset.updated_at).toLocaleDateString() : 'N/A',
+      asset.deleted_by_user ? `${asset.deleted_by_user.first_name} ${asset.deleted_by_user.last_name}` : 'N/A',
+      asset.deleted_at ? new Date(asset.deleted_at).toLocaleDateString() : 'N/A',
     ]);
 
     // Add table
@@ -221,8 +262,8 @@ export default function AssetInventoryPage() {
       body: tableRows,
       startY: 54,
       styles: {
-        fontSize: 8,
-        cellPadding: 3,
+        fontSize: 7,
+        cellPadding: 2,
       },
       headStyles: {
         fillColor: [15, 23, 42], // Slate 900
@@ -231,6 +272,29 @@ export default function AssetInventoryPage() {
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252], // Light gray
+      },
+      columnStyles: {
+        0: { cellWidth: 26 },  // Category
+        1: { cellWidth: 26 },  // Brand
+        2: { cellWidth: 26 },  // Model
+        3: { cellWidth: 26 },  // Serial Number
+        4: { cellWidth: 22 },  // Status
+        5: { cellWidth: 26 },  // Created By
+        6: { cellWidth: 22 },  // Created At
+        7: { cellWidth: 26 },  // Updated By
+        8: { cellWidth: 22 },  // Updated At
+        9: { cellWidth: 26 },  // Deleted By
+        10: { cellWidth: 22 }, // Deleted At
+      },
+      didParseCell: function(data) {
+        // Highlight deleted rows in red (only body rows, not headers)
+        if (data.section === 'body') {
+          const rowIndex = data.row.index;
+          if (sortedAssets[rowIndex]?.deleted_at) {
+            data.cell.styles.fillColor = [255, 230, 230]; // Light red background
+            data.cell.styles.textColor = [180, 0, 0]; // Dark red text
+          }
+        }
       },
     });
 
@@ -247,8 +311,7 @@ export default function AssetInventoryPage() {
       );
     }
 
-    // Open print dialog
-    doc.autoPrint();
+    // Open PDF in new tab (without print dialog)
     window.open(doc.output('bloburl'), '_blank');
   };
 
