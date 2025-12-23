@@ -38,6 +38,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // First, fetch user's position to check if they're a Field Engineer
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('position_id, positions(name)')
+      .eq('id', userId)
+      .single();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const isFieldEngineer = userProfile?.positions && (userProfile.positions as any).name === 'Field Engineer';
+
     // Fetch all attendance records for the specific user and date
     const { data: attendanceRecords, error } = await supabase
       .from('attendance')
@@ -144,12 +157,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       };
     });
 
-    // Apply lunch deduction: subtract 1 hour (60 minutes) if total > 5 hours (300 minutes)
+    // Apply lunch deduction only for Field Engineers: subtract 1 hour (60 minutes) if total > 5 hours (300 minutes)
     let actualTotalMinutes = totalMinutes;
     const FIVE_HOURS_IN_MINUTES = 300;
     const ONE_HOUR_IN_MINUTES = 60;
 
-    if (totalMinutes > FIVE_HOURS_IN_MINUTES) {
+    // Only apply lunch deduction to Field Engineers
+    if (isFieldEngineer && totalMinutes > FIVE_HOURS_IN_MINUTES) {
       actualTotalMinutes = totalMinutes - ONE_HOUR_IN_MINUTES;
     }
 

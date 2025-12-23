@@ -39,19 +39,6 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       return (logsByDate[date] || []).reduce((acc, log) => acc + log.durationSeconds, 0);
   };
 
-  // Apply lunch deduction: subtract 1 hour if total > 5 hours
-  const getAdjustedDailySeconds = (date: string) => {
-      const totalSeconds = getDailyTotalSeconds(date);
-      const FIVE_HOURS = 5 * 3600; // 5 hours in seconds
-      const ONE_HOUR = 3600; // 1 hour in seconds
-
-      // Deduct 1 hour for lunch if worked more than 5 hours
-      if (totalSeconds > FIVE_HOURS) {
-          return totalSeconds - ONE_HOUR;
-      }
-      return totalSeconds;
-  };
-
   const isDateActive = (date: string) => {
       return activeLog && activeLog.date === date && activeLog.status === 'IN_PROGRESS';
   };
@@ -61,9 +48,9 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       if (isDateActive(date)) {
           return 'Active';
       }
-      // Calculate from actual attendance records with lunch deduction
-      const adjustedSeconds = getAdjustedDailySeconds(date);
-      return (adjustedSeconds / 3600).toFixed(1);
+      // Display hours from backend (backend handles position-based deductions)
+      const totalSeconds = getDailyTotalSeconds(date);
+      return (totalSeconds / 3600).toFixed(1);
   };
 
   const hasWorkForDate = (date: string) => {
@@ -173,8 +160,8 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
       return "Active";
     }
 
-    // Calculate from actual attendance records with lunch deduction
-    return (getAdjustedDailySeconds(selectedDate) / 3600).toFixed(2);
+    // Display hours from backend (backend handles position-based deductions)
+    return (getDailyTotalSeconds(selectedDate) / 3600).toFixed(2);
   }, [selectedDate, logsByDate, activeLog]);
 
   return (
@@ -336,7 +323,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ logs, userId, active
 
                     <div className="p-3 sm:p-4 bg-slate-800 border-t border-slate-700 flex justify-between items-center">
                         <span className="text-slate-400 text-xs sm:text-sm font-medium">Actual Total Hours</span>
-                         {/* Calculated from actual attendance records */}
+                         {/* Hours from backend (includes position-based deductions) */}
                          <span className={`text-lg sm:text-xl font-bold font-mono ${isDateActive(selectedDate) ? 'text-amber-400 animate-pulse' : 'text-blue-400'}`}>
                                 {displayTotalHoursModal} {!isDateActive(selectedDate) && <span className="text-xs font-sans text-slate-500 font-normal">hrs</span>}
                         </span>

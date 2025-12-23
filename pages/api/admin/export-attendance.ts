@@ -25,7 +25,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // First, try to get data from attendance_daily_summary
     let summaryQuery = supabase
       .from('attendance_daily_summary')
-      .select('*, profiles(first_name, last_name, email, employee_id)')
+      .select('*, profiles(first_name, last_name, email, employee_id, position_id, positions(name))')
       .gte('date', startDate)
       .lte('date', endDate)
       .order('date', { ascending: true });
@@ -43,7 +43,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // Fallback to attendance table
       let query = supabase
         .from('attendance')
-        .select('*, profiles(first_name, last_name, email, employee_id)')
+        .select('*, profiles(first_name, last_name, email, employee_id, position_id, positions(name))')
         .gte('date', startDate)
         .lte('date', endDate)
         .order('date', { ascending: true });
@@ -62,11 +62,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get attendance IDs to fetch overtime requests
     const attendanceIds = attendanceData?.map(a => a.id) || [];
 
-    // Fetch overtime requests for these attendance records
-    const { data: overtimeData } = await supabase
-      .from('overtime')
-      .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
-      .in('attendance_id', attendanceIds);
+    // Fetch overtime requests in batches to avoid header overflow
+    const BATCH_SIZE = 100;
+    let allOvertimeData: any[] = [];
+
+    for (let i = 0; i < attendanceIds.length; i += BATCH_SIZE) {
+      const batch = attendanceIds.slice(i, i + BATCH_SIZE);
+      const { data: batchData, error: batchError } = await supabase
+        .from('overtime')
+        .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
+        .in('attendance_id', batch);
+
+      if (batchError) {
+        console.error('Overtime fetch error for batch:', batchError);
+      } else if (batchData) {
+        allOvertimeData = allOvertimeData.concat(batchData);
+      }
+    }
+
+    const overtimeData = allOvertimeData;
+    console.log('Attendance IDs count:', attendanceIds.length);
+    console.log('Overtime records fetched:', overtimeData?.length || 0);
 
     // Fetch reviewer profiles if any
     const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
@@ -127,10 +143,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Calculate daily overtime for each day
     const dailyOvertimeMap = new Map<string, number>();
 
+    // Create a map to track Field Engineer status per user
+    const userFieldEngineerMap = new Map<string, boolean>();
+    attendanceData?.forEach(record => {
+      const isFieldEngineer = record.profiles?.positions && (record.profiles.positions as any).name === 'Field Engineer';
+      userFieldEngineerMap.set(record.user_id, isFieldEngineer);
+    });
+
     dailyTotals.forEach((dailyData, key) => {
+      const userId = key.split('_')[0];
+      const isFieldEngineer = userFieldEngineerMap.get(userId) || false;
+
       const totalHours = Math.round(dailyData.totalHours * 100) / 100;
-      // Apply lunch deduction once per day
-      const effectiveHours = totalHours > 5 ? totalHours - 1 : totalHours;
+      // Apply lunch deduction once per day only for Field Engineers
+      const effectiveHours = (isFieldEngineer && totalHours > 5) ? totalHours - 1 : totalHours;
       const roundedEffective = Math.round(effectiveHours * 100) / 100;
       // Calculate overtime based on daily total
       const dailyOvertime = Math.max(0, roundedEffective - 8);
@@ -139,6 +165,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Process attendance data with per-session calculations
     const data = attendanceData?.map(record => {
+      // Check if user is a Field Engineer
+      const isFieldEngineer = record.profiles?.positions && (record.profiles.positions as any).name === 'Field Engineer';
+
       let totalHours = 0;
       let isActiveSession = false;
 
@@ -165,8 +194,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // Round to 2 decimal places
       totalHours = Math.round(totalHours * 100) / 100;
 
-      // Per-session lunch deduction (for display in detailed records)
-      let effectiveHours = totalHours > 5 ? totalHours - 1 : totalHours;
+      // Per-session lunch deduction only for Field Engineers (for display in detailed records)
+      let effectiveHours = (isFieldEngineer && totalHours > 5) ? totalHours - 1 : totalHours;
       effectiveHours = Math.round(effectiveHours * 100) / 100;
 
       // Per-session overtime (kept for backward compatibility in detailed view)
@@ -185,7 +214,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         ...record,
         is_active_session: isActiveSession, // Flag to indicate active session
         total_hours_raw: totalHours, // Original hours before lunch deduction
-        lunch_deduction: totalHours > 5 ? 1 : 0,
+        lunch_deduction: (isFieldEngineer && totalHours > 5) ? 1 : 0,
         total_hours: effectiveHours, // Hours after lunch deduction
         regular_hours: regularHours,
         overtime_hours: overtimeHours, // Per-session overtime (for detailed records)

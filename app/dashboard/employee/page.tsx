@@ -197,25 +197,24 @@ const EmployeeDashboard: React.FC = () => {
 
     setIsFetchingLogs(true);
     try {
-      const { data, error } = await supabase
-        .from('attendance')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('time_out', 'is', null) // Only get records with clock out
-        .order('date', { ascending: false });
+      // Fetch attendance records through API (handles lunch deduction logic)
+      const response = await fetch('/api/attendance/user-logs');
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error('Failed to fetch attendance logs');
+      }
 
-      if (data) {
-        // Convert attendance records to WorkLog format
-        const logs: WorkLog[] = data.map((record) => ({
+      const data = await response.json();
+
+      if (data.records) {
+        // Convert API records to WorkLog format
+        const logs: WorkLog[] = data.records.map((record: any) => ({
           id: record.id,
           date: record.date,
           startTime: new Date(record.time_in).getTime(),
           endTime: new Date(record.time_out).getTime(),
-          durationSeconds: record.total_minutes ? record.total_minutes * 60 : 0,
+          durationSeconds: record.adjusted_minutes * 60, // Use adjusted minutes (includes lunch deduction)
           status: 'COMPLETED' as const,
-          comment: record.overtime_comment || undefined,
           clockInAddress: record.clock_in_address,
           clockOutAddress: record.clock_out_address,
         }));

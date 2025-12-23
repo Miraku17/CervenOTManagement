@@ -307,6 +307,11 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       'Overtime Reviewer'
     ]);
 
+    // Debug logging
+    console.log('Total records received:', data.length);
+    console.log('Sample record:', data[0]);
+    console.log('Records with overtimeRequest:', data.filter(row => row.overtimeRequest).length);
+
     // Filter data to only include records with overtime requests
     const overtimeRecords = data.filter(row => row.overtimeRequest);
 
