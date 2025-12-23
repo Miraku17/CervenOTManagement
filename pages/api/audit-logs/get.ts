@@ -26,6 +26,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    // Check if user has Operations Manager position
+    const { data: userProfile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('position_id, positions(name)')
+      .eq('id', req.user?.id)
+      .single();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
+
+    if (userPosition !== 'Operations Manager') {
+      return res.status(403).json({
+        error: 'Forbidden: Only Operations Managers can access audit logs'
+      });
+    }
+
     const auditLogs: AuditLog[] = [];
 
     // Fetch store inventory logs (created, updated, deleted)

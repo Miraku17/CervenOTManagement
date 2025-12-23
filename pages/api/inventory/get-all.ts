@@ -8,6 +8,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  // Check for restricted positions
+  const userPosition = req.user?.position;
+  if (userPosition === 'Field Engineer') {
+    return res.status(403).json({ error: 'Forbidden: Access denied for Field Engineers' });
+  }
+
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');

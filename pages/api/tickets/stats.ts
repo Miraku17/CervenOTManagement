@@ -8,6 +8,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  // Check for restricted positions (even if admin)
+  const userPosition = req.user?.position?.toLowerCase() || '';
+  const restrictedPositions = ['asset', 'asset lead', 'asset associate'];
+  if (restrictedPositions.includes(userPosition)) {
+    return res.status(403).json({ error: 'Forbidden: Access denied for your position' });
+  }
+
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');

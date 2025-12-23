@@ -44,6 +44,8 @@ interface Asset {
 export default function AssetInventoryPage() {
   const { user } = useAuth();
   const router = useRouter();
+  
+  // State definitions
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -55,10 +57,26 @@ export default function AssetInventoryPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  
+  // Toast notification state
+  const [toast, setToast] = useState<{
+    show: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ show: false, type: 'success', message: '' });
 
   // Access control check
-  // Asset Inventory: accessible only by positions "asset" and "operations manager"
   const [userPosition, setUserPosition] = useState<string | null>(null);
+
+  // Helper function to show toast
+  const showToast = (type: 'success' | 'error', message: string) => {
+    setToast({ show: true, type, message });
+    setTimeout(() => {
+      setToast({ show: false, type, message: '' });
+    }, 3000);
+  };
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -73,7 +91,13 @@ export default function AssetInventoryPage() {
 
         const position = (profile?.positions as any)?.name?.toLowerCase();
         setUserPosition(position || null);
-        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager';
+        
+        // Check for read-only access (Field Engineer)
+        if (position === 'field engineer') {
+          setIsReadOnly(true);
+        }
+
+        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager' || position === 'field engineer';
 
         if (!hasAccess) {
           router.push('/dashboard/ticketing/tickets');
@@ -81,28 +105,14 @@ export default function AssetInventoryPage() {
       } catch (error) {
         console.error('Error checking access:', error);
         router.push('/dashboard/ticketing/tickets');
+      } finally {
+        setCheckingAccess(false);
       }
     };
 
     checkAccess();
   }, [user?.id, router]);
 
-  // Toast notification state
-  const [toast, setToast] = useState<{
-    show: boolean;
-    type: 'success' | 'error';
-    message: string;
-  }>({ show: false, type: 'success', message: '' });
-
-  // Helper function to show toast
-  const showToast = (type: 'success' | 'error', message: string) => {
-    setToast({ show: true, type, message });
-    setTimeout(() => {
-      setToast({ show: false, type, message: '' });
-    }, 3000);
-  };
-
-  // Fetch assets on component mount
   useEffect(() => {
     fetchAssets();
   }, []);
@@ -125,6 +135,17 @@ export default function AssetInventoryPage() {
       setLoading(false);
     }
   };
+
+  if (checkingAccess) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-slate-950">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleEdit = (asset: Asset, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent opening the detail modal
@@ -506,44 +527,50 @@ export default function AssetInventoryPage() {
           <p className="text-slate-400">Manage company assets, equipment, and hardware.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-            >
-              <Plus size={20} />
-              <span>Add Asset</span>
-            </button>
-            <button
-              onClick={handleDownloadTemplate}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-            >
-              <FileSpreadsheet size={20} />
-              <span>Download Template</span>
-            </button>
-            <button
-              onClick={handleImportClick}
-              disabled={isImporting}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
-            >
-              {isImporting ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span>Importing...</span>
-                </>
-              ) : (
-                <>
-                  <Upload size={20} />
-                  <span>Import XLSX</span>
-                </>
-              )}
-            </button>
-            <button
-                onClick={handlePrint}
-                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
-              >
-                <Printer size={20} />
-                <span>Print Report</span>
-              </button>
+            {!isReadOnly && (
+              <>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+                >
+                  <Plus size={20} />
+                  <span>Add Asset</span>
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+                >
+                  <FileSpreadsheet size={20} />
+                  <span>Download Template</span>
+                </button>
+                <button
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} />
+                      <span>Import XLSX</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
+            {!isReadOnly && (
+              <button
+                  onClick={handlePrint}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
+                >
+                  <Printer size={20} />
+                  <span>Print Report</span>
+                </button>
+            )}
         </div>
       </div>
 
@@ -677,13 +704,15 @@ export default function AssetInventoryPage() {
                             </td>
                             <td className="p-4 text-right">
                               <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={(e) => handleEdit(asset, e)}
-                                  className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
-                                  title="Edit asset"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
+                                {!isReadOnly && (
+                                  <button
+                                    onClick={(e) => handleEdit(asset, e)}
+                                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                    title="Edit asset"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                )}
                                 {/* Only operations manager can delete */}
                                 {userPosition === 'operations manager' && (
                                   <button

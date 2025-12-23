@@ -63,38 +63,14 @@ interface InventoryItem {
 export default function StoreInventoryPage() {
   const { user } = useAuth();
   const router = useRouter();
+  
+  // State definitions
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // Access control check
-  // Store Inventory: accessible by admin OR employee role (basically everyone)
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-
-        const userRole = profile?.role;
-        const hasAccess = userRole === 'admin' || userRole === 'employee';
-
-        if (!hasAccess) {
-          router.push('/dashboard/ticketing/tickets');
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        router.push('/dashboard/ticketing/tickets');
-      }
-    };
-
-    checkAccess();
-  }, [user?.id, router]);
+  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [checkingAccess, setCheckingAccess] = useState(true);
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -130,25 +106,6 @@ export default function StoreInventoryPage() {
   const filterRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchInventory();
-  }, []);
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setShowFilterDropdown(false);
-      }
-      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-        setShowCategoryDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const fetchInventory = async () => {
     setLoading(true);
     try {
@@ -173,6 +130,73 @@ export default function StoreInventoryPage() {
       setToast({ show: false, type, message: '' });
     }, 3000);
   };
+
+  // Access control check
+  // Store Inventory: accessible by admin OR employee role (basically everyone)
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const userRole = profile?.role;
+        const userPosition = (profile?.positions as any)?.name;
+        
+        // Check for read-only access (Field Engineer)
+        if (userPosition === 'Field Engineer') {
+          setIsReadOnly(true);
+        }
+
+        const hasAccess = userRole === 'admin' || userRole === 'employee';
+
+        if (!hasAccess) {
+          router.push('/dashboard/ticketing/tickets');
+        }
+      } catch (error) {
+        console.error('Error checking access:', error);
+        router.push('/dashboard/ticketing/tickets');
+      } finally {
+        setCheckingAccess(false);
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, router]);
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setShowFilterDropdown(false);
+      }
+      if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
+        setShowCategoryDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (checkingAccess) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <p className="text-slate-400">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
 
   const handleSuccess = () => {
     fetchInventory(); // Only refresh when item is successfully added or updated
@@ -547,44 +571,48 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-              onClick={() => setIsModalOpen(true)}
-            >
-              <Plus size={20} />
-              <span>Add Item</span>
-            </button>
-            <button
-              onClick={handleDownloadTemplate}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-            >
-              <FileSpreadsheet size={20} />
-              <span>Download Template</span>
-            </button>
-            <button
-              onClick={handleImportClick}
-              disabled={isImporting}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
-            >
-              {isImporting ? (
-                <>
-                  <Loader2 size={20} className="animate-spin" />
-                  <span>Importing...</span>
-                </>
-              ) : (
-                <>
-                  <Upload size={20} />
-                  <span>Import XLSX</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={handlePrint}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
-            >
-              <Printer size={20} />
-              <span>Print Report</span>
-            </button>
+            {!isReadOnly && (
+              <>
+                <button
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+                  onClick={() => setIsModalOpen(true)}
+                >
+                  <Plus size={20} />
+                  <span>Add Item</span>
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
+                >
+                  <FileSpreadsheet size={20} />
+                  <span>Download Template</span>
+                </button>
+                <button
+                  onClick={handleImportClick}
+                  disabled={isImporting}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
+                >
+                  {isImporting ? (
+                    <>
+                      <Loader2 size={20} className="animate-spin" />
+                      <span>Importing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={20} />
+                      <span>Import XLSX</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
+                >
+                  <Printer size={20} />
+                  <span>Print Report</span>
+                </button>
+              </>
+            )}
         </div>
       </div>
 
@@ -887,28 +915,30 @@ export default function StoreInventoryPage() {
                             </td>
                             <td className="p-4 text-slate-400">{item.stations?.name || <span className="text-slate-600">—</span>}</td>
                             <td className="p-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleEdit(item);
-                                  }}
-                                  className="p-2 hover:bg-blue-500/10 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
-                                  title="Edit item"
-                                >
-                                  <Edit2 size={16} />
-                                </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDelete(item);
-                                  }}
-                                  className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                                  title="Delete item"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
+                              {!isReadOnly && (
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleEdit(item);
+                                    }}
+                                    className="p-2 hover:bg-blue-500/10 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
+                                    title="Edit item"
+                                  >
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleDelete(item);
+                                    }}
+                                    className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                    title="Delete item"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              )}
                             </td>
                         </tr>
                       ))

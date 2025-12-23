@@ -61,9 +61,18 @@ export default function TicketingLayout({
   const hasStoreInventoryAccess = isAdmin || user !== null; // Everyone who is logged in
 
   // Check if user has access to asset inventory
-  // Asset Inventory: ONLY positions "asset", "assets", or "operations manager"
+  // Asset Inventory: ONLY positions "asset", "assets", "operations manager", or "field engineer"
   const userPositionLower = userPosition?.toLowerCase();
-  const hasAssetInventoryAccess = userPositionLower === 'asset' || userPositionLower === 'assets' || userPositionLower === 'operations manager';
+  const hasAssetInventoryAccess = userPositionLower === 'asset' || userPositionLower === 'assets' || userPositionLower === 'operations manager' || userPositionLower === 'field engineer';
+
+  // Check if user has access to audit logs
+  // Audit Logs: ONLY Operations Manager position
+  const hasAuditLogsAccess = userPosition === 'Operations Manager';
+
+  // Check if user has access to tickets
+  // Tickets: Restricted for "asset", "asset lead", "asset associate"
+  const restrictedTicketPositions = ['asset', 'asset lead', 'asset associate'];
+  const hasTicketsAccess = !restrictedTicketPositions.includes(userPositionLower || '');
 
   const SidebarContent = () => (
     <>
@@ -172,25 +181,27 @@ export default function TicketingLayout({
         )}
 
         {/* Work Section */}
-        <div>
-          <SidebarLabel>Work</SidebarLabel>
-          <div className="space-y-1">
-            <button
-              onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
-                pathname === '/dashboard/ticketing/tickets'
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
-                  : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-              }`}
-            >
-              <FileText size={18} className={pathname === '/dashboard/ticketing/tickets' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
-              <span className="font-medium text-sm">Tickets</span>
-            </button>
+        {hasTicketsAccess && (
+          <div>
+            <SidebarLabel>Work</SidebarLabel>
+            <div className="space-y-1">
+              <button
+                onClick={() => handleNavigate('/dashboard/ticketing/tickets')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                  pathname === '/dashboard/ticketing/tickets'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <FileText size={18} className={pathname === '/dashboard/ticketing/tickets' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                <span className="font-medium text-sm">Tickets</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Management Section */}
-        {isAdmin && (
+        {hasAuditLogsAccess && (
           <div>
             <SidebarLabel>Management</SidebarLabel>
             <div className="space-y-1">

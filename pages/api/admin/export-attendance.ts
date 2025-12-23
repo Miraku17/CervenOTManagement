@@ -19,6 +19,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Check if user has required position
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('position_id, positions(name)')
+      .eq('id', req.user?.id)
+      .single();
+
+    if (profileError) {
+      throw profileError;
+    }
+
+    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
+    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead'];
+
+    if (!allowedPositions.includes(userPosition)) {
+      return res.status(403).json({
+        error: 'Forbidden: Only Operations Manager, Technical Support Lead, Technical Support Engineer, and Help Desk Lead can export reports'
+      });
+    }
+  } catch (error: any) {
+    console.error('Error checking user position:', error);
+    return res.status(500).json({ error: 'Failed to verify user permissions' });
+  }
+
+  try {
     let attendanceData: any[] | null = null;
     let error: any = null;
 

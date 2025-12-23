@@ -10,6 +10,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   const { id } = req.body;
   const userId = req.user?.id;
+  const userPosition = req.user?.position;
+
+  // Check for restricted positions
+  if (userPosition === 'Field Engineer') {
+    return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers' });
+  }
 
   if (!id) {
     return res.status(400).json({ error: "Inventory item ID is required" });

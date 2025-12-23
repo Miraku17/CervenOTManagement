@@ -68,6 +68,40 @@ export default function AdminLayout({
     return userPosition === 'Operations Manager';
   };
 
+  // Check if user has access to leave requests
+  const hasLeaveRequestsAccess = () => {
+    if (!userPosition) return false;
+    const authorizedPositions = [
+      'Operations Manager',
+      'Technical Support Lead',
+      'Technical Support Engineer'
+    ];
+    return authorizedPositions.includes(userPosition);
+  };
+
+  // Check if user has access to import schedule
+  const hasImportScheduleAccess = () => {
+    if (!userPosition) return false;
+    const authorizedPositions = [
+      'Operations Manager',
+      'Technical Support Lead',
+      'Technical Support Engineer'
+    ];
+    return authorizedPositions.includes(userPosition);
+  };
+
+  // Check if user has access to reports
+  const hasReportsAccess = () => {
+    if (!userPosition) return false;
+    const authorizedPositions = [
+      'Operations Manager',
+      'Technical Support Lead',
+      'Technical Support Engineer',
+      'Help Desk Lead'
+    ];
+    return authorizedPositions.includes(userPosition);
+  };
+
   const handleNavigate = (path: string) => {
     router.push(path);
     setIsMobileMenuOpen(false);
@@ -142,12 +176,14 @@ export default function AdminLayout({
                 isActive={isActive('/dashboard/admin/employee-schedule')}
                 onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
               />
-              <SidebarItem
-                icon={<FileUp size={18} />}
-                label="Import Schedule"
-                isActive={isActive('/dashboard/admin/import-schedule')}
-                onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
-              />
+              {hasImportScheduleAccess() && (
+                <SidebarItem
+                  icon={<FileUp size={18} />}
+                  label="Import Schedule"
+                  isActive={isActive('/dashboard/admin/import-schedule')}
+                  onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
+                />
+              )}
               {hasEditTimeAccess() && (
                 <SidebarItem
                   icon={<Users size={18} />}
@@ -168,36 +204,42 @@ export default function AdminLayout({
           </div>
 
           {/* Requests Section */}
-          <div>
-            <SidebarLabel>Requests</SidebarLabel>
-            <div className="space-y-1">
-              <SidebarItem
-                icon={<Calendar size={18} />}
-                label="Leave Requests"
-                isActive={isActive('/dashboard/admin/leave-requests')}
-                onClick={() => handleNavigate('/dashboard/admin/leave-requests')}
-              />
-              {hasOvertimeAccess() && (
-                <SidebarItem
-                  icon={<FileText size={18} />}
-                  label="Overtime Requests"
-                  isActive={isActive('/dashboard/admin/overtime-requests')}
-                  onClick={() => handleNavigate('/dashboard/admin/overtime-requests')}
-                />
-              )}
+          {(hasLeaveRequestsAccess() || hasOvertimeAccess()) && (
+            <div>
+              <SidebarLabel>Requests</SidebarLabel>
+              <div className="space-y-1">
+                {hasLeaveRequestsAccess() && (
+                  <SidebarItem
+                    icon={<Calendar size={18} />}
+                    label="Leave Requests"
+                    isActive={isActive('/dashboard/admin/leave-requests')}
+                    onClick={() => handleNavigate('/dashboard/admin/leave-requests')}
+                  />
+                )}
+                {hasOvertimeAccess() && (
+                  <SidebarItem
+                    icon={<FileText size={18} />}
+                    label="Overtime Requests"
+                    isActive={isActive('/dashboard/admin/overtime-requests')}
+                    onClick={() => handleNavigate('/dashboard/admin/overtime-requests')}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* System Section */}
           <div>
             <SidebarLabel>System</SidebarLabel>
             <div className="space-y-1">
-              <SidebarItem
-                icon={<Settings size={18} />}
-                label="Reports"
-                isActive={isActive('/dashboard/admin/reports')}
-                onClick={() => handleNavigate('/dashboard/admin/reports')}
-              />
+              {hasReportsAccess() && (
+                <SidebarItem
+                  icon={<Settings size={18} />}
+                  label="Reports"
+                  isActive={isActive('/dashboard/admin/reports')}
+                  onClick={() => handleNavigate('/dashboard/admin/reports')}
+                />
+              )}
               <SidebarItem
                 icon={<BookOpen size={18} />}
                 label="Knowledge Base"
@@ -271,12 +313,14 @@ export default function AdminLayout({
               isActive={isActive('/dashboard/admin/employees')}
               onClick={() => handleNavigate('/dashboard/admin/employees')}
             />
-            <SidebarItem
-              icon={<Settings size={24} />}
-              label="Reports"
-              isActive={isActive('/dashboard/admin/reports')}
-              onClick={() => handleNavigate('/dashboard/admin/reports')}
-            />
+            {hasReportsAccess() && (
+              <SidebarItem
+                icon={<Settings size={24} />}
+                label="Reports"
+                isActive={isActive('/dashboard/admin/reports')}
+                onClick={() => handleNavigate('/dashboard/admin/reports')}
+              />
+            )}
             <SidebarItem
               icon={<BookOpen size={24} />}
               label="Knowledge Base"
@@ -307,18 +351,22 @@ export default function AdminLayout({
                 onClick={() => handleNavigate('/dashboard/admin/overtime-requests')}
               />
             )}
-            <SidebarItem
-              icon={<Calendar size={24} />}
-              label="Leave Requests"
-              isActive={isActive('/dashboard/admin/leave-requests')}
-              onClick={() => handleNavigate('/dashboard/admin/leave-requests')}
-            />
-            <SidebarItem
-              icon={<FileUp size={24} />}
-              label="Import Schedule"
-              isActive={isActive('/dashboard/admin/import-schedule')}
-              onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
-            />
+            {hasLeaveRequestsAccess() && (
+              <SidebarItem
+                icon={<Calendar size={24} />}
+                label="Leave Requests"
+                isActive={isActive('/dashboard/admin/leave-requests')}
+                onClick={() => handleNavigate('/dashboard/admin/leave-requests')}
+              />
+            )}
+            {hasImportScheduleAccess() && (
+              <SidebarItem
+                icon={<FileUp size={24} />}
+                label="Import Schedule"
+                isActive={isActive('/dashboard/admin/import-schedule')}
+                onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
+              />
+            )}
             <SidebarItem
               icon={<Calendar size={24} />}
               label="Employee Schedule"
