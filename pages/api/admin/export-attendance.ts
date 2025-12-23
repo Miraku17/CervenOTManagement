@@ -62,11 +62,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get attendance IDs to fetch overtime requests
     const attendanceIds = attendanceData?.map(a => a.id) || [];
 
-    // Fetch overtime requests for these attendance records
-    const { data: overtimeData } = await supabase
-      .from('overtime')
-      .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
-      .in('attendance_id', attendanceIds);
+    // Fetch overtime requests in batches to avoid header overflow
+    const BATCH_SIZE = 100;
+    let allOvertimeData: any[] = [];
+
+    for (let i = 0; i < attendanceIds.length; i += BATCH_SIZE) {
+      const batch = attendanceIds.slice(i, i + BATCH_SIZE);
+      const { data: batchData, error: batchError } = await supabase
+        .from('overtime')
+        .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
+        .in('attendance_id', batch);
+
+      if (batchError) {
+        console.error('Overtime fetch error for batch:', batchError);
+      } else if (batchData) {
+        allOvertimeData = allOvertimeData.concat(batchData);
+      }
+    }
+
+    const overtimeData = allOvertimeData;
+    console.log('Attendance IDs count:', attendanceIds.length);
+    console.log('Overtime records fetched:', overtimeData?.length || 0);
 
     // Fetch reviewer profiles if any
     const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
