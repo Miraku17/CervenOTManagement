@@ -37,6 +37,7 @@ interface RecentActivity {
   id: string;
   employeeName: string;
   email: string;
+  position: string;
   date: string;
   totalDuration: string | null;
   status: string;
@@ -189,6 +190,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                         </span>
                       </div>
                       <p className="text-xs text-slate-400">{activity.email}</p>
+                      <p className="text-xs text-blue-400 font-medium mt-0.5">{activity.position}</p>
                       <div className="flex items-center gap-3 mt-2 text-xs">
                         <span className="text-slate-500">{activity.date}</span>
                         <span className="text-slate-600">•</span>

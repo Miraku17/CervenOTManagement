@@ -21,18 +21,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     startDate.setDate(startDate.getDate() - 7);
     const startDateStr = startDate.toISOString().split('T')[0];
 
-    // Fetch daily summaries for the same period first to have them ready
-    const { data: dailySummaries } = await supabase
-      .from('attendance_daily_summary')
-      .select('user_id, work_date, total_minutes_final')
-      .gte('work_date', startDateStr);
-
-    const summaryMap = new Map();
-    dailySummaries?.forEach(ds => {
-        summaryMap.set(`${ds.user_id}_${ds.work_date}`, ds.total_minutes_final);
-    });
-
-    // Get recent attendance with user profiles
+    // Get recent attendance with user profiles and positions
     const { data: recentActivity, error } = await supabase
       .from('attendance')
       .select(`
@@ -48,7 +37,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         clock_out_lat,
         clock_out_lng,
         user_id,
-        profiles!inner(first_name, last_name, email)
+        profiles!inner(first_name, last_name, email, position_id, positions(name))
       `)
       .gte('date', startDateStr)
       .order('date', { ascending: false })
@@ -102,6 +91,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           employeeName: `${profile.first_name} ${profile.last_name}`,
           email: profile.email,
           avatarSeed: `${profile.first_name}+${profile.last_name}`,
+          position: profile.positions,
           logs: []
         });
       }
@@ -153,24 +143,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // Sort logs by time_in (ascending) so Session 1 is the earliest
       group.logs.sort((a: any, b: any) => new Date(a.timeInRaw).getTime() - new Date(b.timeInRaw).getTime());
 
-      // Calculate total duration for the day
+      // Calculate total duration for the day by summing all sessions
       let totalMinutes = 0;
-      const summaryKey = `${group.user_id}_${group.date}`;
-      const finalMinutes = summaryMap.get(summaryKey);
 
-      if (typeof finalMinutes === 'number') {
-        // Use the final minutes from the daily summary table if available
-        totalMinutes = finalMinutes;
-      } else {
-        // Fallback: Sum up duration of individual logs
-        group.logs.forEach((log: any) => {
-          if (log.duration) {
-            const parts = log.duration.split(' ');
-            const hours = parseInt(parts[0]) || 0;
-            const minutes = parseInt(parts[1]) || 0;
-            totalMinutes += hours * 60 + minutes;
-          }
-        });
+      // Always sum up duration of individual logs for accuracy
+      group.logs.forEach((log: any) => {
+        if (log.duration) {
+          const parts = log.duration.split(' ');
+          const hours = parseInt(parts[0]) || 0;
+          const minutes = parseInt(parts[1]) || 0;
+          totalMinutes += hours * 60 + minutes;
+        }
+      });
+
+      // Apply lunch deduction for Field Engineers only
+      const isFieldEngineer = group.position && (group.position as any).name === 'Field Engineer';
+      const FIVE_HOURS_IN_MINUTES = 300;
+      const ONE_HOUR_IN_MINUTES = 60;
+
+      if (isFieldEngineer && totalMinutes > FIVE_HOURS_IN_MINUTES) {
+        totalMinutes = totalMinutes - ONE_HOUR_IN_MINUTES;
       }
 
       const totalHours = Math.floor(totalMinutes / 60);
@@ -190,6 +182,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         id: `${group.user_id}_${group.date}`,
         employeeName: group.employeeName,
         email: group.email,
+        position: group.position ? (group.position as any).name : 'N/A',
         date: activityDate.toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',

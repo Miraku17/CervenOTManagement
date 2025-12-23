@@ -311,6 +311,21 @@ const LeaveRequestsView: React.FC = () => {
     }
   };
 
+  const getLeaveTypeStyle = (type: string) => {
+    switch (type) {
+      case 'Sick':
+        return 'bg-pink-500/10 text-pink-400 border-pink-500/20';
+      case 'Emergency':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'Vacation':
+        return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'Leave Without Pay':
+        return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+      default:
+        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
+    }
+  };
+
   const calculateDuration = (start: string, end: string) => {
     try {
       const diff = differenceInDays(parseISO(end), parseISO(start)) + 1;
@@ -594,7 +609,7 @@ const LeaveRequestsView: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-medium text-blue-300">
+                      <span className={`px-2 py-1 rounded border text-xs font-medium whitespace-nowrap ${getLeaveTypeStyle(request.leave_type)}`}>
                         {request.leave_type}
                       </span>
                     </td>
