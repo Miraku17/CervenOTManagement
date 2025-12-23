@@ -20,6 +20,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     warranty_date
   } = req.body;
   const userId = req.user?.id;
+  const userPosition = req.user?.position;
+
+  // Check for restricted positions
+  if (userPosition === 'Field Engineer') {
+    return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers' });
+  }
 
   if (!id || !store_id) {
     return res.status(400).json({ error: 'ID and store are required' });

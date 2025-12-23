@@ -67,9 +67,10 @@ export default function TicketsPage() {
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
 
-  // Check if user is admin
+  // Check user role and position
   useEffect(() => {
     const checkUserRole = async () => {
       if (!user?.id) {
@@ -80,7 +81,7 @@ export default function TicketsPage() {
       try {
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, positions(name)')
           .eq('id', user.id)
           .single();
 
@@ -89,6 +90,7 @@ export default function TicketsPage() {
           setIsAdmin(false);
         } else {
           setIsAdmin(profile?.role === 'admin');
+          setUserPosition((profile?.positions as any)?.name || '');
         }
       } catch (error) {
         console.error('Error checking user role:', error);
@@ -100,6 +102,9 @@ export default function TicketsPage() {
 
     checkUserRole();
   }, [user?.id]);
+
+  const canCreateTicket = userPosition !== 'Field Engineer';
+  const canDeleteTicket = userPosition === 'Operations Manager';
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -235,7 +240,7 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold text-white">Tickets Management</h1>
           <p className="text-slate-400">{isAdmin ? 'Manage and track all support tickets.' : 'View tickets assigned to you.'}</p>
         </div>
-        {isAdmin && (
+        {canCreateTicket && (
           <button
             onClick={() => setIsAddModalOpen(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
@@ -331,7 +336,7 @@ export default function TicketsPage() {
                       {ticket.sev}
                     </span>
                   </div>
-                  {isAdmin && (
+                  {canDeleteTicket && (
                     <button
                       onClick={(e) => handleDeleteClick(ticket.id, e)}
                       className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"

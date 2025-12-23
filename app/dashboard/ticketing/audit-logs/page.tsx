@@ -30,7 +30,9 @@ export default function AuditLogsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Access control check - admin only
+  // Access control check - Operations Manager only
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
@@ -38,18 +40,20 @@ export default function AuditLogsPage() {
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('position_id, positions(name)')
           .eq('id', user.id)
           .single();
 
-        const userRole = profile?.role;
+        const userPosition = profile?.positions && (profile.positions as any).name;
 
-        if (userRole !== 'admin') {
-          router.push('/dashboard');
+        if (userPosition === 'Operations Manager') {
+          setHasAccess(true);
+        } else {
+          setHasAccess(false);
         }
       } catch (error) {
         console.error('Error checking access:', error);
-        router.push('/dashboard');
+        setHasAccess(false);
       }
     };
 
@@ -57,8 +61,10 @@ export default function AuditLogsPage() {
   }, [user, router]);
 
   useEffect(() => {
-    fetchAuditLogs();
-  }, []);
+    if (hasAccess === true) {
+      fetchAuditLogs();
+    }
+  }, [hasAccess]);
 
   const fetchAuditLogs = async () => {
     setLoading(true);
@@ -141,6 +147,41 @@ export default function AuditLogsPage() {
 
     return matchesSearch && matchesType && matchesAction && matchesDate;
   });
+
+  // Show loading while checking access
+  if (hasAccess === null) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
+          <p className="text-slate-400">Checking access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show access denied if user doesn't have Operations Manager position
+  if (hasAccess === false) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[400px]">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <History className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
+          <p className="text-slate-400 mb-4">
+            Only users with the <span className="text-blue-400 font-semibold">Operations Manager</span> position can access audit logs.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard/ticketing')}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            Go Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

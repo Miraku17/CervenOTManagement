@@ -9,6 +9,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
+  // Check for restricted positions (even if admin)
+  const userPosition = req.user?.position?.toLowerCase() || '';
+  const restrictedPositions = ['asset', 'asset lead', 'asset associate', 'field engineer'];
+  if (restrictedPositions.includes(userPosition)) {
+    return res.status(403).json({ error: 'Forbidden: Access denied for your position' });
+  }
+
   const {
     store_id,
     station_id,
@@ -76,4 +83,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler, { requireRole: ['admin', 'employee'] });
