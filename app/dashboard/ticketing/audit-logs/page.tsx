@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
-import { History, Search, Filter, Calendar, User, Package, FileText, Loader2 } from 'lucide-react';
+import { History, Search, Filter, Calendar, User, Package, FileText, Loader2, ChevronDown } from 'lucide-react';
 
 interface AuditLog {
   id: string;
@@ -190,30 +190,36 @@ export default function AuditLogsPage() {
           {/* Inventory Type Filter */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-2">Inventory Type</label>
-            <select
-              value={filterType}
-              onChange={(e) => setFilterType(e.target.value as any)}
-              className="w-full bg-slate-900 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All Types</option>
-              <option value="store_inventory">Store Inventory</option>
-              <option value="asset_inventory">Asset Inventory</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="w-full bg-slate-900 border border-slate-700 text-slate-200 pl-3 pr-10 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm appearance-none"
+              >
+                <option value="all">All Types</option>
+                <option value="store_inventory">Store Inventory</option>
+                <option value="asset_inventory">Asset Inventory</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
           </div>
 
           {/* Action Filter */}
           <div>
             <label className="block text-sm font-medium text-slate-400 mb-2">Action</label>
-            <select
-              value={filterAction}
-              onChange={(e) => setFilterAction(e.target.value as any)}
-              className="w-full bg-slate-900 border border-slate-700 text-slate-200 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-            >
-              <option value="all">All Actions</option>
-              <option value="INSERT">Created</option>
-              <option value="UPDATE">Updated</option>
-              <option value="DELETE">Deleted</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filterAction}
+                onChange={(e) => setFilterAction(e.target.value as any)}
+                className="w-full bg-slate-900 border border-slate-700 text-slate-200 pl-3 pr-10 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm appearance-none"
+              >
+                <option value="all">All Actions</option>
+                <option value="INSERT">Created</option>
+                <option value="UPDATE">Updated</option>
+                <option value="DELETE">Deleted</option>
+              </select>
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
+            </div>
           </div>
 
           {/* Date Range */}
