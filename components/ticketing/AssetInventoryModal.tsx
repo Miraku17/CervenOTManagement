@@ -497,7 +497,14 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                 <select
                   id="underWarranty"
                   value={underWarranty ? 'yes' : 'no'}
-                  onChange={(e) => setUnderWarranty(e.target.value === 'yes')}
+                  onChange={(e) => {
+                    const isWarranty = e.target.value === 'yes';
+                    setUnderWarranty(isWarranty);
+                    // Clear warranty date when switching to "No"
+                    if (!isWarranty) {
+                      setWarrantyDate('');
+                    }
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                 >
                   <option value="no">No</option>
@@ -508,21 +515,23 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
             )}
           </div>
 
-          {/* Warranty Date */}
-          <div>
-            <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
-            {isViewingDetail ? (
-              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.warranty_date ? format(new Date(editItem.warranty_date), 'PPP') : 'N/A'}</p>
-            ) : (
-              <input
-                type="date"
-                id="warrantyDate"
-                value={warrantyDate}
-                onChange={(e) => setWarrantyDate(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
-              />
-            )}
-          </div>
+          {/* Warranty Date - Only show if under warranty */}
+          {(underWarranty || (isViewingDetail && editItem?.under_warranty)) && (
+            <div>
+              <label htmlFor="warrantyDate" className="block text-sm font-medium text-slate-300 mb-1">Warranty Date</label>
+              {isViewingDetail ? (
+                <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.warranty_date ? format(new Date(editItem.warranty_date), 'PPP') : 'N/A'}</p>
+              ) : (
+                <input
+                  type="date"
+                  id="warrantyDate"
+                  value={warrantyDate}
+                  onChange={(e) => setWarrantyDate(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+                />
+              )}
+            </div>
+          )}
 
           {/* Audit Information */}
           {isViewingDetail && (
