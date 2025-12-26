@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
@@ -86,17 +87,17 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
     }
   };
 
-  return (
+  const modalContent = (
     <div
-      className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-50"
+      className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-[9999]"
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-slide-in-right"
+        className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-800 bg-slate-900">
+        <div className="p-6 border-b border-slate-700 bg-slate-900">
           <div className="flex items-start justify-between">
             <div>
               <h3 className="text-2xl font-bold text-white mb-1">Leave Request Details</h3>
@@ -112,7 +113,7 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+        <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto bg-slate-900/50">
           {/* Status Badge */}
           <div className="flex items-center justify-between">
             <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border ${statusConfig.color}`}>
@@ -127,14 +128,14 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
 
           {/* Employee Info (Admin view only) */}
           {request.employee && (
-            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <User className="text-blue-400" size={18} />
                 <h4 className="font-semibold text-white">Employee Information</h4>
               </div>
               <div className="space-y-2 ml-6">
                 <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm">
                     {request.employee.first_name[0]}{request.employee.last_name[0]}
                   </div>
                   <div>
@@ -149,49 +150,49 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
           )}
 
           {/* Leave Details */}
-          <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
             <div className="flex items-center gap-2 mb-4">
               <Calendar className="text-blue-400" size={18} />
               <h4 className="font-semibold text-white">Leave Details</h4>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 ml-6">
               <div>
-                <p className="text-xs text-slate-500 mb-1">Leave Type</p>
+                <p className="text-xs text-slate-400 mb-1">Leave Type</p>
                 <span className="px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-sm font-medium text-blue-300 inline-block">
                   {request.leave_type}
                 </span>
               </div>
               <div>
-                <p className="text-xs text-slate-500 mb-1">Duration</p>
+                <p className="text-xs text-slate-400 mb-1">Duration</p>
                 <p className="text-white font-semibold font-mono">
                   {duration} day{duration !== 1 ? 's' : ''}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 mb-1">Start Date</p>
+                <p className="text-xs text-slate-400 mb-1">Start Date</p>
                 <p className="text-white font-medium">{formatDate(request.start_date)}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 mb-1">End Date</p>
+                <p className="text-xs text-slate-400 mb-1">End Date</p>
                 <p className="text-white font-medium">{formatDate(request.end_date)}</p>
               </div>
             </div>
           </div>
 
           {/* Reason */}
-          <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
             <div className="flex items-center gap-2 mb-3">
               <FileText className="text-blue-400" size={18} />
               <h4 className="font-semibold text-white">Reason</h4>
             </div>
-            <p className="text-slate-300 ml-6 leading-relaxed bg-slate-900/50 p-3 rounded-lg italic border border-slate-700/50">
+            <p className="text-slate-300 ml-6 leading-relaxed bg-slate-900/50 p-3 rounded-lg italic border border-slate-700">
               "{request.reason}"
             </p>
           </div>
 
           {/* Review Information */}
           {request.status !== 'pending' && (
-            <div className="bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="text-blue-400" size={18} />
                 <h4 className="font-semibold text-white">Review Information</h4>
@@ -199,7 +200,7 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
               <div className="space-y-3 ml-6">
                 {request.reviewer && (
                   <div>
-                    <p className="text-xs text-slate-500 mb-1">Reviewed By</p>
+                    <p className="text-xs text-slate-400 mb-1">Reviewed By</p>
                     <p className="text-white font-medium">
                       {request.reviewer.first_name} {request.reviewer.last_name}
                     </p>
@@ -207,14 +208,14 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
                 )}
                 {request.reviewed_at && (
                   <div>
-                    <p className="text-xs text-slate-500 mb-1">Reviewed On</p>
+                    <p className="text-xs text-slate-400 mb-1">Reviewed On</p>
                     <p className="text-white font-medium">{formatDateTime(request.reviewed_at)}</p>
                   </div>
                 )}
                 {request.reviewer_comment && (
                   <div>
-                    <p className="text-xs text-slate-500 mb-1">Reviewer Comment</p>
-                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg italic border border-slate-700/50">
+                    <p className="text-xs text-slate-400 mb-1">Reviewer Comment</p>
+                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg italic border border-slate-700">
                       "{request.reviewer_comment}"
                     </p>
                   </div>
@@ -225,7 +226,7 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-slate-800/50 border-t border-slate-700 flex justify-end">
+        <div className="p-6 bg-slate-800 border-t border-slate-700 flex justify-end">
           <button
             onClick={onClose}
             className="px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
@@ -236,4 +237,6 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };

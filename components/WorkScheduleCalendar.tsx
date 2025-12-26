@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane } from 'lucide-react';
 import type { LeaveRequest } from '@/types';
 
@@ -169,20 +170,20 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
       const hasLeave = !!leaveRequest;
 
       // Determine background color based on priority: leave > rest day > schedule
-      let bgClass = 'border-slate-700 bg-slate-900/50 opacity-60';
+      let bgClass = 'border-slate-800 bg-slate-900/40 hover:bg-slate-800/60';
       if (hasLeave) {
         // Different colors based on leave status
         if (leaveRequest.status === 'approved') {
-          bgClass = 'border-green-700 bg-green-900/30 hover:bg-green-900/40';
+          bgClass = 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20';
         } else if (leaveRequest.status === 'rejected') {
-          bgClass = 'border-red-700 bg-red-900/30 hover:bg-red-900/40';
+          bgClass = 'border-red-500/30 bg-red-500/10 hover:bg-red-500/20';
         } else {
-          bgClass = 'border-amber-700 bg-amber-900/30 hover:bg-amber-900/40';
+          bgClass = 'border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20';
         }
       } else if (isRestDay) {
-        bgClass = 'border-slate-700 bg-orange-900/20 hover:bg-orange-900/30';
+        bgClass = 'border-orange-500/30 bg-orange-500/10 hover:bg-orange-500/20';
       } else if (hasSchedule) {
-        bgClass = 'border-slate-700 bg-slate-800 hover:bg-slate-750';
+        bgClass = 'border-slate-800 bg-slate-900/60 hover:bg-slate-800';
       }
 
       days.push(
@@ -191,41 +192,41 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
           onClick={() => setSelectedDate(dateStr)}
           className={`
             h-16 sm:h-20 md:h-24 p-1.5 sm:p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
-            ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-900/20' : ''}
-            ${!isSelected && isToday ? 'border-blue-500/50 bg-blue-500/10' : ''}
+            ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-500/10' : ''}
+            ${!isSelected && isToday ? 'border-blue-500/50 bg-blue-500/5' : ''}
             ${!isSelected && !isToday ? bgClass : ''}
           `}
         >
           <div className="flex justify-between items-start z-10 relative">
-            <span className={`text-xs sm:text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-400'} group-hover:text-blue-300`}>
+            <span className={`text-xs sm:text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-500'} group-hover:text-slate-300`}>
               {d}
             </span>
             {hasLeave ? (
               <Plane className={`w-3 h-3 sm:w-4 sm:h-4 ${
-                leaveRequest.status === 'approved' ? 'text-green-400' :
-                leaveRequest.status === 'rejected' ? 'text-red-400' :
+                leaveRequest.status === 'approved' ? 'text-emerald-500' :
+                leaveRequest.status === 'rejected' ? 'text-red-500' :
                 'text-amber-400'
               }`} />
             ) : isRestDay ? (
-              <Coffee className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400" />
+              <Coffee className="w-3 h-3 sm:w-4 sm:h-4 text-orange-500" />
             ) : hasSchedule ? (
-              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(168,85,247,0.5)]"></div>
+              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-blue-500 shadow-sm"></div>
             ) : null}
           </div>
 
           {hasLeave ? (
             <div className="mt-auto z-10 relative">
               <span className={`text-[10px] sm:text-xs font-medium ${
-                leaveRequest.status === 'approved' ? 'text-green-400' :
-                leaveRequest.status === 'rejected' ? 'text-red-400' :
-                'text-amber-400'
+                leaveRequest.status === 'approved' ? 'text-emerald-500' :
+                leaveRequest.status === 'rejected' ? 'text-red-500' :
+                'text-amber-500'
               }`}>
                 {leaveRequest.leave_type}
               </span>
             </div>
           ) : isRestDay ? (
             <div className="mt-auto z-10 relative">
-              <span className="text-[10px] sm:text-xs text-orange-400 font-medium">Rest Day</span>
+              <span className="text-[10px] sm:text-xs text-orange-500 font-medium">Rest Day</span>
             </div>
           ) : hasSchedule && schedule.shift_start && schedule.shift_end ? (
             <div className="mt-auto z-10 relative">
@@ -254,122 +255,125 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
   return (
     <>
       {/* Main Modal Overlay */}
-      <div
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      >
+      {typeof document !== 'undefined' && createPortal(
         <div
-          className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] overflow-y-auto"
-          onClick={e => e.stopPropagation()}
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+          onClick={onClose}
         >
-          {/* Header */}
-          <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-4 sm:p-5 flex justify-between items-center z-10">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
-                Work Schedule
-              </h2>
-              <p className="text-slate-400 text-xs sm:text-sm mt-1">View your assigned work schedule</p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-            >
-              <X className="w-5 h-5 sm:w-6 sm:h-6" />
-            </button>
-          </div>
-
-          {/* Calendar Content */}
-          <div className="p-4 sm:p-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-3 sm:p-4 md:p-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
-            <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
-            Work Schedule
-          </h3>
-          <div className="flex items-center gap-3 sm:gap-4 text-slate-400 text-xs sm:text-sm w-full sm:w-auto justify-between sm:justify-start">
-            <span className="font-medium">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
-            <div className="flex gap-1">
+          <div
+            className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] overflow-y-auto"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-4 sm:p-5 flex justify-between items-center z-10">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                  <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
+                  Work Schedule
+                </h2>
+                <p className="text-slate-400 text-xs sm:text-sm mt-1">View your assigned work schedule</p>
+              </div>
               <button
-                onClick={goToPreviousMonth}
-                className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
+                onClick={onClose}
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
               >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              <button
-                onClick={goToToday}
-                className="px-2 py-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                Today
-              </button>
-              <button
-                onClick={goToNextMonth}
-                className="p-1 hover:bg-slate-700 rounded text-slate-500 hover:text-slate-300 transition-colors cursor-pointer"
-              >
-                <ChevronRight className="w-4 h-4" />
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-[10px] sm:text-xs text-slate-500 font-medium uppercase tracking-wider">
-          <div className="hidden sm:block">Sun</div>
-          <div className="hidden sm:block">Mon</div>
-          <div className="hidden sm:block">Tue</div>
-          <div className="hidden sm:block">Wed</div>
-          <div className="hidden sm:block">Thu</div>
-          <div className="hidden sm:block">Fri</div>
-          <div className="hidden sm:block">Sat</div>
-          <div className="sm:hidden">S</div>
-          <div className="sm:hidden">M</div>
-          <div className="sm:hidden">T</div>
-          <div className="sm:hidden">W</div>
-          <div className="sm:hidden">T</div>
-          <div className="sm:hidden">F</div>
-          <div className="sm:hidden">S</div>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            {/* Calendar Content */}
+            <div className="p-4 sm:p-6 bg-slate-950/50">
+              <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
+            <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
+              <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+              Work Schedule
+            </h3>
+            <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
+              <span className="text-sm font-medium text-slate-300">{hasMounted ? `${monthName} ${viewYear}` : ''}</span>
+              <div className="flex items-center bg-slate-800/50 rounded-lg p-0.5 border border-slate-700">
+                <button
+                  onClick={goToPreviousMonth}
+                  className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={goToToday}
+                  className="px-2 py-1 hover:bg-slate-700 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Today
+                </button>
+                <button
+                  onClick={goToNextMonth}
+                  className="p-1.5 hover:bg-slate-700 rounded-md text-slate-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-7 gap-1 sm:gap-2">
-            {hasMounted ? renderDays() : null}
-          </div>
-        )}
 
-              <div className="mt-4 pt-4 border-t border-slate-700 flex flex-wrap gap-4 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-slate-400">Scheduled</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Coffee className="w-3 h-3 text-orange-400" />
-                  <span className="text-slate-400">Rest Day</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Plane className="w-3 h-3 text-green-400" />
-                  <span className="text-slate-400">Leave (Approved)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Plane className="w-3 h-3 text-amber-400" />
-                  <span className="text-slate-400">Leave (Pending)</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Plane className="w-3 h-3 text-red-400" />
-                  <span className="text-slate-400">Leave (Rejected)</span>
+          <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2 text-center text-[10px] sm:text-xs text-slate-500 font-medium uppercase tracking-wider">
+            <div className="hidden sm:block">Sun</div>
+            <div className="hidden sm:block">Mon</div>
+            <div className="hidden sm:block">Tue</div>
+            <div className="hidden sm:block">Wed</div>
+            <div className="hidden sm:block">Thu</div>
+            <div className="hidden sm:block">Fri</div>
+            <div className="hidden sm:block">Sat</div>
+            <div className="sm:hidden">S</div>
+            <div className="sm:hidden">M</div>
+            <div className="sm:hidden">T</div>
+            <div className="sm:hidden">W</div>
+            <div className="sm:hidden">T</div>
+            <div className="sm:hidden">F</div>
+            <div className="sm:hidden">S</div>
+          </div>
+
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+              {hasMounted ? renderDays() : null}
+            </div>
+          )}
+
+                <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <span className="text-slate-400">Scheduled</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Coffee className="w-3 h-3 text-orange-500" />
+                    <span className="text-slate-400">Rest Day</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Plane className="w-3 h-3 text-emerald-500" />
+                    <span className="text-slate-300">Leave (Approved)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Plane className="w-3 h-3 text-amber-500" />
+                    <span className="text-slate-400">Leave (Pending)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Plane className="w-3 h-3 text-red-500" />
+                    <span className="text-slate-400">Leave (Rejected)</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </div>,
+        document.body
+      )}
 
       {/* Date Detail Modal */}
-      {selectedDate && (
+      {selectedDate && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/70 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
           onClick={() => setSelectedDate(null)}
         >
           <div
@@ -395,21 +399,21 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               {/* Leave Request Section */}
               {selectedLeaveRequest && (
                 <div className={`rounded-xl p-4 border ${
-                  selectedLeaveRequest.status === 'approved' ? 'bg-green-900/20 border-green-700/30' :
-                  selectedLeaveRequest.status === 'rejected' ? 'bg-red-900/20 border-red-700/30' :
-                  'bg-amber-900/20 border-amber-700/30'
+                  selectedLeaveRequest.status === 'approved' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                  selectedLeaveRequest.status === 'rejected' ? 'bg-red-500/10 border-red-500/20' :
+                  'bg-amber-500/10 border-amber-500/20'
                 }`}>
                   <div className="flex items-center gap-3 mb-4">
                     <Plane className={`w-8 h-8 ${
-                      selectedLeaveRequest.status === 'approved' ? 'text-green-400' :
-                      selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
-                      'text-amber-400'
+                      selectedLeaveRequest.status === 'approved' ? 'text-emerald-500' :
+                      selectedLeaveRequest.status === 'rejected' ? 'text-red-500' :
+                      'text-amber-500'
                     }`} />
                     <div>
                       <h4 className={`text-lg font-bold ${
-                        selectedLeaveRequest.status === 'approved' ? 'text-green-300' :
-                        selectedLeaveRequest.status === 'rejected' ? 'text-red-300' :
-                        'text-amber-300'
+                        selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
+                        selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                        'text-amber-400'
                       }`}>{selectedLeaveRequest.leave_type}</h4>
                       <p className="text-xs text-slate-400 uppercase tracking-wider">
                         {selectedLeaveRequest.status}
@@ -419,21 +423,21 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
 
                   <div className="space-y-3">
                     <div>
-                      <span className="text-xs text-slate-500 uppercase block mb-1">Date Range</span>
+                      <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Date Range</span>
                       <div className="text-sm text-white">
                         {new Date(selectedLeaveRequest.start_date).toLocaleDateString()} - {new Date(selectedLeaveRequest.end_date).toLocaleDateString()}
                       </div>
                     </div>
 
                     <div>
-                      <span className="text-xs text-slate-500 uppercase block mb-1">Reason</span>
+                      <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Reason</span>
                       <p className="text-sm text-slate-300">{selectedLeaveRequest.reason}</p>
                     </div>
 
                     {selectedLeaveRequest.reviewer && (
                       <div>
-                        <span className="text-xs text-slate-500 uppercase block mb-1">Reviewed By</span>
-                        <div className="text-sm text-slate-300">
+                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Reviewed By</span>
+                        <div className="text-sm text-white">
                           {selectedLeaveRequest.reviewer.first_name} {selectedLeaveRequest.reviewer.last_name}
                         </div>
                         {selectedLeaveRequest.reviewed_at && (
@@ -450,21 +454,21 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               {/* Schedule Section */}
               {selectedSchedule ? (
                 selectedSchedule.is_rest_day ? (
-                  <div className="bg-orange-900/20 border border-orange-700/30 rounded-xl p-4 text-center">
-                    <Coffee className="w-12 h-12 text-orange-400 mx-auto mb-3" />
-                    <h4 className="text-lg font-bold text-orange-300 mb-1">Rest Day</h4>
-                    <p className="text-sm text-slate-400">No scheduled work for this day</p>
+                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
+                    <Coffee className="w-12 h-12 text-orange-500 mx-auto mb-3" />
+                    <h4 className="text-lg font-bold text-orange-400 mb-1">Rest Day</h4>
+                    <p className="text-sm text-muted-foreground">No scheduled work for this day</p>
                   </div>
                 ) : (
-                  <div className="bg-slate-800 rounded-xl p-4 border border-slate-700">
-                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700/50">
+                  <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-sm">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700">
                       <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Shift Details</span>
-                      <div className="w-2 h-2 rounded-full bg-blue-400"></div>
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                     </div>
 
                     <div className="space-y-4">
                       <div>
-                        <span className="text-xs text-slate-500 uppercase block mb-1">Start Time</span>
+                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Start Time</span>
                         <div className="flex items-center gap-2 font-mono text-lg text-white">
                           <Clock className="w-4 h-4 text-blue-400" />
                           {formatTime(selectedSchedule.shift_start)}
@@ -472,7 +476,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                       </div>
 
                       <div>
-                        <span className="text-xs text-slate-500 uppercase block mb-1">End Time</span>
+                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">End Time</span>
                         <div className="flex items-center gap-2 font-mono text-lg text-white">
                           <Clock className="w-4 h-4 text-rose-400" />
                           {formatTime(selectedSchedule.shift_end)}
@@ -489,7 +493,8 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

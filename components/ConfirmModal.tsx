@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { AlertCircle, X, Loader2 } from 'lucide-react'; // Import Loader2
+import { AlertCircle, X, Loader2 } from 'lucide-react';
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -12,7 +12,7 @@ interface ConfirmModalProps {
   onCancel: () => void;
   type?: 'info' | 'warning' | 'danger';
   children?: React.ReactNode;
-  isLoading?: boolean; // New prop for loading state
+  isLoading?: boolean; 
 }
 
 export const ConfirmModal: React.FC<ConfirmModalProps> = ({
@@ -25,36 +25,36 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onCancel,
   type = 'info',
   children,
-  isLoading = false, // Default to false
+  isLoading = false,
 }) => {
   if (!isOpen) return null;
 
   const colors = {
     info: {
       icon: 'text-blue-400',
-      button: 'bg-blue-600 hover:bg-blue-500',
+      button: 'bg-blue-600 hover:bg-blue-500 text-white',
     },
     warning: {
       icon: 'text-amber-400',
-      button: 'bg-amber-600 hover:bg-amber-500',
+      button: 'bg-amber-600 hover:bg-amber-500 text-white',
     },
     danger: {
       icon: 'text-rose-400',
-      button: 'bg-rose-600 hover:bg-rose-500',
+      button: 'bg-rose-600 hover:bg-rose-500 text-white',
     },
   };
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-9999 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
       onClick={onCancel}
     >
       <div
-        className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-slide-in-right"
+        className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-5 border-b border-slate-800 flex justify-between items-start bg-slate-900">
+        <div className="p-5 border-b border-slate-700 flex justify-between items-start bg-slate-900">
           <div className="flex items-start gap-3">
             <AlertCircle className={`w-6 h-6 mt-0.5 ${colors[type].icon}`} />
             <div>
@@ -66,7 +66,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
           <button
             onClick={onCancel}
             className="p-1 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-            disabled={isLoading} // Disable cancel button too while loading
+            disabled={isLoading}
           >
             <X className="w-5 h-5" />
           </button>
@@ -76,14 +76,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
         <div className="p-5 bg-slate-800/50 flex gap-3 justify-end">
           <button
             onClick={onCancel}
-            className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isLoading} // Disable cancel button too while loading
+            className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isLoading}
           >
             {cancelText}
           </button>
           <button
-            onClick={onConfirm} // Only call onConfirm
-            className={`px-4 py-2 rounded-lg text-white font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${colors[type].button}`}
+            onClick={onConfirm}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${colors[type].button}`}
             disabled={isLoading}
           >
             {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
@@ -94,5 +94,5 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
     </div>
   );
 
-  return createPortal(modalContent, document.body);
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };
