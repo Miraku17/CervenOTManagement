@@ -31,11 +31,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead'];
+    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead', 'Operations Technical Lead'];
 
     if (!allowedPositions.includes(userPosition)) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager, Technical Support Lead, Technical Support Engineer, and Help Desk Lead can export reports'
+        error: 'Forbidden: Only Operations Manager, Technical Support Lead, Technical Support Engineer, Help Desk Lead, and Operations Technical Lead can export reports'
       });
     }
   } catch (error: any) {

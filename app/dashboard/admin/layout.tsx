@@ -97,7 +97,8 @@ export default function AdminLayout({
       'Operations Manager',
       'Technical Support Lead',
       'Technical Support Engineer',
-      'Help Desk Lead'
+      'Help Desk Lead',
+      'Operations Technical Lead'
     ];
     return authorizedPositions.includes(userPosition);
   };

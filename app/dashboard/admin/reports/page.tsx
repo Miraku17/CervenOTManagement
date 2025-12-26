@@ -37,7 +37,7 @@ export default function ReportsPage() {
         }
 
         const userPosition = profile?.positions && (profile.positions as any).name;
-        const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead'];
+        const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead', 'Operations Technical Lead'];
 
         if (!allowedPositions.includes(userPosition)) {
           setHasAccess(false);
@@ -79,7 +79,7 @@ export default function ReportsPage() {
     checkAccessAndFetchEmployees();
   }, [user?.id]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || hasAccess === null) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
@@ -108,6 +108,7 @@ export default function ReportsPage() {
             <li>Technical Support Lead</li>
             <li>Technical Support Engineer</li>
             <li>Help Desk Lead</li>
+            <li>Operations Technical Lead</li>
           </ul>
           <p className="text-sm text-slate-400 mt-4">
             If you believe you should have access, please contact your administrator.
