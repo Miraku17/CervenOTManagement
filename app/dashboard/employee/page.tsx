@@ -9,7 +9,7 @@ import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHis
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, FileText, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen } from 'lucide-react';
+import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
@@ -622,50 +622,29 @@ const EmployeeDashboard: React.FC = () => {
   // Show loading screen while initializing
   if (authLoading || isInitialLoad || isCheckingSession) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-center space-y-6">
-          {/* Cerventech Logo */}
+          {/* Cerventech Logo - Spinning */}
           <div className="flex justify-center mb-4">
-            <div className="w-24 h-24 rounded-2xl flex items-center justify-center bg-slate-800/50 backdrop-blur-sm border border-slate-700 p-4">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center bg-white border-4 border-slate-800 shadow-2xl overflow-hidden animate-spin duration-[3s]">
               <img
                 src="/cerventech.png"
                 alt="Cerventech Logo"
-                className="h-full w-full object-contain rounded-full border-2 border-gray-300"
+                className="h-full w-full object-cover"
               />
             </div>
           </div>
 
-          {/* Loading spinner */}
-          <div className="flex justify-center">
-            <Loader2 className="w-12 h-12 text-blue-400 animate-spin" />
-          </div>
-
           {/* Loading text */}
           <div className="space-y-2">
-            <h2 className="text-2xl font-bold text-white">Loading Dashboard...</h2>
-            <p className="text-slate-400 text-sm">
+            <h2 className="text-2xl font-bold text-white tracking-tight">Loading Dashboard...</h2>
+            <p className="text-slate-400 text-sm font-medium">
               {authLoading
-                ? 'Authenticating your session...'
+                ? 'Authenticating...'
                 : isCheckingSession
-                ? 'Checking active work session...'
+                ? 'Syncing work session...'
                 : 'Preparing your workspace...'}
             </p>
-          </div>
-
-          {/* Loading progress indicators */}
-          <div className="mt-8 space-y-2 max-w-md mx-auto">
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Authentication</span>
-              <span>{authLoading ? '⏳' : '✓'}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Active Session Check</span>
-              <span>{isCheckingSession ? '⏳' : '✓'}</span>
-            </div>
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>Loading Data</span>
-              <span>{isInitialLoad ? '⏳' : '✓'}</span>
-            </div>
           </div>
         </div>
       </div>
@@ -707,53 +686,56 @@ const EmployeeDashboard: React.FC = () => {
       />
 
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-gradient-to-r from-slate-950/80 via-blue-950/80 to-slate-900/80 backdrop-blur-md border-b border-slate-800">
+      <nav className="sticky top-0 z-50 bg-slate-950/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Left side: Mobile Menu Toggle (on mobile) + Logo/Title */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="md:hidden"> {/* Mobile Menu Toggle - visible only on small screens */}
                 <button
                   onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   className="p-2 text-slate-400 hover:text-white transition-colors"
                 >
-                  {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+                  {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
                 </button>
               </div>
               {/* Cerventech Logo and Name - always visible */}
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center">
-                  <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-contain rounded-full border-2 border-gray-300" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-700 overflow-hidden shadow-sm">
+                  <img src="/cerventech.png" alt="Cerventech Logo" className="h-full w-full object-cover" />
                 </div>
-                <span className="text-xl font-bold tracking-tight text-white">
-                  Cerventech Inc.
-                </span>
+                <div className="flex flex-col">
+                    <span className="text-sm font-bold tracking-tight text-white leading-none">
+                    Cerventech Inc.
+                    </span>
+                    <span className="text-[10px] text-slate-400 leading-none mt-0.5">Employee Portal</span>
+                </div>
               </div>
             </div>
             
             {/* Right side: Desktop Navigation Buttons (hidden on mobile) */}
-            <div className="hidden md:flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-2">
                 {/* Actions Dropdown */}
                 <div className="relative" ref={actionsMenuRef}>
                   <button
                     onClick={() => setIsActionsMenuOpen(!isActionsMenuOpen)}
-                    className="flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors text-sm font-medium"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors"
                   >
-                    <Menu className="w-4 h-4" />
-                    <span>Menu</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${isActionsMenuOpen ? 'rotate-180' : ''}`} />
+                    <LayoutDashboard className="w-4 h-4" />
+                    <span>Actions</span>
+                    <ChevronDown className={`w-3 h-3 transition-transform ${isActionsMenuOpen ? 'rotate-180' : ''}`} />
                   </button>
 
                   {isActionsMenuOpen && (
-                    <div className="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-lg py-1 z-50">
+                    <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-lg shadow-lg py-1 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
                       <button
                         onClick={() => {
                           setIsScheduleModalOpen(true);
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
                       >
-                        <CalendarIcon className="w-4 h-4" />
+                        <CalendarIcon className="w-4 h-4 text-slate-400" />
                         <span>Work Schedule</span>
                       </button>
                       <button
@@ -761,9 +743,9 @@ const EmployeeDashboard: React.FC = () => {
                           setIsFileLeaveModalOpen(true);
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
                       >
-                        <CalendarDays className="w-4 h-4" />
+                        <CalendarDays className="w-4 h-4 text-slate-400" />
                         <span>File a Leave</span>
                       </button>
                       <button
@@ -771,9 +753,9 @@ const EmployeeDashboard: React.FC = () => {
                           router.push('/dashboard/knowledge-base');
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
                       >
-                        <BookOpen className="w-4 h-4" />
+                        <BookOpen className="w-4 h-4 text-slate-400" />
                         <span>Knowledge Base</span>
                       </button>
                       <button
@@ -781,39 +763,36 @@ const EmployeeDashboard: React.FC = () => {
                           router.push('/dashboard/ticketing');
                           setIsActionsMenuOpen(false);
                         }}
-                        className="w-full flex items-center gap-3 px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
                       >
-                        <Ticket className="w-4 h-4" />
+                        <Ticket className="w-4 h-4 text-slate-400" />
                         <span>Ticketing</span>
                       </button>
                     </div>
                   )}
                 </div>
 
+                <div className="h-4 w-px bg-slate-800 mx-2"></div>
+
                 {isAdmin && (
                   <button
                     onClick={() => router.push('/dashboard/admin')}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors text-sm font-medium border-r border-slate-700 mr-2"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-md transition-colors"
                   >
                     <Shield className="w-4 h-4" />
-                    <span>Admin Dashboard</span>
+                    <span>Admin</span>
                   </button>
                 )}
+                
                 <button
                     onClick={logout}
                     disabled={isLoggingOut}
-                    className="flex items-center gap-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 rounded-md transition-colors disabled:opacity-50"
                 >
                     {isLoggingOut ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                        <span>Logging out...</span>
-                      </>
+                      <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
-                      <>
-                        <LogOut className="w-4 h-4" />
-                        <span>Log Out</span>
-                      </>
+                      <LogOut className="w-4 h-4" />
                     )}
                 </button>
             </div>
@@ -822,17 +801,17 @@ const EmployeeDashboard: React.FC = () => {
 
         {/* Mobile Dropdown Menu - visible only when isMobileMenuOpen is true and on small screens */}
         {isMobileMenuOpen && (
-          <div className="md:hidden border-t border-slate-800 bg-slate-900/95 backdrop-blur-md">
+          <div className="md:hidden border-t border-slate-800 bg-slate-950">
             <div className="px-4 pt-2 pb-4 space-y-2">
               <button
                 onClick={() => {
                   setIsScheduleModalOpen(true);
                   setIsMobileMenuOpen(false); // Close menu after clicking
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
               >
-                <CalendarIcon size={20} />
-                <span className="font-medium">Work Schedule</span>
+                <CalendarIcon size={18} />
+                <span className="font-medium text-sm">Work Schedule</span>
               </button>
               
               <button
@@ -840,10 +819,10 @@ const EmployeeDashboard: React.FC = () => {
                   setIsFileLeaveModalOpen(true);
                   setIsMobileMenuOpen(false); // Close menu after clicking
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
               >
-                <CalendarDays size={20} />
-                <span className="font-medium">File a Leave</span>
+                <CalendarDays size={18} />
+                <span className="font-medium text-sm">File a Leave</span>
               </button>
 
               <button
@@ -851,10 +830,10 @@ const EmployeeDashboard: React.FC = () => {
                   router.push('/dashboard/knowledge-base');
                   setIsMobileMenuOpen(false); // Close menu after clicking
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
               >
-                <BookOpen size={20} />
-                <span className="font-medium">Knowledge Base</span>
+                <BookOpen size={18} />
+                <span className="font-medium text-sm">Knowledge Base</span>
               </button>
 
               <button
@@ -862,10 +841,10 @@ const EmployeeDashboard: React.FC = () => {
                   router.push('/dashboard/ticketing');
                   setIsMobileMenuOpen(false); // Close menu after clicking
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
               >
-                <Ticket size={20} />
-                <span className="font-medium">Ticketing</span>
+                <Ticket size={18} />
+                <span className="font-medium text-sm">Ticketing</span>
               </button>
 
               {isAdmin && (
@@ -874,10 +853,10 @@ const EmployeeDashboard: React.FC = () => {
                     router.push('/dashboard/admin');
                     setIsMobileMenuOpen(false); // Close menu after clicking
                   }}
-                  className="w-full flex items-center gap-3 px-4 py-3 bg-blue-600/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-xl transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-blue-400 hover:bg-blue-500/10 rounded-lg transition-colors"
                 >
-                  <Shield size={20} />
-                  <span className="font-medium">Admin Dashboard</span>
+                  <Shield size={18} />
+                  <span className="font-medium text-sm">Admin Dashboard</span>
                 </button>
               )}
 
@@ -888,17 +867,17 @@ const EmployeeDashboard: React.FC = () => {
                     setIsMobileMenuOpen(false); // Close menu after clicking
                   }}
                   disabled={isLoggingOut}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:bg-slate-800 hover:text-white rounded-xl transition-colors"
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 hover:text-white hover:bg-slate-900 rounded-lg transition-colors"
                 >
                   {isLoggingOut ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                      <span className="font-medium">Logging out...</span>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="font-medium text-sm">Logging out...</span>
                     </>
                   ) : (
                     <>
-                      <LogOut size={20} />
-                      <span className="font-medium">Log Out</span>
+                      <LogOut size={18} />
+                      <span className="font-medium text-sm">Log Out</span>
                     </>
                   )}
                 </button>
@@ -918,31 +897,22 @@ const EmployeeDashboard: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
             {isFromPreviousDay ? (
               // Warning for previous day session
-              <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-l-4 border-amber-500 rounded-lg p-4 shadow-lg backdrop-blur-sm">
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-4 shadow-sm">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
-                    <AlertTriangle className="w-6 h-6 text-amber-400" />
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold text-amber-100 flex items-center gap-2">
-                          <Clock className="w-5 h-5" />
+                        <h3 className="text-sm font-semibold text-amber-500 flex items-center gap-2">
                           Active Work Session Detected
                         </h3>
-                        <p className="mt-2 text-amber-200/90 text-sm">
-                          You have an ongoing work session that hasn't been clocked out yet. This may result in extended hours being recorded. Please clock out.
+                        <p className="mt-1 text-amber-500/80 text-sm">
+                          You have an ongoing work session that hasn't been clocked out yet.
                         </p>
-                        <p className="mt-2 text-amber-100 font-medium text-sm">
-                          <span className="text-amber-300">Started:</span>{' '}
-                          {new Date(activeLog.startTime).toLocaleString('en-US', {
-                            weekday: 'short',
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <p className="mt-1 text-amber-500/80 font-mono text-xs">
+                          Started: {new Date(activeLog.startTime).toLocaleString()}
                         </p>
                         <div className="mt-3 flex flex-wrap gap-2">
                           <button
@@ -952,23 +922,17 @@ const EmployeeDashboard: React.FC = () => {
                                 element.scrollIntoView({ behavior: 'smooth', block: 'center' });
                               }
                             }}
-                            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition-colors shadow-md"
+                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
                           >
                             Go to Time Tracker
-                          </button>
-                          <button
-                            onClick={() => setShowPendingSessionAlert(false)}
-                            className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium rounded-lg transition-colors"
-                          >
-                            Dismiss
                           </button>
                         </div>
                       </div>
                       <button
                         onClick={() => setShowPendingSessionAlert(false)}
-                        className="flex-shrink-0 p-1 text-amber-300 hover:text-amber-100 transition-colors"
+                        className="flex-shrink-0 p-1 text-amber-500/60 hover:text-amber-500 transition-colors"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -976,33 +940,26 @@ const EmployeeDashboard: React.FC = () => {
               </div>
             ) : (
               // Gentle reminder for same day session
-              <div className="bg-gradient-to-r from-blue-500/10 to-cyan-500/10 border-l-4 border-blue-500 rounded-lg p-4 shadow-lg backdrop-blur-sm">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4 shadow-sm">
                 <div className="flex items-start gap-4">
                   <div className="flex-shrink-0">
-                    <Clock className="w-6 h-6 text-blue-400" />
+                    <Clock className="w-5 h-5 text-blue-500" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
                       <div>
-                        <h3 className="text-base font-semibold text-blue-100 flex items-center gap-2">
+                        <h3 className="text-sm font-semibold text-blue-500 flex items-center gap-2">
                           You're Currently Clocked In
                         </h3>
-                        <p className="mt-1 text-blue-200/90 text-sm">
-                          Don't forget to clock out when you're done for the day! 😊
-                        </p>
-                        <p className="mt-2 text-blue-100 text-xs">
-                          <span className="text-blue-300">Started:</span>{' '}
-                          {new Date(activeLog.startTime).toLocaleTimeString('en-US', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
+                        <p className="mt-1 text-blue-500/80 text-xs">
+                          Started: {new Date(activeLog.startTime).toLocaleTimeString()}
                         </p>
                       </div>
                       <button
                         onClick={() => setShowPendingSessionAlert(false)}
-                        className="flex-shrink-0 p-1 text-blue-300 hover:text-blue-100 transition-colors"
+                        className="flex-shrink-0 p-1 text-blue-500/60 hover:text-blue-500 transition-colors"
                       >
-                        <X className="w-5 h-5" />
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
@@ -1014,14 +971,14 @@ const EmployeeDashboard: React.FC = () => {
       })()}
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
         
         {/* Top Row: Profile & Tracker */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-4 h-full">
             <ProfileHeader user={user} />
           </div>
-          <div className="lg:col-span-2" data-time-tracker>
+          <div className="lg:col-span-8 h-full" data-time-tracker>
             <TimeTracker
               onClockIn={requestClockIn}
               onClockOut={requestClockOut}
@@ -1039,16 +996,19 @@ const EmployeeDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Calendar View */}
         <div>
           <CalendarView logs={workLogs} userId={user?.id} activeLog={activeLog} />
         </div>
 
-        <div>
-          <OvertimeHistory key={overtimeHistoryRefreshKey} />
-        </div>
-
-        <div>
-          <LeaveRequestHistory refreshTrigger={leaveRefreshTrigger} />
+        {/* History Sections */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+            <div>
+                 <OvertimeHistory key={overtimeHistoryRefreshKey} />
+            </div>
+            <div>
+                 <LeaveRequestHistory refreshTrigger={leaveRefreshTrigger} />
+            </div>
         </div>
       </main>
     </div>

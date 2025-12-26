@@ -17,7 +17,7 @@ export default function LandingPage() {
             <img
               src="/cerventech.png"
               alt="Cerventech Logo"
-              className="w-10 h-10 rounded-lg object-cover shadow-lg shadow-blue-900/20"
+              className="w-10 h-10 rounded-full object-cover shadow-lg shadow-blue-900/20"
             />
             <span className="text-2xl font-bold tracking-tight">Cerventech Inc.</span>
           </div>

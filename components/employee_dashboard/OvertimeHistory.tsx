@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Clock, CheckCircle, XCircle, AlertCircle, Calendar, Loader2, ChevronRight, Eye, X } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
@@ -131,7 +132,7 @@ const OvertimeHistory: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div id="overtime-history" className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 flex justify-center items-center min-h-[200px]">
+      <div id="overtime-history" className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-6 flex justify-center items-center min-h-[200px]">
         <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
       </div>
     );
@@ -140,13 +141,13 @@ const OvertimeHistory: React.FC = () => {
   return (
     <div id="overtime-history" className="space-y-6 animate-fade-in scroll-mt-24">
       {/* Detail Modal */}
-      {selectedRequest && (
+      {selectedRequest && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-50"
+          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-[9999]"
           onClick={() => setSelectedRequest(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform transition-all"
+            className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden transform transition-all"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6 border-b border-slate-800 bg-slate-900">
@@ -171,11 +172,11 @@ const OvertimeHistory: React.FC = () => {
               </div>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto bg-slate-900/50">
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-slate-500 uppercase font-medium">Overtime Hours</label>
-                  <p className="text-slate-200 mt-1 font-mono text-lg">
+                <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Overtime Hours</label>
+                  <p className="text-white mt-1 font-mono text-xl font-bold">
                     {selectedRequest.overtime_minutes !== undefined
                       ? `${(selectedRequest.overtime_minutes / 60).toFixed(2)} hrs`
                       : selectedRequest.approved_hours !== null
@@ -183,9 +184,9 @@ const OvertimeHistory: React.FC = () => {
                         : 'Pending'}
                   </p>
                 </div>
-                <div>
-                  <label className="text-xs text-slate-500 uppercase font-medium">Requested At</label>
-                  <p className="text-slate-200 mt-1">
+                <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Requested At</label>
+                  <p className="text-white mt-1 text-sm">
                     {new Date(selectedRequest.requested_at).toLocaleString()}
                   </p>
                 </div>
@@ -193,111 +194,111 @@ const OvertimeHistory: React.FC = () => {
 
               {/* Approval Timeline */}
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-white uppercase">Approval Status</h4>
+                <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Approval Status</h4>
 
-                {/* Level 1 */}
-                <div className="flex gap-4">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                      selectedRequest.level1_status === 'approved' ? 'bg-emerald-500/20 border-emerald-500' :
-                      selectedRequest.level1_status === 'rejected' ? 'bg-red-500/20 border-red-500' :
-                      'bg-slate-800 border-slate-600'
-                    }`}>
-                      {getStatusIcon(selectedRequest.level1_status || 'pending')}
-                    </div>
-                    {selectedRequest.level1_status === 'approved' && (
-                      <div className="w-0.5 h-12 bg-emerald-500/30 my-1"></div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between">
-                      <h5 className="font-medium text-white">Level 1 Approval</h5>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level1_status || 'pending')}`}>
-                        {(selectedRequest.level1_status || 'pending').toUpperCase()}
-                      </span>
-                    </div>
-                    {selectedRequest.level1_reviewer_profile && (
-                      <p className="text-sm text-slate-400 mt-1">
-                        by {selectedRequest.level1_reviewer_profile.first_name} {selectedRequest.level1_reviewer_profile.last_name}
-                      </p>
-                    )}
-                    {selectedRequest.level1_reviewed_at && (
-                      <p className="text-xs text-slate-500 mt-1">
-                        {new Date(selectedRequest.level1_reviewed_at).toLocaleString()}
-                      </p>
-                    )}
-                    {selectedRequest.level1_comment && (
-                      <div className="mt-2 bg-slate-800/50 p-3 rounded-lg">
-                        <p className="text-sm text-slate-300">{selectedRequest.level1_comment}</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Level 2 */}
-                {selectedRequest.level1_status === 'approved' && (
-                  <div className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                        selectedRequest.level2_status === 'approved' ? 'bg-emerald-500/20 border-emerald-500' :
-                        selectedRequest.level2_status === 'rejected' ? 'bg-red-500/20 border-red-500' :
-                        'bg-slate-800 border-slate-600'
-                      }`}>
-                        {getStatusIcon(selectedRequest.level2_status || 'pending')}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-medium text-white">Level 2 Approval</h5>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level2_status || 'pending')}`}>
-                          {(selectedRequest.level2_status || 'pending').toUpperCase()}
-                        </span>
-                      </div>
-                      {selectedRequest.level2_reviewer_profile && (
-                        <p className="text-sm text-slate-400 mt-1">
-                          by {selectedRequest.level2_reviewer_profile.first_name} {selectedRequest.level2_reviewer_profile.last_name}
-                        </p>
-                      )}
-                      {selectedRequest.level2_reviewed_at && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          {new Date(selectedRequest.level2_reviewed_at).toLocaleString()}
-                        </p>
-                      )}
-                      {selectedRequest.level2_comment && (
-                        <div className="mt-2 bg-slate-800/50 p-3 rounded-lg">
-                          <p className="text-sm text-slate-300">{selectedRequest.level2_comment}</p>
+                <div className="relative pl-8 border-l-2 border-slate-700 space-y-8">
+                    {/* Level 1 */}
+                    <div className="relative">
+                        <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 bg-slate-900 ${
+                        selectedRequest.level1_status === 'approved' ? 'border-emerald-500 text-emerald-500' :
+                        selectedRequest.level1_status === 'rejected' ? 'border-red-500 text-red-500' :
+                        'border-slate-700 text-slate-500'
+                        }`}>
+                            {getStatusIcon(selectedRequest.level1_status || 'pending')}
                         </div>
-                      )}
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                            <div>
+                                <h5 className="font-medium text-white">Level 1 Approval</h5>
+                                {selectedRequest.level1_reviewer_profile && (
+                                    <p className="text-sm text-slate-400">
+                                        by {selectedRequest.level1_reviewer_profile.first_name} {selectedRequest.level1_reviewer_profile.last_name}
+                                    </p>
+                                )}
+                                {selectedRequest.level1_reviewed_at && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {new Date(selectedRequest.level1_reviewed_at).toLocaleString()}
+                                    </p>
+                                )}
+                            </div>
+                            <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level1_status || 'pending')}`}>
+                                {(selectedRequest.level1_status || 'pending').toUpperCase()}
+                            </span>
+                        </div>
+                        
+                        {selectedRequest.level1_comment && (
+                            <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                                <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level1_comment}&quot;</p>
+                            </div>
+                        )}
                     </div>
-                  </div>
-                )}
+
+                    {/* Level 2 (Only if Level 1 is approved) */}
+                    {selectedRequest.level1_status === 'approved' && (
+                         <div className="relative">
+                            <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 bg-slate-900 ${
+                            selectedRequest.level2_status === 'approved' ? 'border-emerald-500 text-emerald-500' :
+                            selectedRequest.level2_status === 'rejected' ? 'border-red-500 text-red-500' :
+                            'border-slate-700 text-slate-500'
+                            }`}>
+                                {getStatusIcon(selectedRequest.level2_status || 'pending')}
+                            </div>
+                            
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                                <div>
+                                    <h5 className="font-medium text-white">Level 2 Approval</h5>
+                                    {selectedRequest.level2_reviewer_profile && (
+                                        <p className="text-sm text-slate-400">
+                                            by {selectedRequest.level2_reviewer_profile.first_name} {selectedRequest.level2_reviewer_profile.last_name}
+                                        </p>
+                                    )}
+                                    {selectedRequest.level2_reviewed_at && (
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            {new Date(selectedRequest.level2_reviewed_at).toLocaleString()}
+                                        </p>
+                                    )}
+                                </div>
+                                <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level2_status || 'pending')}`}>
+                                    {(selectedRequest.level2_status || 'pending').toUpperCase()}
+                                </span>
+                            </div>
+                            
+                            {selectedRequest.level2_comment && (
+                                <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                                    <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level2_comment}&quot;</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
               </div>
 
               {selectedRequest.comment && (
                 <div>
-                  <label className="text-xs text-slate-500 uppercase font-medium">Your Comment</label>
-                  <p className="text-slate-200 mt-1 bg-slate-800/50 p-3 rounded-lg">
+                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Your Comment</label>
+                  <p className="text-white mt-1 bg-slate-800 border border-slate-700 p-3 rounded-lg text-sm">
                     {selectedRequest.comment}
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 bg-slate-800/50 border-t border-slate-800 flex justify-end">
+            <div className="p-4 bg-slate-900 border-t border-slate-800 flex justify-end">
               <button
                 onClick={() => setSelectedRequest(null)}
-                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-medium transition-colors text-sm"
               >
                 Close
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-          <Clock className="text-blue-400" />
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Clock className="w-5 h-5 text-blue-400" />
           Overtime History
         </h2>
 
@@ -306,10 +307,10 @@ const OvertimeHistory: React.FC = () => {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all whitespace-nowrap ${
                 filter === f
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                  ? 'bg-slate-800 text-white shadow-sm border border-slate-700'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
               }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
@@ -324,31 +325,31 @@ const OvertimeHistory: React.FC = () => {
           {error}
         </div>
       ) : filteredRequests.length === 0 ? (
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-12 text-center">
-          <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Clock className="text-slate-500" size={32} />
+        <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-12 text-center">
+          <div className="w-12 h-12 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Clock className="text-slate-500" size={24} />
           </div>
-          <h3 className="text-lg font-medium text-white mb-1">No {filter !== 'all' ? filter : ''} overtime requests</h3>
-          <p className="text-slate-400 text-sm">
+          <h3 className="text-sm font-medium text-white mb-1">No {filter !== 'all' ? filter : ''} overtime requests</h3>
+          <p className="text-slate-400 text-xs">
             {filter === 'all'
               ? "You haven't submitted any overtime requests yet."
               : `You don't have any ${filter} requests.`}
           </p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {filteredRequests.map((request) => (
             <div
               key={request.id}
-              className="bg-slate-900/50 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition-all cursor-pointer group"
+              className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-4 sm:p-5 hover:border-blue-500/50 transition-all cursor-pointer group shadow-sm hover:shadow-md"
               onClick={() => setSelectedRequest(request)}
             >
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 {/* Left: Date and Hours */}
                 <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <Calendar size={20} className="text-blue-400" />
-                    <span className="text-lg font-semibold text-white">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Calendar size={18} className="text-blue-400" />
+                    <span className="text-base font-semibold text-white">
                       {new Date(request.attendance.date).toLocaleDateString(undefined, {
                         weekday: 'short',
                         year: 'numeric',
@@ -358,14 +359,14 @@ const OvertimeHistory: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400">
-                    <Clock size={16} />
+                    <Clock size={14} />
                     <span>
                       Total: {Math.floor((request.total_minutes_final ?? request.attendance.total_minutes) / 60)}h {(request.total_minutes_final ?? request.attendance.total_minutes) % 60}m
                       {request.total_minutes_final && <span className="text-xs text-slate-500 ml-1">(lunch deducted)</span>}
                     </span>
                     {(request.overtime_minutes !== undefined || request.approved_hours !== null) && (
                       <>
-                        <ChevronRight size={16} className="text-slate-600" />
+                        <ChevronRight size={14} className="text-slate-600" />
                         <span className="text-emerald-400 font-semibold">
                           OT: {request.overtime_minutes !== undefined
                             ? `${(request.overtime_minutes / 60).toFixed(2)} hrs`
@@ -378,43 +379,44 @@ const OvertimeHistory: React.FC = () => {
 
                 {/* Center: Approval Flow */}
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-xs">
                     {/* Level 1 */}
                     <div className="flex items-center gap-2">
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(request.level1_status || 'pending')}`}>
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded border ${getStatusColor(request.level1_status || 'pending')}`}>
                         {getStatusIcon(request.level1_status || 'pending')}
                         <span>L1</span>
                       </div>
                     </div>
 
-                    <ChevronRight size={16} className="text-slate-600" />
+                    <ChevronRight size={14} className="text-slate-600" />
 
                     {/* Level 2 */}
                     <div className="flex items-center gap-2">
-                      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
-                        request.level1_status === 'rejected' ? 'bg-slate-800 text-slate-600 border-slate-700' :
+                      <div className={`flex items-center gap-1 px-2 py-1 rounded border ${
+                        request.level1_status === 'rejected' ? 'bg-slate-800 text-slate-500 border-slate-700' :
                         getStatusColor(request.level2_status || 'pending')
                       }`}>
-                        {request.level1_status === 'rejected' ? <AlertCircle size={16} /> : getStatusIcon(request.level2_status || 'pending')}
+                        {request.level1_status === 'rejected' ? <AlertCircle size={14} /> : getStatusIcon(request.level2_status || 'pending')}
                         <span>L2</span>
                       </div>
                     </div>
 
-                    <ChevronRight size={16} className="text-slate-600" />
+                    <ChevronRight size={14} className="text-slate-600" />
 
                     {/* Final */}
-                    <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${getStatusColor(request.final_status || 'pending')}`}>
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded border ${getStatusColor(request.final_status || 'pending')}`}>
                       {getStatusIcon(request.final_status || 'pending')}
-                      <span className="capitalize">{request.final_status || 'pending'}</span>
+                      <span className="capitalize hidden sm:inline">{request.final_status || 'pending'}</span>
+                      <span className="sm:hidden capitalize">{request.final_status || 'pending'}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Right: View Details */}
                 <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium group-hover:bg-slate-700">
-                    <Eye size={16} />
-                    <span className="hidden sm:inline">View Details</span>
+                  <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-xs font-medium">
+                    <Eye size={14} />
+                    <span className="hidden sm:inline">Details</span>
                   </button>
                 </div>
               </div>

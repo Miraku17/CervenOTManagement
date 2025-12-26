@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Calendar as CalendarIcon, AlertCircle, Loader2, Check, ChevronDown } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
@@ -83,10 +84,10 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl animate-fade-in-up">
-        <div className="flex items-center justify-between p-6 border-b border-slate-800">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between p-6 border-b border-slate-700">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             <CalendarIcon className="text-blue-400" size={24} />
             File Leave Request
@@ -152,7 +153,7 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
             </div>
 
             {totalDays > 0 && (
-               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex items-center gap-2 text-blue-300 text-sm font-medium">
+               <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-3 flex items-center gap-2 text-blue-400 text-sm font-medium">
                  <CalendarIcon size={16} />
                  <span>Total Duration: {totalDays} day{totalDays !== 1 ? 's' : ''}</span>
                </div>
@@ -166,7 +167,7 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
                 required
                 placeholder="Please provide a reason for your leave..."
                 rows={3}
-                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none placeholder-slate-600"
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none resize-none placeholder-slate-500"
               />
             </div>
           </div>
@@ -202,6 +203,8 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
 };
 
 export default FileLeaveModal;
