@@ -23,7 +23,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Use the authenticated user ID from withAuth middleware
     const actualAdminId = req.user?.id || adminId;
 
-    // Verify user has authorization to approve/reject (optional extra validation)
+    // Verify user has authorization to approve/reject
     const { data: adminProfile, error: profileError } = await supabase
       .from('profiles')
       .select('positions(name)')
@@ -56,7 +56,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Get current overtime request to check current status
     const { data: currentRequest, error: fetchError } = await supabase
-      .from('overtime')
+      .from('overtime_v2')
       .select('*')
       .eq('id', id)
       .single();
@@ -80,6 +80,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // If level 1 is rejected, set final_status to rejected
       if (action === 'reject') {
         updates.final_status = 'rejected';
+        updates.status = 'rejected';
+        updates.approved_at = now;
       }
     } else if (level === 'level2') {
       // Level 2 approval - can only happen if level 1 is approved
@@ -96,23 +98,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Set final status based on level 2 decision
       updates.final_status = action === 'approve' ? 'approved' : 'rejected';
+      updates.status = action === 'approve' ? 'approved' : 'rejected';
+      updates.approved_at = now;
     }
 
-    // Update legacy fields for backward compatibility
-    if (updates.final_status === 'approved') {
-      updates.status = 'approved';
-      updates.approved_at = now;
-      updates.reviewer = actualAdminId;
-    } else if (updates.final_status === 'rejected') {
-      updates.status = 'rejected';
-      updates.approved_at = now;
-      updates.reviewer = actualAdminId;
-    }
-
-    console.log(`Updating overtime request ${id} at ${level}:`, updates);
+    console.log(`Updating overtime_v2 request ${id} at ${level}:`, updates);
 
     const { data, error } = await supabase
-      .from('overtime')
+      .from('overtime_v2')
       .update(updates)
       .eq('id', id)
       .select()
@@ -121,24 +114,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (error) throw error;
 
     console.log(`Overtime request ${level} ${action} successfully:`, data);
-
-    // Update is_overtime_approved in attendance table only when final_status is set
-    if (data && data.attendance_id && data.final_status) {
-      const isApproved = data.final_status === 'approved';
-      console.log(`Updating attendance ${data.attendance_id} is_overtime_approved to ${isApproved}`);
-
-      const { error: attendanceError } = await supabase
-        .from('attendance')
-        .update({ is_overtime_approved: isApproved })
-        .eq('id', data.attendance_id);
-
-      if (attendanceError) {
-        console.error('Error updating is_overtime_approved in attendance:', attendanceError);
-        // Don't throw - overtime was already updated successfully
-      } else {
-        console.log(`Successfully updated is_overtime_approved to ${isApproved}`);
-      }
-    }
 
     return res.status(200).json({ message: `Overtime request ${level} ${action}ed`, data });
 
