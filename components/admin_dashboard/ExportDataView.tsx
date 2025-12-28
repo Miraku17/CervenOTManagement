@@ -101,7 +101,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     const dtrData: any[][] = [];
 
     // Add headers
-    dtrData.push(['Employee Name', 'Employee ID', ...uniqueDates, 'Total Regular Hours', 'Overtime Hours']);
+    dtrData.push(['Employee Name', 'Employee ID', ...uniqueDates, 'Total Hours']);
 
     // Sort employees by name and add rows
     const sortedEmployees = Array.from(employeeData.values()).sort((a, b) =>
@@ -109,28 +109,6 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     );
 
     for (const emp of sortedEmployees) {
-      // Calculate total overtime hours using the API's calculated daily_overtime_hours
-      // Use a Set to track which dates we've already counted to avoid double-counting
-      let totalOvertimeHours = 0;
-      const processedDates = new Set<string>();
-
-      for (const row of data) {
-        const firstName = row.profiles?.first_name || '';
-        const lastName = row.profiles?.last_name || '';
-        const fullName = `${firstName} ${lastName}`.trim();
-        const employeeId = row.profiles?.employee_id || 'NA';
-        const employeeKey = `${fullName}_${employeeId}`;
-
-        if (employeeKey === `${emp.name}_${emp.employeeId}`) {
-          const dateKey = row.date;
-          // Only add daily overtime once per date (to avoid counting it multiple times for multiple sessions)
-          if (!processedDates.has(dateKey)) {
-            totalOvertimeHours += (row.daily_overtime_hours || 0);
-            processedDates.add(dateKey);
-          }
-        }
-      }
-
       const row = [
         emp.name,
         emp.employeeId,
@@ -149,8 +127,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
           // Otherwise just show the hours
           return dateData.hours.toFixed(2);
         }),
-        emp.totalHours.toFixed(2),
-        totalOvertimeHours.toFixed(2)
+        emp.totalHours.toFixed(2)
       ];
       dtrData.push(row);
     }
@@ -168,40 +145,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       'Session Status',
       'Total Minutes',
       'Total Hours',
-      'Overtime Hours (Per Session)',
-      'Daily Overtime Hours',
       'Clock In Address',
       'Clock Out Address',
-      'Has Overtime Request',
-      'Overtime Status',
-      'Overtime Comment',
-      'Overtime Approved Hours',
-      'Overtime Requested At',
-      'Overtime Approved/Rejected At',
-      'Overtime Reviewer'
-    ]);
-
-    // Add explanation row
-    detailedData.push([
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      'Per-session calculation',
-      'Daily total (used in DTR Summary)',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      ''
+      'Has OT Request',
+      'OT Start Time',
+      'OT End Time',
+      'OT Total Hours',
+      'OT Reason',
+      'OT Level 1 Status',
+      'OT Level 2 Status',
+      'OT Final Status',
+      'OT Requested At',
+      'OT Level 1 Reviewer',
+      'OT Level 2 Reviewer'
     ]);
 
     // Add detailed records
@@ -221,11 +177,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const sessionStatus = isActiveSession ? 'ACTIVE (Hours calculated up to export time)' : 'Completed';
 
       // Use calculated values from API (already has lunch deduction applied)
-      const totalHoursRaw = row.total_hours_raw || 0;
-      const lunchDeduction = row.lunch_deduction || 0;
       const totalHours = isActiveSession ? 'Active' : (row.total_hours || 0);
-      const overtimeHours = isActiveSession ? 'Active' : (row.overtime_hours || 0);
-      const dailyOvertimeHours = isActiveSession ? 'Active' : (row.daily_overtime_hours || 0);
 
       let totalMinutes = 0;
       if (timeInDate && timeOutDate) {
@@ -236,18 +188,23 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       const addressIn = row.clock_in_address || 'N/A';
       const addressOut = row.clock_out_address || 'N/A';
 
+      // Overtime request from overtime_v2
       const hasOvertimeRequest = row.overtimeRequest ? 'Yes' : 'No';
-      const overtimeStatus = row.overtimeRequest?.status || 'N/A';
-      const overtimeComment = row.overtimeRequest?.comment || 'N/A';
-      const overtimeApprovedHours = row.overtimeRequest?.approved_hours || 'N/A';
-      const overtimeRequestedAt = row.overtimeRequest?.requested_at
+      const otStartTime = row.overtimeRequest?.start_time || 'N/A';
+      const otEndTime = row.overtimeRequest?.end_time || 'N/A';
+      const otTotalHours = row.overtimeRequest?.total_hours?.toFixed(2) || 'N/A';
+      const otReason = row.overtimeRequest?.reason || 'N/A';
+      const otLevel1Status = row.overtimeRequest?.level1_status || 'N/A';
+      const otLevel2Status = row.overtimeRequest?.level2_status || 'N/A';
+      const otFinalStatus = row.overtimeRequest?.final_status || row.overtimeRequest?.status || 'N/A';
+      const otRequestedAt = row.overtimeRequest?.requested_at
         ? new Date(row.overtimeRequest.requested_at).toLocaleString()
         : 'N/A';
-      const overtimeApprovedAt = row.overtimeRequest?.approved_at
-        ? new Date(row.overtimeRequest.approved_at).toLocaleString()
+      const otLevel1Reviewer = row.overtimeRequest?.level1_reviewer
+        ? `${row.overtimeRequest.level1_reviewer.first_name} ${row.overtimeRequest.level1_reviewer.last_name}`
         : 'N/A';
-      const overtimeReviewer = row.overtimeRequest?.reviewer
-        ? `${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}`
+      const otLevel2Reviewer = row.overtimeRequest?.level2_reviewer
+        ? `${row.overtimeRequest.level2_reviewer.first_name} ${row.overtimeRequest.level2_reviewer.last_name}`
         : 'N/A';
 
       detailedData.push([
@@ -259,17 +216,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         sessionStatus,
         totalMinutes,
         totalHours,
-        overtimeHours,
-        dailyOvertimeHours,
         addressIn,
         addressOut,
         hasOvertimeRequest,
-        overtimeStatus,
-        overtimeComment,
-        overtimeApprovedHours,
-        overtimeRequestedAt,
-        overtimeApprovedAt,
-        overtimeReviewer
+        otStartTime,
+        otEndTime,
+        otTotalHours,
+        otReason,
+        otLevel1Status,
+        otLevel2Status,
+        otFinalStatus,
+        otRequestedAt,
+        otLevel1Reviewer,
+        otLevel2Reviewer
       ]);
     }
 
@@ -284,86 +243,109 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     return workbook;
   };
 
-  const convertOvertimeToExcel = (data: any[]) => {
-    if (!data || data.length === 0) return null;
+  const convertOvertimeToExcel = (overtimeV2Data: any[]) => {
+    if (!overtimeV2Data || overtimeV2Data.length === 0) return null;
 
     const overtimeData: any[][] = [];
 
-    // Add headers
+    // Add headers for overtime_v2 data
     overtimeData.push([
-      'Date',
+      'Overtime Date',
       'Employee Name',
       'Employee ID',
-      'Time In',
-      'Time Out',
-      'Session Status',
-      'Total Hours Worked',
-      'Overtime Hours',
-      'Overtime Comment',
-      'Overtime Status',
-      'Overtime Requested At',
-      'Overtime Approved Hours',
-      'Overtime Approved/Rejected At',
-      'Overtime Reviewer'
+      'Email',
+      'OT Start Time',
+      'OT End Time',
+      'Total OT Hours',
+      'Reason',
+      'Level 1 Status',
+      'Level 1 Reviewer',
+      'Level 1 Comment',
+      'Level 1 Reviewed At',
+      'Level 2 Status',
+      'Level 2 Reviewer',
+      'Level 2 Comment',
+      'Level 2 Reviewed At',
+      'Final Status',
+      'Requested At'
     ]);
 
     // Debug logging
-    console.log('Total records received:', data.length);
-    console.log('Sample record:', data[0]);
-    console.log('Records with overtimeRequest:', data.filter(row => row.overtimeRequest).length);
+    console.log('Overtime V2 records received:', overtimeV2Data.length);
 
-    // Filter data to only include records with overtime requests
-    const overtimeRecords = data.filter(row => row.overtimeRequest);
+    // Sort by date and employee name
+    const sortedData = [...overtimeV2Data].sort((a, b) => {
+      const dateCompare = a.overtime_date.localeCompare(b.overtime_date);
+      if (dateCompare !== 0) return dateCompare;
+      const nameA = `${a.profiles?.first_name || ''} ${a.profiles?.last_name || ''}`;
+      const nameB = `${b.profiles?.first_name || ''} ${b.profiles?.last_name || ''}`;
+      return nameA.localeCompare(nameB);
+    });
 
     // Add overtime records
-    for (const row of overtimeRecords) {
+    for (const row of sortedData) {
       const firstName = row.profiles?.first_name || '';
       const lastName = row.profiles?.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim();
       const employeeId = row.profiles?.employee_id || 'NA';
-      const date = row.date;
+      const email = row.profiles?.email || 'N/A';
 
-      const timeInDate = row.time_in ? new Date(row.time_in) : null;
-      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
-      const isActiveSession = row.is_active_session || false;
+      const formatTime = (time: string) => {
+        if (!time) return 'N/A';
+        const [hours, minutes] = time.split(':');
+        const hour = parseInt(hours, 10);
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      };
 
-      const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
-      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : (isActiveSession ? 'ACTIVE SESSION' : 'N/A');
-      const sessionStatus = isActiveSession ? 'ACTIVE (Hours calculated up to export time)' : 'Completed';
+      const otStartTime = formatTime(row.start_time);
+      const otEndTime = formatTime(row.end_time);
+      const totalOTHours = row.total_hours?.toFixed(2) || '0.00';
+      const reason = row.reason || 'N/A';
 
-      // Use calculated values from API (already has lunch deduction applied)
-      const totalHours = isActiveSession ? 'Active' : (row.total_hours || 0);
-      const overtimeHours = isActiveSession ? 'Active' : (row.overtime_hours || 0);
-
-      const overtimeComment = row.overtimeRequest?.comment || 'N/A';
-      const overtimeStatus = row.overtimeRequest?.status || 'N/A';
-      // Use overtime_hours (with lunch deduction) instead of approved_hours
-      const overtimeApprovedHours = isActiveSession ? 'Active' : (overtimeHours > 0 ? (overtimeHours as number).toFixed(2) : 'N/A');
-      const overtimeRequestedAt = row.overtimeRequest?.requested_at
-        ? new Date(row.overtimeRequest.requested_at).toLocaleString()
+      const level1Status = row.level1_status || 'Pending';
+      const level1Reviewer = row.level1_reviewer_profile
+        ? `${row.level1_reviewer_profile.first_name} ${row.level1_reviewer_profile.last_name}`
         : 'N/A';
-      const overtimeApprovedAt = row.overtimeRequest?.approved_at
-        ? new Date(row.overtimeRequest.approved_at).toLocaleString()
+      const level1Comment = row.level1_comment || 'N/A';
+      const level1ReviewedAt = row.level1_reviewed_at
+        ? new Date(row.level1_reviewed_at).toLocaleString()
         : 'N/A';
-      const overtimeReviewer = row.overtimeRequest?.reviewer
-        ? `${row.overtimeRequest.reviewer.first_name} ${row.overtimeRequest.reviewer.last_name}`
+
+      const level2Status = row.level2_status || 'Pending';
+      const level2Reviewer = row.level2_reviewer_profile
+        ? `${row.level2_reviewer_profile.first_name} ${row.level2_reviewer_profile.last_name}`
+        : 'N/A';
+      const level2Comment = row.level2_comment || 'N/A';
+      const level2ReviewedAt = row.level2_reviewed_at
+        ? new Date(row.level2_reviewed_at).toLocaleString()
+        : 'N/A';
+
+      const finalStatus = row.final_status || row.status || 'Pending';
+      const requestedAt = row.requested_at
+        ? new Date(row.requested_at).toLocaleString()
         : 'N/A';
 
       overtimeData.push([
-        date,
+        row.overtime_date,
         fullName,
         employeeId,
-        timeIn,
-        timeOut,
-        sessionStatus,
-        totalHours,
-        overtimeHours,
-        overtimeComment,
-        overtimeStatus,
-        overtimeRequestedAt,
-        overtimeApprovedHours,
-        overtimeApprovedAt,
-        overtimeReviewer
+        email,
+        otStartTime,
+        otEndTime,
+        totalOTHours,
+        reason,
+        level1Status,
+        level1Reviewer,
+        level1Comment,
+        level1ReviewedAt,
+        level2Status,
+        level2Reviewer,
+        level2Comment,
+        level2ReviewedAt,
+        finalStatus,
+        requestedAt
       ]);
     }
 
@@ -399,14 +381,22 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         throw new Error(result.error || 'Failed to fetch data');
       }
 
-      if (!result.data || result.data.length === 0) {
-        alert('No records found for the selected criteria.');
-        return;
+      // For overtime export, check overtimeV2 data; for attendance, check data
+      if (exportType === 'overtime') {
+        if (!result.overtimeV2 || result.overtimeV2.length === 0) {
+          alert('No overtime requests found for the selected criteria.');
+          return;
+        }
+      } else {
+        if (!result.data || result.data.length === 0) {
+          alert('No attendance records found for the selected criteria.');
+          return;
+        }
       }
 
       // Use appropriate conversion function based on export type
       const workbook = exportType === 'overtime'
-        ? convertOvertimeToExcel(result.data)
+        ? convertOvertimeToExcel(result.overtimeV2)
         : convertToExcel(result.data);
 
       if (!workbook) {
