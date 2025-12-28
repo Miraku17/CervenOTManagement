@@ -41,7 +41,11 @@ interface ConfirmationState {
   comment: string;
 }
 
-const OvertimeRequestsView: React.FC = () => {
+interface OvertimeRequestsViewProps {
+  userPosition: string | null;
+}
+
+const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPosition }) => {
   const { user } = useAuth();
   const [requests, setRequests] = useState<OvertimeRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,37 +59,14 @@ const OvertimeRequestsView: React.FC = () => {
     employeeName: '',
     comment: '',
   });
-  const [userPosition, setUserPosition] = useState<string | null>(null);
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequest | null>(null);
 
   useEffect(() => {
-    if (user?.id) {
-      fetchUserPosition();
-    }
-  }, [user?.id]);
-
-  useEffect(() => {
-    // Only fetch requests after we've confirmed the user has access
-    if (user?.id && userPosition && hasOvertimeAccess()) {
+    // Fetch requests immediately since access is already verified by the page
+    if (user?.id && userPosition) {
       fetchRequests();
     }
   }, [user?.id, userPosition]);
-
-  const fetchUserPosition = async () => {
-    if (!user?.id) return;
-
-    try {
-      const response = await fetch(`/api/user/profile?userId=${user.id}`);
-      if (!response.ok) throw new Error('Failed to fetch user profile');
-
-      const data = await response.json();
-      setUserPosition(data.positions?.name || null);
-    } catch (error) {
-      console.error('Error fetching user position:', error);
-      setUserPosition(null);
-      setIsLoading(false);
-    }
-  };
 
   const fetchRequests = async () => {
     // Keep loading true only on initial load if desired, or just rely on refreshing logic
@@ -219,40 +200,7 @@ const OvertimeRequestsView: React.FC = () => {
     }
   };
 
-  // Show loading while fetching user position
-  if (userPosition === null && isLoading) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Check access after loading user position
-  if (userPosition !== null && !hasOvertimeAccess()) {
-    return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
-            <X className="w-8 h-8 text-red-400" />
-          </div>
-          <div>
-            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
-            <p className="text-slate-400">You don't have permission to view overtime requests.</p>
-            <p className="text-slate-500 text-sm mt-2">
-              Your position: <span className="font-medium">{userPosition}</span>
-            </p>
-            <p className="text-slate-500 text-sm">Only authorized positions can access this feature.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading while fetching requests (after access is confirmed)
+  // Show loading while fetching requests
   if (isLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">

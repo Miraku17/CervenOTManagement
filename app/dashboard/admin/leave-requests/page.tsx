@@ -13,6 +13,9 @@ export default function LeaveRequestsPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
+      // Wait for auth to complete before checking access
+      if (authLoading) return;
+
       if (!user?.id) {
         setHasAccess(false);
         setIsLoading(false);
@@ -50,14 +53,14 @@ export default function LeaveRequestsPage() {
     };
 
     checkAccess();
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || isLoading || hasAccess === null) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400">Loading...</p>
+          <p className="text-slate-400">Checking access...</p>
         </div>
       </div>
     );
