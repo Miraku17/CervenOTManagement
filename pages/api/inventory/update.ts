@@ -17,7 +17,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     model_id,
     serial_number,
     under_warranty,
-    warranty_date
+    warranty_date,
+    status
   } = req.body;
   const userId = req.user?.id;
   const userPosition = req.user?.position;
@@ -43,6 +44,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(400).json({ error: 'Category, Brand, and Model are required' });
   }
 
+  if (status && !['temporary', 'permanent'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be either "temporary" or "permanent"' });
+  }
+
   if (!userId) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
@@ -54,20 +59,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
 
+    const updateData: any = {
+      store_id,
+      station_id,
+      category_id,
+      brand_id,
+      model_id,
+      serial_number,
+      under_warranty: under_warranty || false,
+      warranty_date: warranty_date || null,
+      updated_at: new Date().toISOString(),
+      updated_by: userId,
+    };
+
+    // Only update status if provided
+    if (status) {
+      updateData.status = status;
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('store_inventory')
-      .update({
-        store_id,
-        station_id,
-        category_id,
-        brand_id,
-        model_id,
-        serial_number,
-        under_warranty: under_warranty || false,
-        warranty_date: warranty_date || null,
-        updated_at: new Date().toISOString(),
-        updated_by: userId,
-      })
+      .update(updateData)
       .eq('id', id);
 
     if (updateError) throw updateError;

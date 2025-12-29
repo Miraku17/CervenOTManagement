@@ -26,6 +26,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         serial_number,
         under_warranty,
         warranty_date,
+        status,
         stores:store_id (
           id,
           store_name,

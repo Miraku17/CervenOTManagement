@@ -58,6 +58,7 @@ export default function AssetInventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   
   // Toast notification state
@@ -83,6 +84,19 @@ export default function AssetInventoryPage() {
       if (!user?.id) return;
 
       try {
+        // Check if user has edit-only access from assets_edit_access table
+        const { data: editAccess } = await supabase
+          .from('assets_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .single();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('positions(name)')
@@ -91,20 +105,33 @@ export default function AssetInventoryPage() {
 
         const position = (profile?.positions as any)?.name?.toLowerCase();
         setUserPosition(position || null);
-        
-        // Check for read-only access (Field Engineer)
-        if (position === 'field engineer') {
+
+        // Check for read-only access (Field Engineer) - but not for edit-only user
+        if (position === 'field engineer' && !isEditOnly) {
           setIsReadOnly(true);
         }
 
-        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager' || position === 'field engineer';
+        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager' || position === 'field engineer' || isEditOnly;
 
         if (!hasAccess) {
           router.push('/dashboard/ticketing/tickets');
         }
       } catch (error) {
         console.error('Error checking access:', error);
-        router.push('/dashboard/ticketing/tickets');
+        // Check if user has edit-only access even if profile fetch fails
+        const { data: editAccess } = await supabase
+          .from('assets_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .single();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (!isEditOnly) {
+          router.push('/dashboard/ticketing/tickets');
+        } else {
+          setIsEditOnlyUser(true);
+        }
       } finally {
         setCheckingAccess(false);
       }
@@ -527,7 +554,7 @@ export default function AssetInventoryPage() {
           <p className="text-slate-400">Manage company assets, equipment, and hardware.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            {!isReadOnly && (
+            {!isReadOnly && !isEditOnlyUser && (
               <>
                 <button
                   onClick={() => setIsModalOpen(true)}
@@ -715,8 +742,8 @@ export default function AssetInventoryPage() {
                                     <Edit2 size={16} />
                                   </button>
                                 )}
-                                {/* Assets manager and operations manager can delete */}
-                                {(userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager') && (
+                                {/* Assets manager and operations manager can delete, but not edit-only user */}
+                                {!isEditOnlyUser && (userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

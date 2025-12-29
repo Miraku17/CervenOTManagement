@@ -9,6 +9,7 @@ interface InventoryItem {
   serial_number: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  status?: 'temporary' | 'permanent';
   created_by_user?: {
     id: string;
     first_name: string;
@@ -89,6 +90,17 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
         <div className="flex items-start justify-between p-6 border-b border-slate-800 bg-slate-900 sticky top-0 rounded-t-2xl z-10">
           <div>
             <div className="flex items-center gap-3 mb-2">
+              {/* Status Badge */}
+              {item.status && (
+                <span className={`px-2.5 py-0.5 rounded-md text-xs font-medium border uppercase ${
+                  item.status === 'permanent'
+                    ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                    : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                }`}>
+                  {item.status}
+                </span>
+              )}
+              {/* Warranty Badge */}
               {item.under_warranty ? (
                 <span className="px-2.5 py-0.5 rounded-md text-xs font-medium border bg-green-500/10 text-green-400 border-green-500/20 uppercase flex items-center gap-1">
                   <Shield size={12} />
@@ -120,6 +132,20 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
             <LabelValue label="Store Name" value={item.stores?.store_name} />
             <LabelValue label="Store Code" value={item.stores?.store_code} />
             <LabelValue label="Station" value={item.stations?.name} />
+            <LabelValue
+              label="Status"
+              value={
+                item.status ? (
+                  <span className={`inline-flex px-2 py-0.5 rounded-md text-xs font-medium border uppercase ${
+                    item.status === 'permanent'
+                      ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>
+                    {item.status}
+                  </span>
+                ) : 'N/A'
+              }
+            />
           </DetailSection>
 
           <DetailSection title="Product Information" icon={Package}>
