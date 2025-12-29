@@ -39,22 +39,24 @@ const EmployeeDashboard: React.FC = () => {
 
   // Admin check
   const [isAdmin, setIsAdmin] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   // Overtime history refresh key
   const [overtimeHistoryRefreshKey, setOvertimeHistoryRefreshKey] = useState(0);
 
-  // Check if user is admin
+  // Check if user is admin and get position
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user?.id) return;
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('role, positions(name)')
         .eq('id', user.id)
         .single();
 
       setIsAdmin(profile?.role === 'admin');
+      setUserPosition((profile?.positions as any)?.name?.toLowerCase() || null);
     };
 
     checkAdminStatus();
@@ -728,13 +730,18 @@ const EmployeeDashboard: React.FC = () => {
                       </button>
                       <button
                         onClick={() => {
-                          router.push('/dashboard/ticketing/tickets');
+                          // Redirect based on user position
+                          if (userPosition === 'asset' || userPosition === 'assets') {
+                            router.push('/dashboard/ticketing/asset-inventory');
+                          } else {
+                            router.push('/dashboard/ticketing/tickets');
+                          }
                           setIsActionsMenuOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
                       >
                         <Ticket className="w-4 h-4 text-slate-400" />
-                        <span>Ticketing</span>
+                        <span>{userPosition === 'asset' || userPosition === 'assets' ? 'Assets' : 'Ticketing'}</span>
                       </button>
                     </div>
                   )}
@@ -817,13 +824,18 @@ const EmployeeDashboard: React.FC = () => {
 
               <button
                 onClick={() => {
-                  router.push('/dashboard/ticketing/tickets');
+                  // Redirect based on user position
+                  if (userPosition === 'asset' || userPosition === 'assets') {
+                    router.push('/dashboard/ticketing/asset-inventory');
+                  } else {
+                    router.push('/dashboard/ticketing/tickets');
+                  }
                   setIsMobileMenuOpen(false); // Close menu after clicking
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
               >
                 <Ticket size={18} />
-                <span className="font-medium text-sm">Ticketing</span>
+                <span className="font-medium text-sm">{userPosition === 'asset' || userPosition === 'assets' ? 'Assets' : 'Ticketing'}</span>
               </button>
 
               {isAdmin && (
@@ -951,7 +963,7 @@ const EmployeeDashboard: React.FC = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        
+
         {/* Top Row: Profile & Tracker */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-4 h-full">

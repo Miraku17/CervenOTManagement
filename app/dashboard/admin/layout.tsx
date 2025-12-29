@@ -256,9 +256,15 @@ export default function AdminLayout({
             <div className="space-y-1">
               <SidebarItem
                 icon={<Ticket size={18} />}
-                label="Ticketing System"
+                label={userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets' ? 'Assets' : 'Ticketing System'}
                 isActive={false}
-                onClick={() => router.push('/dashboard/ticketing/tickets')}
+                onClick={() => {
+                  if (userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets') {
+                    router.push('/dashboard/ticketing/asset-inventory');
+                  } else {
+                    router.push('/dashboard/ticketing/tickets');
+                  }
+                }}
               />
             </div>
           </div>
@@ -376,9 +382,16 @@ export default function AdminLayout({
             />
             <SidebarItem
               icon={<Ticket size={24} />}
-              label="Ticketing"
+              label={userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets' ? 'Assets' : 'Ticketing'}
               isActive={false}
-              onClick={() => router.push('/dashboard/ticketing/tickets')}
+              onClick={() => {
+                if (userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets') {
+                  router.push('/dashboard/ticketing/asset-inventory');
+                } else {
+                  router.push('/dashboard/ticketing/tickets');
+                }
+                setIsMobileMenuOpen(false);
+              }}
             />
           </nav>
 
