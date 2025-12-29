@@ -37,9 +37,8 @@ export default function LeaveRequestsPage() {
         }
 
         const userPosition = profile?.positions && (profile.positions as any).name;
-        const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
 
-        if (allowedPositions.includes(userPosition)) {
+        if (userPosition === 'Operations Manager') {
           setHasAccess(true);
         } else {
           setHasAccess(false);
@@ -77,12 +76,10 @@ export default function LeaveRequestsPage() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
           <p className="text-slate-300 mb-2">
-            Only users with the following positions can access leave requests:
+            Only users with the following position can access leave requests:
           </p>
           <ul className="text-blue-400 font-medium space-y-1">
             <li>Operations Manager</li>
-            <li>Technical Support Lead</li>
-            <li>Technical Support Engineer</li>
           </ul>
           <p className="text-sm text-slate-400 mt-4">
             If you believe you should have access, please contact your administrator.

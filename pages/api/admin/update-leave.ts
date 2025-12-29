@@ -39,11 +39,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
 
-    if (!allowedPositions.includes(userPosition)) {
+    if (userPosition !== 'Operations Manager') {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager, Technical Support Lead, and Technical Support Engineer can update leave requests'
+        error: 'Forbidden: Only Operations Manager can update leave requests'
       });
     }
 

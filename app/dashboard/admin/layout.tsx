@@ -29,11 +29,15 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
+  const [isLoadingPosition, setIsLoadingPosition] = useState(true);
 
   // Check if user is admin, redirect if not
   useEffect(() => {
     const checkAdminAccess = async () => {
-      if (!user?.id) return;
+      if (!user?.id) {
+        setIsLoadingPosition(false);
+        return;
+      }
 
       const { data: profile } = await supabase
         .from('profiles')
@@ -43,9 +47,11 @@ export default function AdminLayout({
 
       if (profile?.role !== 'admin') {
         router.push('/dashboard/employee');
+        return;
       }
 
       setUserPosition((profile?.positions as any)?.name || null);
+      setIsLoadingPosition(false);
     };
 
     checkAdminAccess();
@@ -70,13 +76,7 @@ export default function AdminLayout({
 
   // Check if user has access to leave requests
   const hasLeaveRequestsAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Operations Manager',
-      'Technical Support Lead',
-      'Technical Support Engineer'
-    ];
-    return authorizedPositions.includes(userPosition);
+    return userPosition === 'Operations Manager';
   };
 
   // Check if user has access to import schedule
@@ -251,23 +251,28 @@ export default function AdminLayout({
           </div>
 
           {/* Apps Section */}
-          <div>
-            <SidebarLabel>Apps</SidebarLabel>
-            <div className="space-y-1">
-              <SidebarItem
-                icon={<Ticket size={18} />}
-                label={userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets' ? 'Assets' : 'Ticketing System'}
-                isActive={false}
-                onClick={() => {
-                  if (userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets') {
-                    router.push('/dashboard/ticketing/asset-inventory');
-                  } else {
-                    router.push('/dashboard/ticketing/tickets');
-                  }
-                }}
-              />
+          {!isLoadingPosition && userPosition !== null && (
+            <div>
+              <SidebarLabel>Apps</SidebarLabel>
+              <div className="space-y-1">
+                {userPosition.toLowerCase() === 'asset' || userPosition.toLowerCase() === 'assets' ? (
+                  <SidebarItem
+                    icon={<Ticket size={18} />}
+                    label="Assets"
+                    isActive={false}
+                    onClick={() => router.push('/dashboard/ticketing/asset-inventory')}
+                  />
+                ) : (
+                  <SidebarItem
+                    icon={<Ticket size={18} />}
+                    label="Ticketing System"
+                    isActive={false}
+                    onClick={() => router.push('/dashboard/ticketing/tickets')}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </nav>
 
         <div className="p-3 border-t border-slate-800">
@@ -380,19 +385,31 @@ export default function AdminLayout({
               isActive={isActive('/dashboard/admin/employee-schedule')}
               onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
             />
-            <SidebarItem
-              icon={<Ticket size={24} />}
-              label={userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets' ? 'Assets' : 'Ticketing'}
-              isActive={false}
-              onClick={() => {
-                if (userPosition?.toLowerCase() === 'asset' || userPosition?.toLowerCase() === 'assets') {
-                  router.push('/dashboard/ticketing/asset-inventory');
-                } else {
-                  router.push('/dashboard/ticketing/tickets');
-                }
-                setIsMobileMenuOpen(false);
-              }}
-            />
+            {!isLoadingPosition && userPosition !== null && (
+              <>
+                {userPosition.toLowerCase() === 'asset' || userPosition.toLowerCase() === 'assets' ? (
+                  <SidebarItem
+                    icon={<Ticket size={24} />}
+                    label="Assets"
+                    isActive={false}
+                    onClick={() => {
+                      router.push('/dashboard/ticketing/asset-inventory');
+                      setIsMobileMenuOpen(false);
+                    }}
+                  />
+                ) : (
+                  <SidebarItem
+                    icon={<Ticket size={24} />}
+                    label="Ticketing"
+                    isActive={false}
+                    onClick={() => {
+                      router.push('/dashboard/ticketing/tickets');
+                      setIsMobileMenuOpen(false);
+                    }}
+                  />
+                )}
+              </>
+            )}
           </nav>
 
           <div className="p-4 border-t border-slate-800 mt-auto">
