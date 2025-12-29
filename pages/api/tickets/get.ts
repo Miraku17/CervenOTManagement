@@ -17,13 +17,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Check for restricted positions
-    const userPosition = req.user.position?.toLowerCase() || '';
-    const restrictedPositions = ['asset', 'asset lead', 'asset associate'];
-    if (restrictedPositions.includes(userPosition)) {
-      return res.status(403).json({ error: 'Forbidden: Access denied for your position' });
-    }
-
     // Build the query
     let query = supabaseAdmin
       .from('tickets')

@@ -63,6 +63,7 @@ export default function AdminLayout({
     const authorizedPositions = [
       'Admin Tech',
       'Technical Support Engineer',
+      'Technical Support Lead',
       'Operations Technical Lead',
       'Operations Manager'
     ];
@@ -76,7 +77,13 @@ export default function AdminLayout({
 
   // Check if user has access to leave requests
   const hasLeaveRequestsAccess = () => {
-    return userPosition === 'Operations Manager';
+    if (!userPosition) return false;
+    const authorizedPositions = [
+      'Operations Manager',
+      'Technical Support Lead',
+      'Technical Support Engineer'
+    ];
+    return authorizedPositions.includes(userPosition);
   };
 
   // Check if user has access to import schedule

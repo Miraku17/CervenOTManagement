@@ -47,6 +47,7 @@ export default function OvertimeRequestsPage() {
     const authorizedPositions = [
       'Admin Tech',
       'Technical Support Engineer',
+      'Technical Support Lead',
       'Operations Technical Lead',
       'Operations Manager'
     ];

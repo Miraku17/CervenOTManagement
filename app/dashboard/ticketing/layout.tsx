@@ -70,9 +70,8 @@ export default function TicketingLayout({
   const hasAuditLogsAccess = userPosition === 'Operations Manager';
 
   // Check if user has access to tickets
-  // Tickets: Restricted for "asset", "asset lead", "asset associate"
-  const restrictedTicketPositions = ['asset', 'asset lead', 'asset associate'];
-  const hasTicketsAccess = !restrictedTicketPositions.includes(userPositionLower || '');
+  // Tickets: All authenticated users have access
+  const hasTicketsAccess = true;
 
   const SidebarContent = () => (
     <>

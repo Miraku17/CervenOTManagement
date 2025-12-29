@@ -11,7 +11,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   // Check for restricted positions (even if admin)
   const userPosition = req.user?.position?.toLowerCase() || '';
-  const restrictedPositions = ['asset', 'asset lead', 'asset associate', 'field engineer'];
+  const restrictedPositions = ['field engineer'];
   if (restrictedPositions.includes(userPosition)) {
     return res.status(403).json({ error: 'Forbidden: Access denied for your position' });
   }
