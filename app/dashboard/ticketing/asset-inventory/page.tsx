@@ -713,8 +713,8 @@ export default function AssetInventoryPage() {
                                     <Edit2 size={16} />
                                   </button>
                                 )}
-                                {/* Only operations manager can delete */}
-                                {userPosition === 'operations manager' && (
+                                {/* Assets manager and operations manager can delete */}
+                                {(userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

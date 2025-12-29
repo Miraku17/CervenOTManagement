@@ -16,6 +16,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const { data: brands, error } = await supabaseAdmin
       .from('brands')
       .select('id, name')
+      .is('deleted_at', null)
       .order('name', { ascending: true });
 
     if (error) throw error;

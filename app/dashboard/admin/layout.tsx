@@ -258,7 +258,7 @@ export default function AdminLayout({
                 icon={<Ticket size={18} />}
                 label="Ticketing System"
                 isActive={false}
-                onClick={() => router.push('/dashboard/ticketing/stores')}
+                onClick={() => router.push('/dashboard/ticketing/tickets')}
               />
             </div>
           </div>
@@ -378,7 +378,7 @@ export default function AdminLayout({
               icon={<Ticket size={24} />}
               label="Ticketing"
               isActive={false}
-              onClick={() => router.push('/dashboard/ticketing')}
+              onClick={() => router.push('/dashboard/ticketing/tickets')}
             />
           </nav>
 

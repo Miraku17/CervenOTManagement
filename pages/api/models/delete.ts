@@ -12,7 +12,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const userId = req.user?.id;
 
   if (!id) {
-    return res.status(400).json({ error: 'Asset ID is required' });
+    return res.status(400).json({ error: 'Model ID is required' });
   }
 
   if (!userId) {
@@ -20,15 +20,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-
-      if (!supabaseAdmin) {
+    if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
 
-
-    // Soft delete: Update the asset with deleted_at and deleted_by
+    // Soft delete: Update the model with deleted_at and deleted_by
     const { error } = await supabaseAdmin
-      .from('asset_inventory')
+      .from('models')
       .update({
         deleted_at: new Date().toISOString(),
         deleted_by: userId,
@@ -38,10 +36,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (error) throw error;
 
-    return res.status(200).json({ message: 'Asset deleted successfully' });
+    return res.status(200).json({ message: 'Model deleted successfully' });
   } catch (error: any) {
-    console.error('Error deleting asset:', error);
-    return res.status(500).json({ error: error.message || 'Failed to delete asset' });
+    console.error('Error deleting model:', error);
+    return res.status(500).json({ error: error.message || 'Failed to delete model' });
   }
 }
 
