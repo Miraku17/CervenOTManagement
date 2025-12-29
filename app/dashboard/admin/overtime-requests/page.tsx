@@ -7,26 +7,40 @@ import { useAuth } from '@/hooks/useAuth';
 import { X } from 'lucide-react';
 
 export default function OvertimeRequestsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [userPosition, setUserPosition] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isCheckingAccess, setIsCheckingAccess] = useState(true);
 
   useEffect(() => {
     const fetchUserPosition = async () => {
-      if (!user?.id) return;
+      // Wait for auth to complete before checking access
+      if (authLoading) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('positions(name)')
-        .eq('id', user.id)
-        .single();
+      if (!user?.id) {
+        setUserPosition('');
+        setIsCheckingAccess(false);
+        return;
+      }
 
-      setUserPosition((profile?.positions as any)?.name || null);
-      setLoading(false);
+      setIsCheckingAccess(true);
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        setUserPosition((profile?.positions as any)?.name || '');
+      } catch (error) {
+        console.error('Error fetching user position:', error);
+        setUserPosition('');
+      } finally {
+        setIsCheckingAccess(false);
+      }
     };
 
     fetchUserPosition();
-  }, [user?.id]);
+  }, [user?.id, authLoading]);
 
   const hasOvertimeAccess = () => {
     if (!userPosition) return false;
@@ -39,10 +53,13 @@ export default function OvertimeRequestsPage() {
     return authorizedPositions.includes(userPosition);
   };
 
-  if (loading) {
+  if (authLoading || isCheckingAccess) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400">Checking access...</p>
+        </div>
       </div>
     );
   }
@@ -64,5 +81,5 @@ export default function OvertimeRequestsPage() {
     );
   }
 
-  return <OvertimeRequestsView />;
+  return <OvertimeRequestsView userPosition={userPosition} />;
 }

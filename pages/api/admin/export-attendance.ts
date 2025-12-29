@@ -84,33 +84,39 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (error) throw error;
     }
 
-    // Get attendance IDs to fetch overtime requests
-    const attendanceIds = attendanceData?.map(a => a.id) || [];
+    // Fetch overtime requests from overtime_v2 table
+    // Get unique user IDs from attendance data
+    const userIds = [...new Set(attendanceData?.map(a => a.user_id) || [])];
 
-    // Fetch overtime requests in batches to avoid header overflow
+    // Fetch overtime_v2 requests for the date range
+    let allOvertimeV2Data: any[] = [];
     const BATCH_SIZE = 100;
-    let allOvertimeData: any[] = [];
 
-    for (let i = 0; i < attendanceIds.length; i += BATCH_SIZE) {
-      const batch = attendanceIds.slice(i, i + BATCH_SIZE);
+    for (let i = 0; i < userIds.length; i += BATCH_SIZE) {
+      const batch = userIds.slice(i, i + BATCH_SIZE);
       const { data: batchData, error: batchError } = await supabase
-        .from('overtime')
-        .select('attendance_id, comment, status, approved_hours, reviewer, requested_at, approved_at')
-        .in('attendance_id', batch);
+        .from('overtime_v2')
+        .select('*')
+        .in('requested_by', batch)
+        .gte('overtime_date', startDate)
+        .lte('overtime_date', endDate);
 
       if (batchError) {
-        console.error('Overtime fetch error for batch:', batchError);
+        console.error('Overtime_v2 fetch error for batch:', batchError);
       } else if (batchData) {
-        allOvertimeData = allOvertimeData.concat(batchData);
+        allOvertimeV2Data = allOvertimeV2Data.concat(batchData);
       }
     }
 
-    const overtimeData = allOvertimeData;
-    console.log('Attendance IDs count:', attendanceIds.length);
-    console.log('Overtime records fetched:', overtimeData?.length || 0);
+    console.log('User IDs count:', userIds.length);
+    console.log('Overtime_v2 records fetched:', allOvertimeV2Data?.length || 0);
 
-    // Fetch reviewer profiles if any
-    const reviewerIds = overtimeData?.filter(ot => ot.reviewer).map(ot => ot.reviewer) || [];
+    // Fetch reviewer profiles for level1 and level2 reviewers
+    const reviewerIds = [
+      ...allOvertimeV2Data.filter(ot => ot.level1_reviewer).map(ot => ot.level1_reviewer),
+      ...allOvertimeV2Data.filter(ot => ot.level2_reviewer).map(ot => ot.level2_reviewer)
+    ].filter((id, index, self) => self.indexOf(id) === index); // unique IDs
+
     let reviewersMap = new Map();
     if (reviewerIds.length > 0) {
       const { data: reviewers } = await supabase
@@ -120,20 +126,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       reviewersMap = new Map(reviewers?.map(r => [r.id, r]) || []);
     }
 
-    // Create overtime map
-    const overtimeMap = new Map(
-      overtimeData?.map(ot => [
-        ot.attendance_id,
+    // Create overtime map keyed by user_id + date
+    const overtimeV2Map = new Map(
+      allOvertimeV2Data?.map(ot => [
+        `${ot.requested_by}_${ot.overtime_date}`,
         {
-          comment: ot.comment,
-          status: ot.status,
-          approved_hours: ot.approved_hours,
+          id: ot.id,
+          overtime_date: ot.overtime_date,
+          start_time: ot.start_time,
+          end_time: ot.end_time,
+          total_hours: ot.total_hours,
+          reason: ot.reason,
+          status: ot.final_status || ot.status,
+          level1_status: ot.level1_status,
+          level2_status: ot.level2_status,
+          final_status: ot.final_status,
+          level1_reviewer: ot.level1_reviewer ? reviewersMap.get(ot.level1_reviewer) : null,
+          level2_reviewer: ot.level2_reviewer ? reviewersMap.get(ot.level2_reviewer) : null,
+          level1_comment: ot.level1_comment,
+          level2_comment: ot.level2_comment,
           requested_at: ot.requested_at,
-          approved_at: ot.approved_at,
-          reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null
+          level1_reviewed_at: ot.level1_reviewed_at,
+          level2_reviewed_at: ot.level2_reviewed_at,
+          approved_at: ot.approved_at
         }
       ]) || []
     );
+
+    // Also store the raw overtime_v2 data for the overtime-only export
+    const overtimeV2Records = allOvertimeV2Data;
 
     // First, calculate daily totals for each user/date combination
     const dailyTotals = new Map<string, { totalHours: number; hasActiveSession: boolean }>();
@@ -235,6 +256,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const dailyKey = `${record.user_id}_${record.date}`;
       const dailyOvertime = dailyOvertimeMap.get(dailyKey) || 0;
 
+      // Get overtime_v2 request for this user and date
+      const overtimeV2Key = `${record.user_id}_${record.date}`;
+      const overtimeRequest = overtimeV2Map.get(overtimeV2Key) || null;
+
       return {
         ...record,
         is_active_session: isActiveSession, // Flag to indicate active session
@@ -244,11 +269,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         regular_hours: regularHours,
         overtime_hours: overtimeHours, // Per-session overtime (for detailed records)
         daily_overtime_hours: dailyOvertime, // Daily-based overtime (for DTR summary)
-        overtimeRequest: overtimeMap.get(record.id) || null
+        overtimeRequest: overtimeRequest
       };
     });
 
-    return res.status(200).json({ data });
+    // For overtime-only export, fetch profiles for overtime_v2 records
+    const overtimeV2WithProfiles = await Promise.all(
+      overtimeV2Records.map(async (ot) => {
+        const { data: profile } = await supabase!
+          .from('profiles')
+          .select('first_name, last_name, email, employee_id')
+          .eq('id', ot.requested_by)
+          .single();
+
+        return {
+          ...ot,
+          profiles: profile,
+          level1_reviewer_profile: ot.level1_reviewer ? reviewersMap.get(ot.level1_reviewer) : null,
+          level2_reviewer_profile: ot.level2_reviewer ? reviewersMap.get(ot.level2_reviewer) : null
+        };
+      })
+    );
+
+    return res.status(200).json({ data, overtimeV2: overtimeV2WithProfiles });
 
   } catch (error: any) {
     console.error('Export attendance error:', error);

@@ -12,9 +12,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // First, fetch all overtime requests
+    // Fetch all overtime requests from overtime_v2
     const { data: overtimeData, error: overtimeError } = await supabase
-      .from('overtime')
+      .from('overtime_v2')
       .select('*')
       .order('requested_at', { ascending: false });
 
@@ -29,54 +29,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Get unique user IDs for batch fetching
     const requesterIds = [...new Set(overtimeData.map(ot => ot.requested_by))];
-    const reviewerIds = [...new Set(overtimeData.map(ot => ot.reviewer).filter(Boolean))];
     const level1ReviewerIds = [...new Set(overtimeData.map(ot => ot.level1_reviewer).filter(Boolean))];
     const level2ReviewerIds = [...new Set(overtimeData.map(ot => ot.level2_reviewer).filter(Boolean))];
-    const attendanceIds = [...new Set(overtimeData.map(ot => ot.attendance_id))];
 
-    // Combine all reviewer IDs for a single fetch
-    const allReviewerIds = [...new Set([...reviewerIds, ...level1ReviewerIds, ...level2ReviewerIds])];
+    // Combine all user IDs for a single fetch
+    const allUserIds = [...new Set([...requesterIds, ...level1ReviewerIds, ...level2ReviewerIds])];
 
-    // Fetch all related data in parallel
-    const [requestersResult, reviewersResult, attendanceResult, dailySummaryResult] = await Promise.all([
-      supabase.from('profiles').select('id, first_name, last_name, email, positions(name)').in('id', requesterIds),
-      allReviewerIds.length > 0
-        ? supabase.from('profiles').select('id, first_name, last_name, email, positions(name)').in('id', allReviewerIds)
-        : Promise.resolve({ data: [], error: null }),
-      supabase.from('attendance').select('id, date, total_minutes, user_id').in('id', attendanceIds),
-      supabase.from('attendance_daily_summary').select('user_id, work_date, overtime_minutes').in('user_id', requesterIds),
-    ]);
+    // Fetch all profiles in one query
+    const { data: profilesData, error: profilesError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email, positions(name)')
+      .in('id', allUserIds);
 
-    // Create lookup maps
-    const requestersMap = new Map(requestersResult.data?.map(p => [p.id, p]) || []);
-    const reviewersMap = new Map(reviewersResult.data?.map(p => [p.id, p]) || []);
-    const attendanceMap = new Map(attendanceResult.data?.map(a => [a.id, a]) || []);
+    if (profilesError) {
+      console.error('Profiles query error:', profilesError);
+    }
 
-    // Create daily summary lookup map by user_id and work_date
-    const dailySummaryMap = new Map(
-      dailySummaryResult.data?.map(ds => [`${ds.user_id}_${ds.work_date}`, ds]) || []
-    );
+    // Create lookup map
+    const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
-    // Combine the data
+    // Transform the data
     const transformedData = overtimeData.map(ot => {
-      const attendance = attendanceMap.get(ot.attendance_id);
-      const dailySummary = attendance
-        ? dailySummaryMap.get(`${attendance.user_id}_${attendance.date}`)
-        : null;
-
       return {
         ...ot,
-        requested_by: requestersMap.get(ot.requested_by),
-        reviewer: ot.reviewer ? reviewersMap.get(ot.reviewer) : null,
-        level1_reviewer_profile: ot.level1_reviewer ? reviewersMap.get(ot.level1_reviewer) : null,
-        level2_reviewer_profile: ot.level2_reviewer ? reviewersMap.get(ot.level2_reviewer) : null,
-        attendance: attendance,
-        overtime_minutes: dailySummary?.overtime_minutes || null,
+        requested_by: profilesMap.get(ot.requested_by) || null,
+        level1_reviewer_profile: ot.level1_reviewer ? profilesMap.get(ot.level1_reviewer) : null,
+        level2_reviewer_profile: ot.level2_reviewer ? profilesMap.get(ot.level2_reviewer) : null,
       };
     });
 
-    console.log('Overtime requests fetched:', transformedData.length);
-    console.log('Sample request with two-level approval:', transformedData.find(r => r.level1_reviewer || r.level2_reviewer));
+    console.log('Overtime requests fetched from overtime_v2:', transformedData.length);
 
     return res.status(200).json({ data: transformedData });
 

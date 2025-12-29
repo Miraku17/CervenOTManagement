@@ -4,7 +4,7 @@ import { WorkLog } from '@/types';
 
 interface TimeTrackerProps {
   onClockIn: () => void;
-  onClockOut: (duration: number, comment?: string) => void;
+  onClockOut: (duration: number) => void;
   activeLog: WorkLog | null;
   isLoading?: boolean;
   locationStatus?: {
@@ -14,11 +14,6 @@ interface TimeTrackerProps {
     address: string | null;
   };
   onRefreshLocation?: () => void;
-  todayOvertimeRequest?: {
-    id: string;
-    comment: string;
-    status: string;
-  } | null;
 }
 
 export const TimeTracker: React.FC<TimeTrackerProps> = ({
@@ -28,14 +23,10 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
   isLoading = false,
   locationStatus,
   onRefreshLocation,
-  todayOvertimeRequest
 }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [now, setNow] = useState(new Date());
   const [hasMounted, setHasMounted] = useState(false);
-  const [isOvertime, setIsOvertime] = useState(false);
-  const [overtimeComment, setOvertimeComment] = useState('');
-  const [overtimeError, setOvertimeError] = useState<string | null>(null);
   const intervalRef = useRef<number | null>(null);
 
   // Effect for Live Clock
@@ -72,15 +63,6 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
     };
   }, [activeLog]);
 
-  // Reset overtime checkbox state if there's already a request today
-  useEffect(() => {
-    if (todayOvertimeRequest) {
-      setIsOvertime(false);
-      setOvertimeComment('');
-      setOvertimeError(null);
-    }
-  }, [todayOvertimeRequest]);
-
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -90,15 +72,8 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
     return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
   };
 
-  const handleClockOutWithComment = () => {
-    setOvertimeError(null);
-    if (isOvertime && !overtimeComment.trim()) {
-      setOvertimeError('Please add a comment for overtime work.');
-      return;
-    }
-    onClockOut(elapsedSeconds, isOvertime ? overtimeComment : undefined);
-    setIsOvertime(false);
-    setOvertimeComment('');
+  const handleClockOut = () => {
+    onClockOut(elapsedSeconds);
   };
 
   const isRunning = !!activeLog;
@@ -225,58 +200,8 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                     )}
                 </div>
 
-                {/* Overtime Request Status - Always visible */}
-                {todayOvertimeRequest && (
-                  <div className="mb-4 bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className={`px-2 py-0.5 rounded text-xs font-semibold uppercase tracking-wider ${
-                        todayOvertimeRequest.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                        todayOvertimeRequest.status === 'approved' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                        'bg-red-500/10 text-red-400 border border-red-500/20'
-                      }`}>
-                        {todayOvertimeRequest.status}
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-200 font-medium mb-1">Overtime Request Submitted</p>
-                    <p className="text-xs text-slate-400 italic mb-2">&quot;{todayOvertimeRequest.comment}&quot;</p>
-                  </div>
-                )}
-
-                {isRunning && !todayOvertimeRequest && (
-                  <div className="w-full space-y-3 px-4 py-3 bg-slate-800/50 rounded-lg border border-slate-700 mb-4">
-                    <div className="space-y-2">
-                      <label className="flex items-center space-x-2 text-slate-200 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          className="form-checkbox h-4 w-4 text-blue-600 bg-slate-900 border-slate-600 rounded focus:ring-blue-500 focus:ring-offset-slate-900"
-                          checked={isOvertime}
-                          onChange={(e) => {
-                            setIsOvertime(e.target.checked);
-                            if (!e.target.checked) setOvertimeError(null);
-                          }}
-                        />
-                        <span className="text-sm font-medium">Mark as Overtime</span>
-                      </label>
-                    </div>
-                    {isOvertime && (
-                      <div className="animate-in slide-in-from-top-2 fade-in duration-200">
-                        <textarea
-                          className={`w-full bg-slate-900 border rounded-md p-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${overtimeError ? 'border-red-500 focus:ring-red-500' : 'border-slate-600'}`}
-                          placeholder="Please provide a reason for overtime..."
-                          rows={2}
-                          value={overtimeComment}
-                          onChange={(e) => setOvertimeComment(e.target.value)}
-                        />
-                        {overtimeError && (
-                          <p className="text-red-400 text-xs mt-1 font-medium">{overtimeError}</p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <button
-                    onClick={isRunning ? handleClockOutWithComment : onClockIn}
+                    onClick={isRunning ? handleClockOut : onClockIn}
                     disabled={isLoading}
                     className={`
                         group relative flex items-center justify-center gap-3 px-6 py-4 rounded-lg w-full font-bold text-base transition-all duration-200 transform
@@ -295,7 +220,7 @@ export const TimeTracker: React.FC<TimeTrackerProps> = ({
                     ) : isRunning ? (
                         <>
                             <Square className="w-5 h-5 fill-current" />
-                            {isOvertime && overtimeComment ? 'Clock Out & Submit Overtime' : 'Clock Out'}
+                            Clock Out
                         </>
                     ) : (
                         <>

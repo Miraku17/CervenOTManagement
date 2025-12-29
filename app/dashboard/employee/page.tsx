@@ -7,6 +7,7 @@ import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 import OvertimeHistory from '@/components/employee_dashboard/OvertimeHistory';
 import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHistory';
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
+import FileOvertimeModal from '@/components/employee_dashboard/FileOvertimeModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard } from 'lucide-react';
@@ -26,7 +27,7 @@ const EmployeeDashboard: React.FC = () => {
   const [isFetchingLogs, setIsFetchingLogs] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<'clockIn' | 'clockOut' | null>(null);
-  const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number; comment?: string } | null>(null);
+  const [pendingClockOutData, setPendingClockOutData] = useState<{ duration: number } | null>(null);
   const [currentLocation, setCurrentLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [currentAddress, setCurrentAddress] = useState<string | null>(null);
   const [isRequestingLocation, setIsRequestingLocation] = useState(false);
@@ -39,13 +40,7 @@ const EmployeeDashboard: React.FC = () => {
   // Admin check
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Overtime request check
-  const [hasOvertimeRequestToday, setHasOvertimeRequestToday] = useState(false);
-  const [todayOvertimeRequest, setTodayOvertimeRequest] = useState<{
-    id: string;
-    comment: string;
-    status: string;
-  } | null>(null);
+  // Overtime history refresh key
   const [overtimeHistoryRefreshKey, setOvertimeHistoryRefreshKey] = useState(0);
 
   // Check if user is admin
@@ -102,6 +97,7 @@ const EmployeeDashboard: React.FC = () => {
   };
 
   const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
+  const [isFileOvertimeModalOpen, setIsFileOvertimeModalOpen] = useState(false);
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -127,39 +123,9 @@ const EmployeeDashboard: React.FC = () => {
     setLeaveRefreshTrigger(prev => prev + 1);
   };
 
-  // Check if user has already submitted an overtime request today
-  const checkTodayOvertimeRequest = async () => {
-    if (!user?.id) return;
-
-    try {
-      // Use Philippine timezone for date calculation to ensure consistency
-      const PHILIPPINE_TZ = 'Asia/Manila';
-      const today = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'yyyy-MM-dd');
-      const { data, error } = await supabase
-        .from('overtime')
-        .select('id, comment, status, attendance!inner(date, user_id)')
-        .eq('attendance.user_id', user.id)
-        .eq('attendance.date', today);
-
-      if (error) throw error;
-
-      if (data && data.length > 0) {
-        setHasOvertimeRequestToday(true);
-        setTodayOvertimeRequest({
-          id: data[0].id,
-          comment: data[0].comment,
-          status: data[0].status
-        });
-        console.log('Found overtime request for today:', data[0]);
-      } else {
-        setHasOvertimeRequestToday(false);
-        setTodayOvertimeRequest(null);
-      }
-    } catch (error) {
-      console.error('Error checking overtime request:', error);
-      setHasOvertimeRequestToday(false);
-      setTodayOvertimeRequest(null);
-    }
+  const handleOvertimeSuccess = () => {
+    showToast('success', 'Overtime request submitted successfully!');
+    setOvertimeHistoryRefreshKey(prev => prev + 1);
   };
 
   // Initialize dashboard - load all data in parallel
@@ -174,7 +140,6 @@ const EmployeeDashboard: React.FC = () => {
         checkActiveSession(),
         fetchAttendanceRecords(),
         requestLocationOnMount(),
-        checkTodayOvertimeRequest()
       ]);
 
       console.log('Dashboard initialization complete');
@@ -451,8 +416,8 @@ const EmployeeDashboard: React.FC = () => {
     setShowConfirmModal(true);
   };
 
-  const requestClockOut = (duration: number, comment?: string) => {
-    setPendingClockOutData({ duration, comment });
+  const requestClockOut = (duration: number) => {
+    setPendingClockOutData({ duration });
     setConfirmAction('clockOut');
     setShowConfirmModal(true);
   };
@@ -461,7 +426,7 @@ const EmployeeDashboard: React.FC = () => {
     if (confirmAction === 'clockIn') {
       handleClockIn();
     } else if (confirmAction === 'clockOut' && pendingClockOutData) {
-      handleClockOut(pendingClockOutData.duration, pendingClockOutData.comment);
+      handleClockOut(pendingClockOutData.duration);
       setPendingClockOutData(null);
     }
     setShowConfirmModal(false);
@@ -540,7 +505,7 @@ const EmployeeDashboard: React.FC = () => {
     }
   };
 
-  const handleClockOut = async (finalDurationSeconds: number, comment?: string) => {
+  const handleClockOut = async (finalDurationSeconds: number) => {
     if (!activeLog || !user?.id || isClocking) return;
 
     // Check if we have location data
@@ -567,19 +532,13 @@ const EmployeeDashboard: React.FC = () => {
           latitude: location.latitude,
           longitude: location.longitude,
           address: address,
-          overtimeComment: comment,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        // Check if it's an overtime already requested error
-        if (data.error && data.error.includes('already submitted an overtime request')) {
-          showToast('error', 'Overtime already requested today. Only one overtime request per day is allowed.');
-        } else {
-          showToast('error', data.error || 'Failed to clock out. Please try again.');
-        }
+        showToast('error', data.error || 'Failed to clock out. Please try again.');
         throw new Error(data.error || 'Failed to clock out');
       }
 
@@ -592,24 +551,16 @@ const EmployeeDashboard: React.FC = () => {
         endTime: now,
         durationSeconds: finalDurationSeconds,
         status: 'COMPLETED',
-        comment: comment,
       };
 
       setWorkLogs(prev => [...prev, completedLog]);
       setActiveLog(null);
       setShowPendingSessionAlert(true); // Reset alert for next session
 
-      const message = comment
-        ? 'Successfully clocked out with overtime request!'
-        : 'Successfully clocked out!';
-      showToast('success', message);
+      showToast('success', 'Successfully clocked out!');
 
-      // Refresh attendance records and overtime request status from database
+      // Refresh attendance records from database
       fetchAttendanceRecords();
-      checkTodayOvertimeRequest();
-
-      // Refresh overtime history to show the new request immediately
-      setOvertimeHistoryRefreshKey(prev => prev + 1);
     } catch (error: any) {
       console.error('Clock-out error:', error);
       // Error toast is already shown above, no need to show it again
@@ -676,6 +627,13 @@ const EmployeeDashboard: React.FC = () => {
         isOpen={isFileLeaveModalOpen}
         onClose={() => setIsFileLeaveModalOpen(false)}
         onSuccess={handleLeaveSuccess}
+        userId={user?.id || ''}
+      />
+
+      <FileOvertimeModal
+        isOpen={isFileOvertimeModalOpen}
+        onClose={() => setIsFileOvertimeModalOpen(false)}
+        onSuccess={handleOvertimeSuccess}
         userId={user?.id || ''}
       />
 
@@ -747,6 +705,16 @@ const EmployeeDashboard: React.FC = () => {
                       >
                         <CalendarDays className="w-4 h-4 text-slate-400" />
                         <span>File a Leave</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFileOvertimeModalOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                      >
+                        <Clock className="w-4 h-4 text-slate-400" />
+                        <span>File Overtime Request</span>
                       </button>
                       <button
                         onClick={() => {
@@ -823,6 +791,17 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <CalendarDays size={18} />
                 <span className="font-medium text-sm">File a Leave</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsFileOvertimeModalOpen(true);
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
+              >
+                <Clock size={18} />
+                <span className="font-medium text-sm">File Overtime Request</span>
               </button>
 
               <button
@@ -991,7 +970,6 @@ const EmployeeDashboard: React.FC = () => {
                 address: currentAddress,
               }}
               onRefreshLocation={() => requestLocation(true)}
-              todayOvertimeRequest={todayOvertimeRequest}
             />
           </div>
         </div>
@@ -1004,7 +982,7 @@ const EmployeeDashboard: React.FC = () => {
         {/* History Sections */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             <div>
-                 <OvertimeHistory key={overtimeHistoryRefreshKey} />
+                 <OvertimeHistory refreshKey={overtimeHistoryRefreshKey} />
             </div>
             <div>
                  <LeaveRequestHistory refreshTrigger={leaveRefreshTrigger} />

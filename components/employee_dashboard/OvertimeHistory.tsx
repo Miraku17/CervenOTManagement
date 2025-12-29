@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, CheckCircle, XCircle, AlertCircle, Calendar, Loader2, ChevronRight, Eye, X } from 'lucide-react';
-import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
 
 interface ProfileData {
@@ -12,30 +11,30 @@ interface ProfileData {
 
 interface OvertimeRequest {
   id: string;
-  created_at: string;
-  requested_at: string;
+  overtime_date: string;
+  start_time: string;
+  end_time: string;
+  total_hours: number;
+  reason: string;
   status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  approved_at: string | null;
   level1_status: 'pending' | 'approved' | 'rejected' | null;
   level2_status: 'pending' | 'approved' | 'rejected' | null;
   final_status: 'pending' | 'approved' | 'rejected' | null;
-  comment: string | null;
   level1_comment: string | null;
   level2_comment: string | null;
-  approved_hours: number | null;
   level1_reviewed_at: string | null;
   level2_reviewed_at: string | null;
-  attendance: {
-    date: string;
-    total_minutes: number;
-    user_id: string;
-  };
-  total_minutes_final?: number; // From attendance_daily_summary (with lunch deduction)
-  overtime_minutes?: number; // From attendance_daily_summary (overtime with lunch deduction)
   level1_reviewer_profile?: ProfileData | null;
   level2_reviewer_profile?: ProfileData | null;
 }
 
-const OvertimeHistory: React.FC = () => {
+interface OvertimeHistoryProps {
+  refreshKey?: number;
+}
+
+const OvertimeHistory: React.FC<OvertimeHistoryProps> = ({ refreshKey }) => {
   const { user } = useAuth();
   const [requests, setRequests] = useState<OvertimeRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,54 +46,22 @@ const OvertimeHistory: React.FC = () => {
     if (user?.id) {
       fetchRequests();
     }
-  }, [user?.id]);
+  }, [user?.id, refreshKey]);
 
   const fetchRequests = async () => {
     try {
       setIsLoading(true);
+      setError(null);
 
-      const { data, error } = await supabase
-        .from('overtime')
-        .select(`
-          *,
-          attendance!inner (
-            date,
-            total_minutes,
-            user_id
-          ),
-          level1_reviewer_profile:level1_reviewer (
-            first_name,
-            last_name,
-            email
-          ),
-          level2_reviewer_profile:level2_reviewer (
-            first_name,
-            last_name,
-            email
-          )
-        `)
-        .eq('attendance.user_id', user!.id)
-        .order('requested_at', { ascending: false });
+      const response = await fetch('/api/overtime/my-requests');
+      const data = await response.json();
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch overtime requests');
+      }
 
-      // Enhance data with attendance_daily_summary info (includes lunch deduction)
-      const enhancedData = await Promise.all((data || []).map(async (request) => {
-        const { data: summaryData } = await supabase
-          .from('attendance_daily_summary')
-          .select('total_minutes_final, overtime_minutes')
-          .eq('user_id', request.attendance.user_id)
-          .eq('work_date', request.attendance.date)
-          .single();
-
-        return {
-          ...request,
-          total_minutes_final: summaryData?.total_minutes_final,
-          overtime_minutes: summaryData?.overtime_minutes
-        };
-      }));
-
-      setRequests(enhancedData);
+      console.log('Fetched overtime requests:', data.requests);
+      setRequests(data.requests || []);
     } catch (err: any) {
       console.error('Error fetching overtime history:', err);
       setError('Failed to load overtime history');
@@ -123,6 +90,14 @@ const OvertimeHistory: React.FC = () => {
       default:
         return <Clock size={16} />;
     }
+  };
+
+  const formatTime = (time: string) => {
+    const [hours, minutes] = time.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const displayHour = hour % 12 || 12;
+    return `${displayHour}:${minutes} ${ampm}`;
   };
 
   const filteredRequests = requests.filter(req => {
@@ -155,7 +130,7 @@ const OvertimeHistory: React.FC = () => {
                 <div>
                   <h3 className="text-xl font-bold text-white">Overtime Request Details</h3>
                   <p className="text-slate-400 text-sm mt-1">
-                    {new Date(selectedRequest.attendance.date).toLocaleDateString(undefined, {
+                    {new Date(selectedRequest.overtime_date).toLocaleDateString(undefined, {
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
@@ -177,19 +152,22 @@ const OvertimeHistory: React.FC = () => {
                 <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Overtime Hours</label>
                   <p className="text-white mt-1 font-mono text-xl font-bold">
-                    {selectedRequest.overtime_minutes !== undefined
-                      ? `${(selectedRequest.overtime_minutes / 60).toFixed(2)} hrs`
-                      : selectedRequest.approved_hours !== null
-                        ? `${selectedRequest.approved_hours.toFixed(2)} hrs`
-                        : 'Pending'}
+                    {selectedRequest.total_hours.toFixed(2)} hrs
                   </p>
                 </div>
                 <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Requested At</label>
+                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Time Period</label>
                   <p className="text-white mt-1 text-sm">
-                    {new Date(selectedRequest.requested_at).toLocaleString()}
+                    {formatTime(selectedRequest.start_time)} - {formatTime(selectedRequest.end_time)}
                   </p>
                 </div>
+              </div>
+
+              <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Requested At</label>
+                <p className="text-white mt-1 text-sm">
+                  {new Date(selectedRequest.requested_at).toLocaleString()}
+                </p>
               </div>
 
               {/* Approval Timeline */}
@@ -206,7 +184,7 @@ const OvertimeHistory: React.FC = () => {
                         }`}>
                             {getStatusIcon(selectedRequest.level1_status || 'pending')}
                         </div>
-                        
+
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                             <div>
                                 <h5 className="font-medium text-white">Level 1 Approval</h5>
@@ -225,7 +203,7 @@ const OvertimeHistory: React.FC = () => {
                                 {(selectedRequest.level1_status || 'pending').toUpperCase()}
                             </span>
                         </div>
-                        
+
                         {selectedRequest.level1_comment && (
                             <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
                                 <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level1_comment}&quot;</p>
@@ -243,7 +221,7 @@ const OvertimeHistory: React.FC = () => {
                             }`}>
                                 {getStatusIcon(selectedRequest.level2_status || 'pending')}
                             </div>
-                            
+
                             <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
                                 <div>
                                     <h5 className="font-medium text-white">Level 2 Approval</h5>
@@ -262,7 +240,7 @@ const OvertimeHistory: React.FC = () => {
                                     {(selectedRequest.level2_status || 'pending').toUpperCase()}
                                 </span>
                             </div>
-                            
+
                             {selectedRequest.level2_comment && (
                                 <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
                                     <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level2_comment}&quot;</p>
@@ -273,11 +251,11 @@ const OvertimeHistory: React.FC = () => {
                 </div>
               </div>
 
-              {selectedRequest.comment && (
+              {selectedRequest.reason && (
                 <div>
-                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Your Comment</label>
+                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Reason</label>
                   <p className="text-white mt-1 bg-slate-800 border border-slate-700 p-3 rounded-lg text-sm">
-                    {selectedRequest.comment}
+                    {selectedRequest.reason}
                   </p>
                 </div>
               )}
@@ -350,7 +328,7 @@ const OvertimeHistory: React.FC = () => {
                   <div className="flex items-center gap-3 mb-2">
                     <Calendar size={18} className="text-blue-400" />
                     <span className="text-base font-semibold text-white">
-                      {new Date(request.attendance.date).toLocaleDateString(undefined, {
+                      {new Date(request.overtime_date).toLocaleDateString(undefined, {
                         weekday: 'short',
                         year: 'numeric',
                         month: 'short',
@@ -361,19 +339,12 @@ const OvertimeHistory: React.FC = () => {
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Clock size={14} />
                     <span>
-                      Total: {Math.floor((request.total_minutes_final ?? request.attendance.total_minutes) / 60)}h {(request.total_minutes_final ?? request.attendance.total_minutes) % 60}m
-                      {request.total_minutes_final && <span className="text-xs text-slate-500 ml-1">(lunch deducted)</span>}
+                      {formatTime(request.start_time)} - {formatTime(request.end_time)}
                     </span>
-                    {(request.overtime_minutes !== undefined || request.approved_hours !== null) && (
-                      <>
-                        <ChevronRight size={14} className="text-slate-600" />
-                        <span className="text-emerald-400 font-semibold">
-                          OT: {request.overtime_minutes !== undefined
-                            ? `${(request.overtime_minutes / 60).toFixed(2)} hrs`
-                            : `${request.approved_hours!.toFixed(2)} hrs`}
-                        </span>
-                      </>
-                    )}
+                    <ChevronRight size={14} className="text-slate-600" />
+                    <span className="text-emerald-400 font-semibold">
+                      {request.total_hours.toFixed(2)} hrs
+                    </span>
                   </div>
                 </div>
 
