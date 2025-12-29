@@ -607,46 +607,48 @@ export default function AssetInventoryPage() {
         </div>
       </div>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <div className="flex items-start justify-between">
-                  <div>
-                      <p className="text-slate-400 text-sm mb-1">Total Assets</p>
-                      <h3 className="text-2xl font-bold text-white">{loading ? '-' : assets.length}</h3>
-                  </div>
-                  <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
-                      <Server size={24} />
-                  </div>
-              </div>
-          </div>
-           <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <div className="flex items-start justify-between">
-                  <div>
-                      <p className="text-slate-400 text-sm mb-1">With Serial Number</p>
-                      <h3 className="text-2xl font-bold text-white">
-                        {loading ? '-' : assets.filter(a => a.serial_number).length}
-                      </h3>
-                  </div>
-                  <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
-                      <Tag size={24} />
-                  </div>
-              </div>
-          </div>
-           <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
-              <div className="flex items-start justify-between">
-                  <div>
-                      <p className="text-slate-400 text-sm mb-1">Categories</p>
-                      <h3 className="text-2xl font-bold text-white">
-                        {loading ? '-' : new Set(assets.map(a => a.categories?.id).filter(Boolean)).size}
-                      </h3>
-                  </div>
-                  <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400">
-                      <Monitor size={24} />
-                  </div>
-              </div>
-          </div>
-      </div>
+      {/* Stats Overview - Hidden for asset positions */}
+      {userPosition !== 'asset' && userPosition !== 'assets' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className="text-slate-400 text-sm mb-1">Total Assets</p>
+                        <h3 className="text-2xl font-bold text-white">{loading ? '-' : assets.length}</h3>
+                    </div>
+                    <div className="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+                        <Server size={24} />
+                    </div>
+                </div>
+            </div>
+             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className="text-slate-400 text-sm mb-1">With Serial Number</p>
+                        <h3 className="text-2xl font-bold text-white">
+                          {loading ? '-' : assets.filter(a => a.serial_number).length}
+                        </h3>
+                    </div>
+                    <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
+                        <Tag size={24} />
+                    </div>
+                </div>
+            </div>
+             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
+                <div className="flex items-start justify-between">
+                    <div>
+                        <p className="text-slate-400 text-sm mb-1">Categories</p>
+                        <h3 className="text-2xl font-bold text-white">
+                          {loading ? '-' : new Set(assets.map(a => a.categories?.id).filter(Boolean)).size}
+                        </h3>
+                    </div>
+                    <div className="p-2 bg-amber-500/10 rounded-lg text-amber-400">
+                        <Monitor size={24} />
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
       {/* Inventory Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">

@@ -89,6 +89,15 @@ export default function TicketsPage() {
           console.error('Error fetching user role:', error);
           setIsAdmin(false);
         } else {
+          const position = (profile?.positions as any)?.name?.toLowerCase() || '';
+
+          // Redirect asset positions to asset inventory
+          const restrictedPositions = ['asset', 'assets', 'asset lead', 'asset associate'];
+          if (restrictedPositions.includes(position)) {
+            router.push('/dashboard/ticketing/asset-inventory');
+            return;
+          }
+
           setIsAdmin(profile?.role === 'admin');
           setUserPosition((profile?.positions as any)?.name || '');
         }
@@ -101,7 +110,7 @@ export default function TicketsPage() {
     };
 
     checkUserRole();
-  }, [user?.id]);
+  }, [user?.id, router]);
 
   const canCreateTicket = userPosition !== 'Field Engineer';
   const canDeleteTicket = userPosition === 'Operations Manager';

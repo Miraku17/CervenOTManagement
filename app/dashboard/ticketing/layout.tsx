@@ -110,8 +110,8 @@ export default function TicketingLayout({
           </div>
         </div>
 
-        {/* Analytics Section */}
-        {isAdmin && (
+        {/* Analytics Section - Hidden for asset positions */}
+        {isAdmin && userPositionLower !== 'asset' && userPositionLower !== 'assets' && (
           <div>
             <SidebarLabel>Analytics</SidebarLabel>
             <div className="space-y-1">
