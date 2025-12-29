@@ -31,6 +31,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const now = new Date();
     const requestedDate = date; // Already in yyyy-MM-dd format
 
+    // Check if user is Operations Manager for auto-approval
+    const { data: userProfile, error: positionError } = await supabase
+      .from('profiles')
+      .select('position_id, positions(name)')
+      .eq('id', userId)
+      .single();
+
+    if (positionError) {
+      throw new Error('Failed to fetch user profile.');
+    }
+
+    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
+    const isOperationsManager = userPosition === 'Operations Manager';
+
     // Check if user already has an overtime request for this date
     const { data: existingOvertimeRequests, error: checkError } = await supabase
       .from('overtime_v2')
@@ -48,26 +62,49 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Create the overtime request in overtime_v2
     // Note: total_hours is a computed column in the database
+    const overtimeRequestData: any = {
+      requested_by: userId,
+      overtime_date: requestedDate,
+      start_time: startTime,
+      end_time: endTime,
+      reason: reason,
+      status: isOperationsManager ? 'approved' : 'pending',
+      requested_at: now.toISOString(),
+      created_at: now.toISOString(),
+      updated_at: now.toISOString()
+    };
+
+    // If auto-approving, set approval info for both levels
+    if (isOperationsManager) {
+      // Level 1 approval
+      overtimeRequestData.level1_reviewer = userId;
+      overtimeRequestData.level1_status = 'approved';
+      overtimeRequestData.level1_reviewed_at = now.toISOString();
+      overtimeRequestData.level1_comment = 'Auto-approved (Operations Manager)';
+      // Level 2 approval
+      overtimeRequestData.level2_reviewer = userId;
+      overtimeRequestData.level2_status = 'approved';
+      overtimeRequestData.level2_reviewed_at = now.toISOString();
+      overtimeRequestData.level2_comment = 'Auto-approved (Operations Manager)';
+      // Set final status and approval timestamp
+      overtimeRequestData.final_status = 'approved';
+      overtimeRequestData.approved_at = now.toISOString();
+    }
+
     const { data: overtimeData, error: overtimeError } = await supabase
       .from('overtime_v2')
-      .insert({
-        requested_by: userId,
-        overtime_date: requestedDate,
-        start_time: startTime,
-        end_time: endTime,
-        reason: reason,
-        status: 'pending',
-        requested_at: now.toISOString(),
-        created_at: now.toISOString(),
-        updated_at: now.toISOString()
-      })
+      .insert(overtimeRequestData)
       .select()
       .single();
 
     if (overtimeError) throw overtimeError;
 
+    const message = isOperationsManager
+      ? 'Overtime request submitted and automatically approved'
+      : 'Overtime request submitted successfully';
+
     return res.status(200).json({
-      message: 'Overtime request submitted successfully',
+      message,
       overtime: overtimeData
     });
 

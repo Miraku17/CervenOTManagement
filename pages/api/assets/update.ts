@@ -24,10 +24,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
-  try {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
 
-      if (!supabaseAdmin) {
-      throw new Error('Database connection not available');
+  try {
+    // Check if user has edit-only access from assets_edit_access table
+    const { data: editAccess } = await supabaseAdmin
+      .from('assets_edit_access')
+      .select('can_edit')
+      .eq('profile_id', userId)
+      .single();
+
+    const hasEditAccess = editAccess?.can_edit === true;
+
+    // Check if user has position-based access or edit access from table
+    const userPosition = req.user?.position?.toLowerCase();
+    const hasPositionAccess = userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager';
+
+    if (!hasPositionAccess && !hasEditAccess) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to update assets' });
     }
 
     const updateData = {
@@ -80,4 +96,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requirePosition: ['asset', 'operations manager'] });
+export default withAuth(handler);

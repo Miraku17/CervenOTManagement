@@ -26,14 +26,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    
-    // First, try to find existing record (exclude soft-deleted)
-    const { data: existing, error: findError } = await supabaseAdmin
+
+    // Tables with soft delete support
+    const tablesWithSoftDelete = ['categories', 'brands', 'models'];
+
+    // First, try to find existing record (exclude soft-deleted for supported tables)
+    let query = supabaseAdmin
       .from(tableName)
       .select('id, name')
-      .eq('name', value)
-      .is('deleted_at', null)
-      .maybeSingle();
+      .eq('name', value);
+
+    // Only filter by deleted_at if the table supports soft delete
+    if (tablesWithSoftDelete.includes(tableName)) {
+      query = query.is('deleted_at', null);
+    }
+
+    const { data: existing, error: findError } = await query.maybeSingle();
 
     if (findError) throw findError;
 

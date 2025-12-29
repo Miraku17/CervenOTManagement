@@ -10,6 +10,7 @@ export default function LeaveRequestsPage() {
   const { user, loading: authLoading } = useAuth();
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -36,9 +37,12 @@ export default function LeaveRequestsPage() {
           return;
         }
 
-        const userPosition = profile?.positions && (profile.positions as any).name;
+        const position = profile?.positions && (profile.positions as any).name;
+        setUserPosition(position);
 
-        if (userPosition === 'Operations Manager') {
+        // Allow Operations Manager, Technical Support Lead, and Technical Support Engineer
+        const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
+        if (allowedPositions.includes(position)) {
           setHasAccess(true);
         } else {
           setHasAccess(false);
@@ -76,10 +80,12 @@ export default function LeaveRequestsPage() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
           <p className="text-slate-300 mb-2">
-            Only users with the following position can access leave requests:
+            Only users with the following positions can access leave requests:
           </p>
           <ul className="text-blue-400 font-medium space-y-1">
             <li>Operations Manager</li>
+            <li>Technical Support Lead</li>
+            <li>Technical Support Engineer</li>
           </ul>
           <p className="text-sm text-slate-400 mt-4">
             If you believe you should have access, please contact your administrator.
@@ -89,5 +95,8 @@ export default function LeaveRequestsPage() {
     );
   }
 
-  return <LeaveRequestsView />;
+  // Only Operations Manager can approve/reject
+  const canApprove = userPosition === 'Operations Manager';
+
+  return <LeaveRequestsView canApprove={canApprove} />;
 }

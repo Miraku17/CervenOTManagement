@@ -37,7 +37,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const adminPosition = (adminProfile.positions as any)?.name;
 
     // Check level-specific authorization
-    const level1Positions = ['Admin Tech', 'Technical Support Engineer', 'Operations Technical Lead'];
+    const level1Positions = ['Admin Tech', 'Technical Support Engineer', 'Technical Support Lead', 'Operations Technical Lead'];
     const level2Positions = ['Operations Manager', 'Admin Tech'];
 
     if (level === 'level1' && (!adminPosition || !level1Positions.includes(adminPosition))) {

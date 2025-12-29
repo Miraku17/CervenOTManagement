@@ -19,6 +19,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
+  // Block edit-only users from deleting assets
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
+  const { data: editAccess } = await supabaseAdmin
+    .from('assets_edit_access')
+    .select('can_edit')
+    .eq('profile_id', userId)
+    .single();
+
+  const hasEditOnlyAccess = editAccess?.can_edit === true;
+
+  if (hasEditOnlyAccess) {
+    return res.status(403).json({ error: 'Forbidden: You do not have permission to delete assets' });
+  }
+
   try {
 
       if (!supabaseAdmin) {

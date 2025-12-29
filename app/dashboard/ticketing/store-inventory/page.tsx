@@ -19,6 +19,7 @@ interface InventoryItem {
   serial_number: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  status?: 'temporary' | 'permanent';
   stores: {
     id: string;
     store_name: string;
@@ -409,6 +410,7 @@ export default function StoreInventoryPage() {
     const tableColumn = [
       'Item Details',
       'Serial Number',
+      'Status',
       'Category',
       'Brand',
       'Model',
@@ -425,6 +427,7 @@ export default function StoreInventoryPage() {
     const tableRows = sortedItems.map((item) => [
       `${item.brands?.name || 'N/A'}\n${item.categories?.name || 'N/A'}`,
       item.serial_number || 'N/A',
+      item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'N/A',
       item.categories?.name || 'N/A',
       item.brands?.name || 'N/A',
       item.models?.name || 'N/A',
@@ -457,18 +460,19 @@ export default function StoreInventoryPage() {
       },
       columnStyles: {
         0: { cellWidth: 22 },  // Item Details
-        1: { cellWidth: 20 },  // Serial Number
-        2: { cellWidth: 20 },  // Category
-        3: { cellWidth: 20 },  // Brand
-        4: { cellWidth: 20 },  // Model
-        5: { cellWidth: 22 },  // Store
-        6: { cellWidth: 20 },  // Station
-        7: { cellWidth: 24 },  // Created By
-        8: { cellWidth: 20 },  // Created At
-        9: { cellWidth: 24 },  // Updated By
-        10: { cellWidth: 20 }, // Updated At
-        11: { cellWidth: 24 }, // Deleted By
-        12: { cellWidth: 20 }, // Deleted At
+        1: { cellWidth: 18 },  // Serial Number
+        2: { cellWidth: 16 },  // Status
+        3: { cellWidth: 18 },  // Category
+        4: { cellWidth: 18 },  // Brand
+        5: { cellWidth: 18 },  // Model
+        6: { cellWidth: 20 },  // Store
+        7: { cellWidth: 18 },  // Station
+        8: { cellWidth: 22 },  // Created By
+        9: { cellWidth: 18 },  // Created At
+        10: { cellWidth: 22 }, // Updated By
+        11: { cellWidth: 18 }, // Updated At
+        12: { cellWidth: 22 }, // Deleted By
+        13: { cellWidth: 18 }, // Deleted At
       },
       didParseCell: function(data) {
         // Highlight deleted rows in red (only body rows, not headers)

@@ -31,19 +31,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'End date must be after start date.' });
     }
 
-    // 2. Check Leave Credits (skip for Leave Without Pay)
-    if (type !== 'Leave Without Pay') {
-      const { data: profile, error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .select('leave_credits')
-        .eq('id', userId)
-        .single();
+    // Check if user is Operations Manager for auto-approval
+    const { data: userProfile, error: positionError } = await supabaseAdmin
+      .from('profiles')
+      .select('leave_credits, position_id, positions(name)')
+      .eq('id', userId)
+      .single();
 
-      if (profileError) {
-        throw new Error('Failed to fetch user profile.');
-      }
+    if (positionError) {
+      throw new Error('Failed to fetch user profile.');
+    }
 
-      const currentCredits = profile.leave_credits || 0;
+    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
+    const isOperationsManager = userPosition === 'Operations Manager';
+
+    // 2. Check Leave Credits (skip for Leave Without Pay and Operations Managers)
+    if (type !== 'Leave Without Pay' && !isOperationsManager) {
+      const currentCredits = userProfile.leave_credits || 0;
       if (currentCredits < duration) {
         return res.status(400).json({
           error: `Insufficient leave credits. You have ${currentCredits} credits but requested ${duration} days. You can leave without pay.`
@@ -71,17 +75,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // 4. Insert Request
+    // 4. Insert Request (auto-approve for Operations Managers)
+    const now = new Date().toISOString();
+    const requestData: any = {
+      employee_id: userId,
+      leave_type: type,
+      start_date: startDate,
+      end_date: endDate,
+      reason: reason,
+      status: isOperationsManager ? 'approved' : 'pending',
+    };
+
+    // If auto-approving, set reviewer info
+    if (isOperationsManager) {
+      requestData.reviewer_id = userId; // Self-approved
+      requestData.reviewed_at = now;
+      requestData.reviewer_comment = 'Auto-approved (Operations Manager)';
+    }
+
     const { data, error } = await supabaseAdmin
       .from('leave_requests')
-      .insert({
-        employee_id: userId,
-        leave_type: type,
-        start_date: startDate,
-        end_date: endDate,
-        reason: reason,
-        status: 'pending',
-      })
+      .insert(requestData)
       .select()
       .single();
 
@@ -89,7 +103,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw error;
     }
 
-    return res.status(201).json({ message: 'Leave request submitted successfully', data });
+    // If auto-approved and not Leave Without Pay, deduct credits immediately
+    if (isOperationsManager && type !== 'Leave Without Pay') {
+      const currentCredits = userProfile.leave_credits || 0;
+      const { error: updateError } = await supabaseAdmin
+        .from('profiles')
+        .update({ leave_credits: currentCredits - duration })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Error deducting leave credits:', updateError);
+        // Don't fail the request if credit deduction fails, just log it
+      }
+    }
+
+    const message = isOperationsManager
+      ? 'Leave request submitted and automatically approved'
+      : 'Leave request submitted successfully';
+
+    return res.status(201).json({ message, data });
   } catch (error: any) {
     console.error('Error creating leave request:', error);
     return res.status(500).json({ error: error.message || 'Failed to submit leave request.' });

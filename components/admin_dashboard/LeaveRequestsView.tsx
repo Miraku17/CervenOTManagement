@@ -38,7 +38,11 @@ interface ConfirmationState {
   employeeName: string;
 }
 
-const LeaveRequestsView: React.FC = () => {
+interface LeaveRequestsViewProps {
+  canApprove?: boolean;
+}
+
+const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true }) => {
   const { user } = useAuth();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -645,7 +649,7 @@ const LeaveRequestsView: React.FC = () => {
                       {request.reason}
                     </td>
                     <td className="px-6 py-4 text-right">
-                      {request.status === 'pending' && (
+                      {request.status === 'pending' && canApprove && (
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={(e) => {
@@ -678,6 +682,9 @@ const LeaveRequestsView: React.FC = () => {
                             )}
                           </button>
                         </div>
+                      )}
+                      {request.status === 'pending' && !canApprove && (
+                        <span className="text-xs text-slate-500 italic">View Only</span>
                       )}
                     </td>
                   </tr>

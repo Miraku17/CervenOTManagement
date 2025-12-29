@@ -99,6 +99,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [serialNumber, setSerialNumber] = useState('');
   const [underWarranty, setUnderWarranty] = useState(false);
   const [warrantyDate, setWarrantyDate] = useState('');
+  const [status, setStatus] = useState<'temporary' | 'permanent'>('permanent');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -174,6 +175,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setSerialNumber(editItem.serial_number || '');
       setUnderWarranty(editItem.under_warranty || false);
       setWarrantyDate(editItem.warranty_date || '');
+      setStatus((editItem as any).status || 'permanent');
     } else if (isOpen && !editItem) {
       // Reset form when opening for new item
       setSelectedStore(null);
@@ -191,6 +193,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setSerialNumber('');
       setUnderWarranty(false);
       setWarrantyDate('');
+      setStatus('permanent');
     }
   }, [isOpen, editItem]);
 
@@ -426,6 +429,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
         serial_number: serialNumber,
         under_warranty: underWarranty,
         warranty_date: warrantyDate || null,
+        status: status,
       };
 
       const response = await fetch(
@@ -463,6 +467,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setSerialNumber('');
       setUnderWarranty(false);
       setWarrantyDate('');
+      setStatus('permanent');
 
       showToast('success', `Inventory item ${isEditMode ? 'updated' : 'created'} successfully!`);
 
@@ -846,6 +851,37 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                 placeholder="Enter serial number..."
                 required
               />
+            </div>
+
+            {/* Status Row */}
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-slate-300 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="permanent"
+                    checked={status === 'permanent'}
+                    onChange={(e) => setStatus(e.target.value as 'permanent' | 'temporary')}
+                    className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700 focus:ring-blue-500"
+                  />
+                  <span className="text-slate-300">Permanent</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="status"
+                    value="temporary"
+                    checked={status === 'temporary'}
+                    onChange={(e) => setStatus(e.target.value as 'permanent' | 'temporary')}
+                    className="w-4 h-4 text-blue-600 bg-slate-800 border-slate-700 focus:ring-blue-500"
+                  />
+                  <span className="text-slate-300">Temporary</span>
+                </label>
+              </div>
             </div>
 
             {/* Warranty Row */}
