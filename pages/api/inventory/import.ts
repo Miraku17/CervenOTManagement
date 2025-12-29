@@ -20,6 +20,7 @@ interface ImportRow {
   'Brand': string;
   'Model': string;
   'Serial Number': string;
+  'Status': string;
   'Under Warranty': string;
   'Warranty Date'?: string;
 }
@@ -128,7 +129,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       try {
         // Skip completely empty rows
         const isEmpty = !row['Store Name'] && !row['Store Code'] && !row['Station Name'] &&
-                        !row['Category'] && !row['Brand'] && !row['Model'] && !row['Serial Number'];
+                        !row['Category'] && !row['Brand'] && !row['Model'] && !row['Serial Number'] &&
+                        !row['Status'];
         if (isEmpty) {
           continue; // Skip this row without counting it as success or failure
         }
@@ -152,6 +154,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (!row['Serial Number']) {
           throw new Error('Serial Number is required');
         }
+        if (!row['Status']) {
+          throw new Error('Status is required');
+        }
+
+        // Validate and normalize status
+        const statusValue = row['Status'].trim().toLowerCase();
+        if (!['permanent', 'temporary'].includes(statusValue)) {
+          throw new Error('Status must be either "Permanent" or "Temporary"');
+        }
+        const status = statusValue as 'permanent' | 'temporary';
 
         // Parse warranty information
         const underWarranty = row['Under Warranty']?.toLowerCase() === 'yes';
@@ -216,6 +228,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               brand_id: brandId,
               model_id: modelId,
               serial_number: row['Serial Number'].trim(),
+              status: status,
               under_warranty: underWarranty,
               warranty_date: warrantyDate,
               updated_at: new Date().toISOString(),
@@ -235,6 +248,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               brand_id: brandId,
               model_id: modelId,
               serial_number: row['Serial Number'].trim(),
+              status: status,
               under_warranty: underWarranty,
               warranty_date: warrantyDate,
               created_by: userId,

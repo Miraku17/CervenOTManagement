@@ -514,7 +514,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
                 value="attendance"
                 checked={exportType === 'attendance'}
                 onChange={(e) => setExportType(e.target.value as 'attendance' | 'overtime')}
-                className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500 focus:ring-2"
+                className="w-4 h-4 text-slate-400 bg-slate-900 border-slate-600 focus:ring-slate-500 focus:ring-1"
               />
               <div className="flex-1">
                 <div className="text-white font-medium">Full Attendance with Overtime</div>
@@ -528,7 +528,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
                 value="overtime"
                 checked={exportType === 'overtime'}
                 onChange={(e) => setExportType(e.target.value as 'attendance' | 'overtime')}
-                className="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500 focus:ring-2"
+                className="w-4 h-4 text-slate-400 bg-slate-900 border-slate-600 focus:ring-slate-500 focus:ring-1"
               />
               <div className="flex-1">
                 <div className="text-white font-medium">Overtime Requests Only</div>

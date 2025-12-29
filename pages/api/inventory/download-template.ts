@@ -25,6 +25,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Brand': 'Dell',
         'Model': 'OptiPlex 7090',
         'Serial Number': 'SN123456789',
+        'Status': 'Permanent',
         'Under Warranty': 'Yes',
         'Warranty Date': '2025-12-31'
       },
@@ -36,6 +37,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Brand': '',
         'Model': '',
         'Serial Number': '',
+        'Status': '',
         'Under Warranty': '',
         'Warranty Date': ''
       }
@@ -54,6 +56,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 15 }, // Brand
       { wch: 20 }, // Model
       { wch: 20 }, // Serial Number
+      { wch: 12 }, // Status
       { wch: 15 }, // Under Warranty
       { wch: 15 }  // Warranty Date
     ];
@@ -70,6 +73,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Field': 'Brand', 'Description': 'Brand name (Required)', 'Example': 'Dell, HP, Lenovo' },
       { 'Field': 'Model', 'Description': 'Model name (Required)', 'Example': 'OptiPlex 7090' },
       { 'Field': 'Serial Number', 'Description': 'Unique serial number (Required)', 'Example': 'SN123456789' },
+      { 'Field': 'Status', 'Description': 'Inventory status - Permanent or Temporary (Required)', 'Example': 'Permanent' },
       { 'Field': 'Under Warranty', 'Description': 'Warranty status - Yes or No (Optional, defaults to No)', 'Example': 'Yes' },
       { 'Field': 'Warranty Date', 'Description': 'Warranty expiration date (Optional, format: YYYY-MM-DD)', 'Example': '2025-12-31' }
     ];
