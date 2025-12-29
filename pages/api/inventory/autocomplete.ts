@@ -15,9 +15,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Fetch all autocomplete data in parallel - now with IDs
     const [categoriesRes, brandsRes, modelsRes, stationsRes] = await Promise.all([
-      supabaseAdmin.from('categories').select('id, name').order('name'),
-      supabaseAdmin.from('brands').select('id, name').order('name'),
-      supabaseAdmin.from('models').select('id, name').order('name'),
+      supabaseAdmin.from('categories').select('id, name').is('deleted_at', null).order('name'),
+      supabaseAdmin.from('brands').select('id, name').is('deleted_at', null).order('name'),
+      supabaseAdmin.from('models').select('id, name').is('deleted_at', null).order('name'),
       supabaseAdmin.from('stations').select('id, name').order('name'),
     ]);
 

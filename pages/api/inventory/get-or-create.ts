@@ -27,11 +27,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     
-    // First, try to find existing record
+    // First, try to find existing record (exclude soft-deleted)
     const { data: existing, error: findError } = await supabaseAdmin
       .from(tableName)
       .select('id, name')
       .eq('name', value)
+      .is('deleted_at', null)
       .maybeSingle();
 
     if (findError) throw findError;
