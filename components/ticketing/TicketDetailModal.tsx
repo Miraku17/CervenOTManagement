@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown, ExternalLink } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown, ExternalLink, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/services/supabase';
@@ -59,6 +59,17 @@ interface KBArticle {
   id: string;
   title: string;
   kb_code: string;
+}
+
+interface TicketAttachment {
+  id: string;
+  ticket_id: string;
+  file_path: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string;
+  created_at: string;
 }
 
 const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
@@ -315,6 +326,16 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [kbArticles, setKbArticles] = useState<KBArticle[]>([]);
+  const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<TicketAttachment | null>(null);
+  const [attachmentsToDelete, setAttachmentsToDelete] = useState<string[]>([]); // IDs of attachments marked for deletion
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]); // New files to upload on save
+  const [pendingPreviewUrls, setPendingPreviewUrls] = useState<string[]>([]); // Preview URLs for pending files
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -367,6 +388,49 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     }
   }, [isOpen]);
 
+  // Fetch attachments when ticket changes
+  useEffect(() => {
+    const fetchAttachments = async () => {
+      if (!ticket?.id) {
+        setAttachments([]);
+        setAttachmentUrls({});
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase
+          .from('ticket_attachments')
+          .select('*')
+          .eq('ticket_id', ticket.id)
+          .order('created_at', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching attachments:', error);
+          setAttachments([]);
+          setAttachmentUrls({});
+        } else {
+          setAttachments(data || []);
+
+          // Fetch signed URLs for all attachments
+          const urls: Record<string, string> = {};
+          for (const attachment of data || []) {
+            const url = await getAttachmentUrl(attachment.file_path);
+            urls[attachment.id] = url;
+          }
+          setAttachmentUrls(urls);
+        }
+      } catch (error) {
+        console.error('Error fetching attachments:', error);
+        setAttachments([]);
+        setAttachmentUrls({});
+      }
+    };
+
+    if (isOpen && ticket) {
+      fetchAttachments();
+    }
+  }, [isOpen, ticket?.id]);
+
   // Reset edit data when ticket changes
   useEffect(() => {
     if (ticket) {
@@ -399,17 +463,107 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   const canEdit = isAdmin || (user?.id === ticket.serviced_by);
 
+  // Get signed URL for attachment (for private buckets)
+  const getAttachmentUrl = async (filePath: string): Promise<string> => {
+    const { data, error } = await supabase.storage
+      .from('ticket-attachments')
+      .createSignedUrl(filePath, 3600); // URL valid for 1 hour
+
+    if (error) {
+      console.error('Error creating signed URL:', error);
+      return '';
+    }
+
+    return data.signedUrl;
+  };
+
+  // Show delete confirmation modal
+  const showDeleteConfirmation = (attachment: TicketAttachment) => {
+    setAttachmentToDelete(attachment);
+    setShowDeleteConfirm(true);
+  };
+
+  // Mark attachment for deletion (will be deleted on save)
+  const handleMarkForDeletion = () => {
+    if (!attachmentToDelete) return;
+
+    // Add to deletion list
+    setAttachmentsToDelete(prev => [...prev, attachmentToDelete.id]);
+
+    // Close modal
+    setShowDeleteConfirm(false);
+    setAttachmentToDelete(null);
+  };
+
+  // Handle adding new attachments (stored as pending until save)
+  const handleUploadAttachments = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Calculate total after adding new files
+    const currentTotal = attachments.length - attachmentsToDelete.length + pendingAttachments.length;
+    if (currentTotal + files.length > 10) {
+      alert(`You can only have up to 10 attachments per ticket. Current total: ${currentTotal}`);
+      return;
+    }
+
+    // Validate each file
+    const validFiles: File[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        alert(`${file.name} is not an image file`);
+        continue;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        alert(`${file.name} is too large. Maximum size is 5MB`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) return;
+
+    // Create preview URLs
+    const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+
+    // Add to pending state
+    setPendingAttachments(prev => [...prev, ...validFiles]);
+    setPendingPreviewUrls(prev => [...prev, ...newPreviewUrls]);
+
+    // Reset file input
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  // Remove pending attachment before save
+  const handleRemovePendingAttachment = (index: number) => {
+    // Revoke preview URL
+    URL.revokeObjectURL(pendingPreviewUrls[index]);
+
+    setPendingAttachments(prev => prev.filter((_, i) => i !== index));
+    setPendingPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSave = async () => {
-    if (!ticket) return;
+    if (!ticket || !user?.id) return;
 
     setIsSaving(true);
     try {
+      // 1. Sanitize date fields - convert empty strings to null
+      const sanitizedData = Object.entries(editData).reduce((acc, [key, value]) => {
+        // Convert empty strings to null for all fields
+        acc[key] = value === '' ? null : value;
+        return acc;
+      }, {} as Record<string, any>);
+
+      // 2. Update ticket fields
       const response = await fetch('/api/tickets/update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: ticket.id,
-          ...editData,
+          ...sanitizedData,
           status: toDbStatus(editData.status || 'Open')
         })
       });
@@ -420,13 +574,84 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         throw new Error(data.error || 'Failed to update ticket');
       }
 
+      // 2. Delete marked attachments
+      for (const attachmentId of attachmentsToDelete) {
+        const attachment = attachments.find(a => a.id === attachmentId);
+        if (!attachment) continue;
+
+        // Delete from storage
+        const { error: storageError } = await supabase.storage
+          .from('ticket-attachments')
+          .remove([attachment.file_path]);
+
+        if (storageError) {
+          console.error('Error deleting from storage:', storageError);
+          continue;
+        }
+
+        // Delete from database
+        const { error: dbError } = await supabase
+          .from('ticket_attachments')
+          .delete()
+          .eq('id', attachmentId);
+
+        if (dbError) {
+          console.error('Error deleting from database:', dbError);
+        }
+      }
+
+      // 3. Upload pending attachments
+      for (const [index, file] of pendingAttachments.entries()) {
+        const currentCount = attachments.length - attachmentsToDelete.length + index;
+        const fileExt = file.name.split('.').pop();
+        const fileName = `image-${currentCount + 1}.${fileExt}`;
+        const filePath = `${ticket.id}/${fileName}`;
+
+        // Upload to storage
+        const { error: uploadError } = await supabase.storage
+          .from('ticket-attachments')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error('Error uploading file:', uploadError);
+          continue;
+        }
+
+        // Create database record
+        const { error: dbError } = await supabase
+          .from('ticket_attachments')
+          .insert({
+            ticket_id: ticket.id,
+            file_path: filePath,
+            file_name: file.name,
+            file_type: file.type,
+            file_size: file.size,
+            uploaded_by: user.id,
+          });
+
+        if (dbError) {
+          console.error('Error saving attachment record:', dbError);
+          await supabase.storage.from('ticket-attachments').remove([filePath]);
+        }
+      }
+
+      // Clean up pending previews
+      pendingPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+
+      // Clear pending state
+      setAttachmentsToDelete([]);
+      setPendingAttachments([]);
+      setPendingPreviewUrls([]);
+
       if (onUpdate && data.ticket) {
         onUpdate(data.ticket);
       }
 
       setIsEditMode(false);
       setShowSuccessModal(true);
-      onClose();
     } catch (error: any) {
       console.error('Error updating ticket:', error);
       alert(error.message || 'Failed to update ticket');
@@ -437,6 +662,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   const handleCancelEdit = () => {
     setIsEditMode(false);
+
     // Reset edit data
     if (ticket) {
       setEditData({
@@ -462,6 +688,12 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         kb_id: ticket.kb_id || '',
       });
     }
+
+    // Clear attachment changes
+    setAttachmentsToDelete([]);
+    pendingPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setPendingAttachments([]);
+    setPendingPreviewUrls([]);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -780,6 +1012,149 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             />
           </DetailSection>
 
+          {/* Attachments Section */}
+          <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-5 mb-4">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={18} className="text-blue-400" />
+                <h3 className="font-semibold text-slate-200">
+                  Attachments ({attachments.length - attachmentsToDelete.length + pendingAttachments.length}/10)
+                </h3>
+              </div>
+              {canEdit && isEditMode && attachments.length < 10 && (
+                <>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleUploadAttachments}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingImages}
+                    className="flex items-center gap-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {uploadingImages ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Uploading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={16} />
+                        <span>Add Images</span>
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+            {(attachments.length - attachmentsToDelete.length + pendingAttachments.length) > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {/* Existing attachments (not marked for deletion) */}
+                {attachments
+                  .filter(attachment => !attachmentsToDelete.includes(attachment.id))
+                  .map((attachment) => {
+                    const imageUrl = attachmentUrls[attachment.id];
+                    const isMarkedForDeletion = attachmentsToDelete.includes(attachment.id);
+                    return (
+                      <div key={attachment.id} className={`relative group ${isMarkedForDeletion ? 'opacity-50' : ''}`}>
+                        <button
+                          onClick={() => imageUrl && setSelectedImage(imageUrl)}
+                          className="aspect-square rounded-lg overflow-hidden bg-slate-900 border border-slate-700 hover:border-blue-500 transition-all cursor-pointer group-hover:scale-105"
+                          disabled={!imageUrl}
+                        >
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={attachment.file_name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                          )}
+                        </button>
+                        {canEdit && isEditMode && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              showDeleteConfirmation(attachment);
+                            }}
+                            className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-all opacity-0 group-hover:opacity-100 z-10"
+                            title="Delete image"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="text-xs text-white truncate">
+                            {attachment.file_name}
+                          </p>
+                          <p className="text-xs text-slate-300">
+                            {(attachment.file_size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                {/* Pending attachments (not yet uploaded) */}
+                {pendingAttachments.map((file, index) => (
+                  <div key={`pending-${index}`} className="relative group">
+                    <button
+                      onClick={() => setSelectedImage(pendingPreviewUrls[index])}
+                      className="aspect-square rounded-lg overflow-hidden bg-slate-900 border border-yellow-500/50 hover:border-yellow-500 transition-all cursor-pointer group-hover:scale-105"
+                    >
+                      <img
+                        src={pendingPreviewUrls[index]}
+                        alt={file.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {/* Pending badge */}
+                      <div className="absolute top-2 left-2 bg-yellow-500/90 text-black text-xs px-2 py-0.5 rounded-md font-medium">
+                        Pending
+                      </div>
+                    </button>
+                    {canEdit && isEditMode && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemovePendingAttachment(index);
+                        }}
+                        className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-all opacity-0 group-hover:opacity-100 z-10"
+                        title="Remove image"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <p className="text-xs text-white truncate">
+                        {file.name}
+                      </p>
+                      <p className="text-xs text-slate-300">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-slate-500">
+                <ImageIcon size={48} className="mx-auto mb-2 opacity-50" />
+                <p>No attachments</p>
+                {canEdit && (
+                  <p className="text-sm mt-1">
+                    {isEditMode ? 'Click "Add Images" to upload' : 'Click "Edit" to add images'}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
         </div>
 
         {/* Footer */}
@@ -832,12 +1207,74 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             </div>
             <h3 className="text-xl font-bold text-white text-center">Update Successful</h3>
             <p className="text-slate-400 text-center">The ticket has been updated successfully.</p>
-            <button 
-              onClick={() => setShowSuccessModal(false)}
+            <button
+              onClick={() => {
+                setShowSuccessModal(false);
+                onClose();
+              }}
               className="mt-2 w-full px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
             >
               Close
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {selectedImage && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-black/95 backdrop-blur-sm p-4 animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          <button
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 p-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-colors z-10"
+          >
+            <X size={24} />
+          </button>
+          <div className="relative max-w-7xl max-h-full">
+            <img
+              src={selectedImage}
+              alt="Full size attachment"
+              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && attachmentToDelete && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 sm:p-6 md:p-8 shadow-2xl transform transition-all scale-100 flex flex-col items-center gap-3 sm:gap-4 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+              <AlertTriangle size={28} className="text-red-500 sm:w-8 sm:h-8" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-white text-center">Mark for Deletion?</h3>
+            <p className="text-sm sm:text-base text-slate-400 text-center leading-relaxed">
+              Mark <span className="text-white font-medium break-all">"{attachmentToDelete.file_name}"</span> for deletion?
+              <span className="block mt-1 text-slate-500 text-xs sm:text-sm">
+                It will be permanently deleted when you click "Save Changes".
+              </span>
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mt-2">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirm(false);
+                  setAttachmentToDelete(null);
+                }}
+                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleMarkForDeletion}
+                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2 text-sm sm:text-base"
+              >
+                <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+                <span className="whitespace-nowrap">Mark for Deletion</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

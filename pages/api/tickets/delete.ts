@@ -27,7 +27,41 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Ticket ID is required' });
     }
 
-    // Delete the ticket
+    // 1. Get all attachments for this ticket
+    const { data: attachments, error: fetchError } = await supabase
+      .from('ticket_attachments')
+      .select('file_path')
+      .eq('ticket_id', id);
+
+    if (fetchError) {
+      console.error('Error fetching attachments:', fetchError);
+    }
+
+    // 2. Delete all files from storage
+    if (attachments && attachments.length > 0) {
+      const filePaths = attachments.map(att => att.file_path);
+      const { error: storageError } = await supabase.storage
+        .from('ticket-attachments')
+        .remove(filePaths);
+
+      if (storageError) {
+        console.error('Error deleting files from storage:', storageError);
+        // Continue with deletion even if storage cleanup fails
+      }
+    }
+
+    // 3. Delete ticket_attachments records (if not handled by CASCADE)
+    const { error: attachmentDeleteError } = await supabase
+      .from('ticket_attachments')
+      .delete()
+      .eq('ticket_id', id);
+
+    if (attachmentDeleteError) {
+      console.error('Error deleting attachment records:', attachmentDeleteError);
+      // Continue with ticket deletion
+    }
+
+    // 4. Delete the ticket
     const { error } = await supabase
       .from('tickets')
       .delete()
