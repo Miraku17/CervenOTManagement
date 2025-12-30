@@ -67,16 +67,28 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Check if user already has an overtime request for this date
     const { data: existingOvertimeRequests, error: checkError } = await supabase
       .from('overtime_v2')
-      .select('id')
+      .select('id, level1_status, level2_status, final_status')
       .eq('requested_by', userId)
       .eq('overtime_date', requestedDate);
 
     if (checkError) throw checkError;
 
+    // Check if there are any pending or approved requests for this date
     if (existingOvertimeRequests && existingOvertimeRequests.length > 0) {
-      return res.status(400).json({
-        error: 'You have already submitted an overtime request for this date. Only one overtime request per day is allowed.'
+      const hasPendingOrApproved = existingOvertimeRequests.some(req => {
+        // Check if request is still pending (no final status or final status is pending)
+        const isPending = !req.final_status || req.final_status === 'pending';
+        // Check if request is approved
+        const isApproved = req.final_status === 'approved';
+
+        return isPending || isApproved;
       });
+
+      if (hasPendingOrApproved) {
+        return res.status(400).json({
+          error: 'You already have a pending or approved overtime request for this date. You can only submit a new request if all previous requests for this date were rejected.'
+        });
+      }
     }
 
     // Create the overtime request in overtime_v2

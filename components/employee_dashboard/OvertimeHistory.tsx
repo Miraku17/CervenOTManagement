@@ -174,80 +174,108 @@ const OvertimeHistory: React.FC<OvertimeHistoryProps> = ({ refreshKey }) => {
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-white uppercase tracking-wider">Approval Status</h4>
 
-                <div className="relative pl-8 border-l-2 border-slate-700 space-y-8">
+                <div className="space-y-3">
                     {/* Level 1 */}
-                    <div className="relative">
-                        <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 bg-slate-900 ${
-                        selectedRequest.level1_status === 'approved' ? 'border-emerald-500 text-emerald-500' :
-                        selectedRequest.level1_status === 'rejected' ? 'border-red-500 text-red-500' :
-                        'border-slate-700 text-slate-500'
-                        }`}>
-                            {getStatusIcon(selectedRequest.level1_status || 'pending')}
-                        </div>
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                            <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                selectedRequest.level1_status === 'approved' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' :
+                                selectedRequest.level1_status === 'rejected' ? 'border-red-500 bg-red-500/10 text-red-500' :
+                                'border-slate-600 bg-slate-700/50 text-slate-400'
+                            }`}>
+                                {getStatusIcon(selectedRequest.level1_status || 'pending')}
+                            </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                            <div>
-                                <h5 className="font-medium text-white">Level 1 Approval</h5>
+                            <div className="flex-1 min-w-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                    <h5 className="font-semibold text-white">Level 1 Approval</h5>
+                                    <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level1_status || 'pending')}`}>
+                                        {getStatusIcon(selectedRequest.level1_status || 'pending')}
+                                        {(selectedRequest.level1_status || 'pending').toUpperCase()}
+                                    </span>
+                                </div>
+
                                 {selectedRequest.level1_reviewer_profile && (
-                                    <p className="text-sm text-slate-400">
-                                        by {selectedRequest.level1_reviewer_profile.first_name} {selectedRequest.level1_reviewer_profile.last_name}
+                                    <p className="text-sm text-slate-400 mb-1">
+                                        Reviewed by {selectedRequest.level1_reviewer_profile.first_name} {selectedRequest.level1_reviewer_profile.last_name}
                                     </p>
                                 )}
                                 {selectedRequest.level1_reviewed_at && (
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <p className="text-xs text-slate-500">
                                         {new Date(selectedRequest.level1_reviewed_at).toLocaleString()}
                                     </p>
                                 )}
-                            </div>
-                            <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level1_status || 'pending')}`}>
-                                {(selectedRequest.level1_status || 'pending').toUpperCase()}
-                            </span>
-                        </div>
 
-                        {selectedRequest.level1_comment && (
-                            <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                                <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level1_comment}&quot;</p>
+                                {selectedRequest.level1_comment && (
+                                    <div className="mt-3 bg-slate-900/50 p-3 rounded border border-slate-700">
+                                        <p className="text-xs text-slate-400 italic">&quot;{selectedRequest.level1_comment}&quot;</p>
+                                    </div>
+                                )}
                             </div>
-                        )}
+                        </div>
                     </div>
 
                     {/* Level 2 (Only if Level 1 is approved) */}
                     {selectedRequest.level1_status === 'approved' && (
-                         <div className="relative">
-                            <div className={`absolute -left-[41px] top-0 w-8 h-8 rounded-full flex items-center justify-center border-2 bg-slate-900 ${
-                            selectedRequest.level2_status === 'approved' ? 'border-emerald-500 text-emerald-500' :
-                            selectedRequest.level2_status === 'rejected' ? 'border-red-500 text-red-500' :
-                            'border-slate-700 text-slate-500'
-                            }`}>
-                                {getStatusIcon(selectedRequest.level2_status || 'pending')}
-                            </div>
+                        <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                    selectedRequest.level2_status === 'approved' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' :
+                                    selectedRequest.level2_status === 'rejected' ? 'border-red-500 bg-red-500/10 text-red-500' :
+                                    'border-slate-600 bg-slate-700/50 text-slate-400'
+                                }`}>
+                                    {getStatusIcon(selectedRequest.level2_status || 'pending')}
+                                </div>
 
-                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                                <div>
-                                    <h5 className="font-medium text-white">Level 2 Approval</h5>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                                        <h5 className="font-semibold text-white">Level 2 Approval</h5>
+                                        <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level2_status || 'pending')}`}>
+                                            {getStatusIcon(selectedRequest.level2_status || 'pending')}
+                                            {(selectedRequest.level2_status || 'pending').toUpperCase()}
+                                        </span>
+                                    </div>
+
                                     {selectedRequest.level2_reviewer_profile && (
-                                        <p className="text-sm text-slate-400">
-                                            by {selectedRequest.level2_reviewer_profile.first_name} {selectedRequest.level2_reviewer_profile.last_name}
+                                        <p className="text-sm text-slate-400 mb-1">
+                                            Reviewed by {selectedRequest.level2_reviewer_profile.first_name} {selectedRequest.level2_reviewer_profile.last_name}
                                         </p>
                                     )}
                                     {selectedRequest.level2_reviewed_at && (
-                                        <p className="text-xs text-slate-500 mt-0.5">
+                                        <p className="text-xs text-slate-500">
                                             {new Date(selectedRequest.level2_reviewed_at).toLocaleString()}
                                         </p>
                                     )}
-                                </div>
-                                <span className={`inline-flex self-start items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.level2_status || 'pending')}`}>
-                                    {(selectedRequest.level2_status || 'pending').toUpperCase()}
-                                </span>
-                            </div>
 
-                            {selectedRequest.level2_comment && (
-                                <div className="mt-2 bg-slate-800/50 p-3 rounded-lg border border-slate-700">
-                                    <p className="text-sm text-slate-400 italic">&quot;{selectedRequest.level2_comment}&quot;</p>
+                                    {selectedRequest.level2_comment && (
+                                        <div className="mt-3 bg-slate-900/50 p-3 rounded border border-slate-700">
+                                            <p className="text-xs text-slate-400 italic">&quot;{selectedRequest.level2_comment}&quot;</p>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
+                            </div>
                         </div>
                     )}
+
+                    {/* Final Status */}
+                    <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center border-2 ${
+                                    selectedRequest.final_status === 'approved' ? 'border-emerald-500 bg-emerald-500/10 text-emerald-500' :
+                                    selectedRequest.final_status === 'rejected' ? 'border-red-500 bg-red-500/10 text-red-500' :
+                                    'border-slate-600 bg-slate-700/50 text-slate-400'
+                                }`}>
+                                    {getStatusIcon(selectedRequest.final_status || 'pending')}
+                                </div>
+                                <h5 className="font-semibold text-white">Final Status</h5>
+                            </div>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(selectedRequest.final_status || 'pending')}`}>
+                                {getStatusIcon(selectedRequest.final_status || 'pending')}
+                                {(selectedRequest.final_status || 'pending').toUpperCase()}
+                            </span>
+                        </div>
+                    </div>
                 </div>
               </div>
 
