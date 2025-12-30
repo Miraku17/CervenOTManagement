@@ -14,13 +14,18 @@ interface ImportResult {
   errors?: string[];
 }
 
+interface ImportError {
+  error: string;
+  details?: string;
+}
+
 const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<string>('');
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ImportError | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -92,7 +97,14 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
           const data = await response.json();
 
           if (!response.ok) {
-            throw new Error(data.error || data.details || 'Failed to import stores');
+            // Store both error and details for better error display
+            setError({
+              error: data.error || 'Failed to import stores',
+              details: data.details
+            });
+            setIsLoading(false);
+            setLoadingStage('');
+            return;
           }
 
           setLoadingStage('Finalizing...');
@@ -105,7 +117,10 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
 
         } catch (err: any) {
           console.error('Import error:', err);
-          setError(err.message || 'Failed to import stores');
+          setError({
+            error: 'Import processing failed',
+            details: err.message || 'An unexpected error occurred while processing your import. Please try again.'
+          });
         } finally {
           setIsLoading(false);
           setLoadingStage('');
@@ -113,7 +128,10 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
       };
 
       reader.onerror = () => {
-        setError('Failed to read file');
+        setError({
+          error: 'Failed to read file',
+          details: 'The file could not be read from your device. Please try selecting the file again.'
+        });
         setIsLoading(false);
         setLoadingStage('');
       };
@@ -122,7 +140,10 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
 
     } catch (err: any) {
       console.error('Import error:', err);
-      setError(err.message || 'Failed to import stores');
+      setError({
+        error: 'Upload failed',
+        details: err.message || 'An unexpected error occurred while uploading the file. Please try again.'
+      });
       setIsLoading(false);
       setLoadingStage('');
     }
@@ -177,11 +198,12 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
             <div className="flex items-start gap-3">
               <AlertCircle size={20} className="text-blue-400 shrink-0 mt-0.5" />
               <div className="text-sm text-blue-200">
-                <p className="font-medium mb-1">File Requirements:</p>
+                <p className="font-medium mb-2">File Requirements:</p>
                 <ul className="list-disc list-inside space-y-1 text-blue-300/80">
-                  <li>File format: .xlsx or .xls</li>
-                  <li>Required columns: store_name, store_code, store_type, contact_no, city, location, group</li>
-                  <li>Optional columns: managers (comma-separated)</li>
+                  <li>File format: .xlsx or .xls (max 10MB)</li>
+                  <li>Must contain a sheet named <span className="font-semibold text-blue-200">"stores"</span></li>
+                  <li>Required column: <span className="font-semibold text-blue-200">Store Code</span></li>
+                  <li>Optional columns: STORE NAME, STORE TYPE, Contact No., Mobile Number, STORE ADDRESS, City, Location, Group, Status, Managers (comma-separated)</li>
                 </ul>
               </div>
             </div>
@@ -303,9 +325,18 @@ const ImportStoresModal: React.FC<ImportStoresModalProps> = ({ isOpen, onClose, 
             <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
-                <div className="text-sm text-red-200">
-                  <p className="font-medium mb-1">Import Failed</p>
-                  <p className="text-red-300/80">{error}</p>
+                <div className="text-sm text-red-200 flex-1">
+                  <p className="font-bold text-red-400 mb-2 text-base">{error.error}</p>
+                  {error.details && (
+                    <div className="space-y-2">
+                      <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-3">
+                        <p className="text-red-300/90 leading-relaxed">{error.details}</p>
+                      </div>
+                      <p className="text-xs text-red-400/60 italic">
+                        If the problem persists, please check your Excel file format and try again.
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

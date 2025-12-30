@@ -45,6 +45,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Calculate total hours (handles overnight shifts)
+    const calculateHours = (start: string, end: string): number => {
+      const [startHour, startMin] = start.split(':').map(Number);
+      const [endHour, endMin] = end.split(':').map(Number);
+
+      let startMinutes = startHour * 60 + startMin;
+      let endMinutes = endHour * 60 + endMin;
+
+      // If end time is less than start time, it means overnight shift (next day)
+      if (endMinutes < startMinutes) {
+        endMinutes += 24 * 60; // Add 24 hours in minutes
+      }
+
+      const diffMinutes = endMinutes - startMinutes;
+      return Number((diffMinutes / 60).toFixed(2)); // Convert to hours with 2 decimals
+    };
+
+    const totalHours = calculateHours(startTime, endTime);
     const now = new Date();
 
     // Update the overtime request
@@ -53,6 +71,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .update({
         start_time: startTime,
         end_time: endTime,
+        total_hours: totalHours,
         reason: reason,
         updated_at: now.toISOString()
       })
