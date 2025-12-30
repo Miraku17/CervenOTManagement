@@ -109,11 +109,8 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
       return;
     }
 
-    if (formData.startTime >= formData.endTime) {
-      setError('End time must be after start time.');
-      setIsLoading(false);
-      return;
-    }
+    // Allow overnight shifts (e.g., 10 PM to 2 AM next day)
+    // No validation needed here - the database will calculate hours correctly
 
     if (!formData.reason.trim()) {
       setError('Please provide a reason for overtime.');
@@ -252,19 +249,19 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3">
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(false)}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
+                className="w-full sm:flex-1 px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-red-600 text-white hover:bg-red-500 rounded-xl transition-colors shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:flex-1 px-4 py-2.5 bg-red-600 text-white hover:bg-red-500 rounded-xl transition-colors shadow-lg shadow-red-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <>
@@ -341,12 +338,12 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
               </div>
             )}
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex flex-col sm:flex-row items-stretch gap-3 pt-2">
               <button
                 type="button"
                 onClick={() => setShowDeleteConfirm(true)}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:flex-1 px-4 py-2.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 rounded-xl transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Trash2 size={18} />
                 <span>Delete</span>
@@ -355,7 +352,7 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
                 type="button"
                 onClick={() => setIsEditMode(true)}
                 disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-500 rounded-xl transition-colors shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full sm:flex-1 px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-500 rounded-xl transition-colors shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <Edit3 size={18} />
                 <span>Edit Request</span>
@@ -415,6 +412,21 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
                     </div>
                   </div>
 
+                  {/* Overnight shift indicator */}
+                  {formData.startTime && formData.endTime && formData.startTime > formData.endTime && (
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                      <div className="flex items-start gap-2">
+                        <Clock size={16} className="text-blue-400 mt-0.5 shrink-0" />
+                        <div className="text-sm">
+                          <p className="text-blue-400 font-medium">Overnight Shift Detected</p>
+                          <p className="text-blue-300/80 text-xs mt-0.5">
+                            This overtime extends into the next day (e.g., {formatTimeDisplay(formData.startTime)} → {formatTimeDisplay(formData.endTime)} next day)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Reason for Overtime</label>
                     <textarea
@@ -431,19 +443,19 @@ const FileOvertimeModal: React.FC<FileOvertimeModalProps> = ({ isOpen, onClose, 
             </div>
 
             {!isCheckingDate && (
-              <div className="flex items-center gap-3 pt-2">
+              <div className="flex flex-col-reverse sm:flex-row items-stretch gap-3 pt-2">
                 <button
                   type="button"
                   onClick={isEditMode ? () => setIsEditMode(false) : handleClose}
                   disabled={isLoading}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
+                  className="w-full sm:flex-1 px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
                 >
                   {isEditMode ? 'Back' : 'Cancel'}
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="flex-1 px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-500 rounded-xl transition-colors shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:flex-1 px-4 py-2.5 bg-amber-600 text-white hover:bg-amber-500 rounded-xl transition-colors shadow-lg shadow-amber-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <>

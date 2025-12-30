@@ -102,6 +102,8 @@ export default function StoreInventoryPage() {
 
   // Import states
   const [isImporting, setIsImporting] = useState(false);
+  const [importErrors, setImportErrors] = useState<Array<{ row: number; error: string; data?: any }>>([]);
+  const [showImportErrors, setShowImportErrors] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const filterRef = useRef<HTMLDivElement>(null);
@@ -320,9 +322,11 @@ export default function StoreInventoryPage() {
 
           showToast(result.failed > 0 ? 'error' : 'success', message);
 
-          // Log errors for debugging
+          // Store and display errors if any
           if (result.errors && result.errors.length > 0) {
             console.error('Import errors:', result.errors);
+            setImportErrors(result.errors);
+            setShowImportErrors(true);
           }
 
           // Refresh inventory
@@ -985,6 +989,83 @@ export default function StoreInventoryPage() {
         onCancel={() => !isDeleting && setIsDeleteModalOpen(false)}
         isLoading={isDeleting}
       />
+
+      {/* Import Errors Modal */}
+      {showImportErrors && importErrors.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[80vh] shadow-2xl flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-red-400" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-white">Import Errors ({importErrors.length})</h2>
+                  <p className="text-sm text-slate-400">Review and fix these issues in your Excel file</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportErrors(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Error List */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-3">
+                {importErrors.map((error, index) => (
+                  <div key={index} className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                        <span className="text-red-400 font-bold text-sm">{error.row}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-red-400 mb-2">Row {error.row}</p>
+                        <p className="text-sm text-red-300/90 mb-3">{error.error}</p>
+                        {error.data && (
+                          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-3 mt-2">
+                            <p className="text-xs font-semibold text-slate-400 mb-2">Row Data:</p>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              {Object.entries(error.data).map(([key, value]) => (
+                                <div key={key} className="flex gap-2">
+                                  <span className="text-slate-500 font-medium">{key}:</span>
+                                  <span className="text-slate-300 truncate">{value as string || '(empty)'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-slate-800 bg-slate-900/50">
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertCircle size={18} className="text-blue-400 shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-200">
+                    <p className="font-medium mb-1">Required Columns:</p>
+                    <p className="text-blue-300/80">Store Name, Store Code, Station Name, Category, Brand, Model, Serial Number, Status (Permanent/Temporary)</p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowImportErrors(false)}
+                className="w-full px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

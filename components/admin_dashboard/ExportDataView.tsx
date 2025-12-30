@@ -132,113 +132,11 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       dtrData.push(row);
     }
 
-    // ==================== SHEET 2: DETAILED RECORDS ====================
-    const detailedData: any[][] = [];
-
-    // Add headers
-    detailedData.push([
-      'Date',
-      'Employee Name',
-      'Employee ID',
-      'Time In',
-      'Time Out',
-      'Session Status',
-      'Total Minutes',
-      'Total Hours',
-      'Clock In Address',
-      'Clock Out Address',
-      'Has OT Request',
-      'OT Start Time',
-      'OT End Time',
-      'OT Total Hours',
-      'OT Reason',
-      'OT Level 1 Status',
-      'OT Level 2 Status',
-      'OT Final Status',
-      'OT Requested At',
-      'OT Level 1 Reviewer',
-      'OT Level 2 Reviewer'
-    ]);
-
-    // Add detailed records
-    for (const row of data) {
-      const firstName = row.profiles?.first_name || '';
-      const lastName = row.profiles?.last_name || '';
-      const fullName = `${firstName} ${lastName}`.trim();
-      const employeeId = row.profiles?.employee_id || 'NA';
-      const date = row.date;
-
-      const timeInDate = row.time_in ? new Date(row.time_in) : null;
-      const timeOutDate = row.time_out ? new Date(row.time_out) : null;
-      const isActiveSession = row.is_active_session || false;
-
-      const timeIn = timeInDate ? timeInDate.toLocaleTimeString() : 'N/A';
-      const timeOut = timeOutDate ? timeOutDate.toLocaleTimeString() : (isActiveSession ? 'ACTIVE SESSION' : 'N/A');
-      const sessionStatus = isActiveSession ? 'ACTIVE (Hours calculated up to export time)' : 'Completed';
-
-      // Use calculated values from API (already has lunch deduction applied)
-      const totalHours = isActiveSession ? 'Active' : (row.total_hours || 0);
-
-      let totalMinutes = 0;
-      if (timeInDate && timeOutDate) {
-        const diffMs = timeOutDate.getTime() - timeInDate.getTime();
-        totalMinutes = Math.floor(diffMs / 60000);
-      }
-
-      const addressIn = row.clock_in_address || 'N/A';
-      const addressOut = row.clock_out_address || 'N/A';
-
-      // Overtime request from overtime_v2
-      const hasOvertimeRequest = row.overtimeRequest ? 'Yes' : 'No';
-      const otStartTime = row.overtimeRequest?.start_time || 'N/A';
-      const otEndTime = row.overtimeRequest?.end_time || 'N/A';
-      const otTotalHours = row.overtimeRequest?.total_hours?.toFixed(2) || 'N/A';
-      const otReason = row.overtimeRequest?.reason || 'N/A';
-      const otLevel1Status = row.overtimeRequest?.level1_status || 'N/A';
-      const otLevel2Status = row.overtimeRequest?.level2_status || 'N/A';
-      const otFinalStatus = row.overtimeRequest?.final_status || row.overtimeRequest?.status || 'N/A';
-      const otRequestedAt = row.overtimeRequest?.requested_at
-        ? new Date(row.overtimeRequest.requested_at).toLocaleString()
-        : 'N/A';
-      const otLevel1Reviewer = row.overtimeRequest?.level1_reviewer
-        ? `${row.overtimeRequest.level1_reviewer.first_name} ${row.overtimeRequest.level1_reviewer.last_name}`
-        : 'N/A';
-      const otLevel2Reviewer = row.overtimeRequest?.level2_reviewer
-        ? `${row.overtimeRequest.level2_reviewer.first_name} ${row.overtimeRequest.level2_reviewer.last_name}`
-        : 'N/A';
-
-      detailedData.push([
-        date,
-        fullName,
-        employeeId,
-        timeIn,
-        timeOut,
-        sessionStatus,
-        totalMinutes,
-        totalHours,
-        addressIn,
-        addressOut,
-        hasOvertimeRequest,
-        otStartTime,
-        otEndTime,
-        otTotalHours,
-        otReason,
-        otLevel1Status,
-        otLevel2Status,
-        otFinalStatus,
-        otRequestedAt,
-        otLevel1Reviewer,
-        otLevel2Reviewer
-      ]);
-    }
-
-    // Create workbook and add sheets
+    // Create workbook and add sheet
     const workbook = XLSX.utils.book_new();
     const dtrSheet = XLSX.utils.aoa_to_sheet(dtrData);
-    const detailedSheet = XLSX.utils.aoa_to_sheet(detailedData);
 
     XLSX.utils.book_append_sheet(workbook, dtrSheet, 'DTR Summary');
-    XLSX.utils.book_append_sheet(workbook, detailedSheet, 'Detailed Records');
 
     return workbook;
   };
