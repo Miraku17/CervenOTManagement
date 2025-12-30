@@ -909,8 +909,8 @@ export default function StoreInventoryPage() {
                               {item.serial_number || <span className="text-slate-600 italic">No S/N</span>}
                             </td>
                             <td className="p-4 text-slate-400">
-                                <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
-                                  {item.categories?.name || 'N/A'}
+                                <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs whitespace-nowrap">
+                                  {item.categories?.name?.replace(/[\n\r]+/g, ' ').trim() || 'N/A'}
                                 </span>
                             </td>
                             <td className="p-4 text-slate-400">{item.brands?.name || 'N/A'}</td>
