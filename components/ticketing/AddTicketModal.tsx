@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown } from 'lucide-react';
+import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
 
@@ -95,6 +95,11 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [error, setError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
+
+  // Image upload state
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
@@ -365,6 +370,58 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     }));
   };
 
+  // Handle image selection
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+
+    // Validate: max 10 images total
+    if (selectedImages.length + files.length > 10) {
+      setError(`You can only upload up to 10 images. Currently selected: ${selectedImages.length}`);
+      return;
+    }
+
+    // Validate each file
+    const validFiles: File[] = [];
+    for (const file of files) {
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        setError(`${file.name} is not an image file`);
+        continue;
+      }
+
+      // Check file size (5MB = 5 * 1024 * 1024 bytes)
+      if (file.size > 5 * 1024 * 1024) {
+        setError(`${file.name} is too large. Maximum size is 5MB`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      // Create preview URLs
+      const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+
+      setSelectedImages(prev => [...prev, ...validFiles]);
+      setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+      setError(null);
+    }
+
+    // Reset file input
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  // Handle removing an image
+  const handleRemoveImage = (index: number) => {
+    // Revoke the preview URL to free memory
+    URL.revokeObjectURL(imagePreviewUrls[index]);
+
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -439,6 +496,64 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         throw new Error(data.error || 'Failed to create ticket');
       }
 
+      // Upload images if any
+      if (selectedImages.length > 0 && data.ticket?.id) {
+        try {
+          const attachments = [];
+          const uploadErrors = [];
+
+          for (const [index, file] of selectedImages.entries()) {
+            // Create file name with ticket folder structure
+            const fileExt = file.name.split('.').pop();
+            const fileName = `image-${index + 1}.${fileExt}`;
+            const filePath = `${data.ticket.id}/${fileName}`;
+
+            // Upload to Supabase Storage
+            const { error: uploadError } = await supabase.storage
+              .from('ticket-attachments')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error('Error uploading image:', uploadError);
+              uploadErrors.push(`${file.name}: ${uploadError.message}`);
+              continue;
+            }
+
+            // Save attachment record
+            attachments.push({
+              ticket_id: data.ticket.id,
+              file_path: filePath,
+              file_name: file.name,
+              file_type: file.type,
+              file_size: file.size,
+              uploaded_by: currentUserId,
+            });
+          }
+
+          // Save all attachments to database
+          if (attachments.length > 0) {
+            const { error: dbError } = await supabase
+              .from('ticket_attachments')
+              .insert(attachments);
+
+            if (dbError) {
+              console.error('Error saving attachments to database:', dbError);
+              alert(`Ticket created successfully, but failed to save attachments to database:\n${dbError.message}\n\nPlease check:\n1. Run the SQL migration: /supabase/setup_ticket_attachments.sql\n2. Check RLS policies on ticket_attachments table`);
+            } else if (uploadErrors.length > 0) {
+              alert(`Ticket created successfully.\n\nSome images failed to upload:\n${uploadErrors.join('\n')}\n\nPlease check:\n1. Storage bucket 'tickets' exists\n2. Storage policies allow uploads`);
+            }
+          } else if (uploadErrors.length > 0) {
+            alert(`Ticket created successfully, but all images failed to upload:\n${uploadErrors.join('\n')}\n\nPlease check:\n1. Storage bucket 'tickets' exists in Supabase Dashboard\n2. Run SQL migration: /supabase/setup_ticket_attachments.sql\n3. Check storage policies`);
+          }
+        } catch (uploadError: any) {
+          console.error('Error processing attachments:', uploadError);
+          alert(`Ticket created successfully, but attachment processing failed:\n${uploadError.message}`);
+        }
+      }
+
       // Reset form
       setFormData({
         store_id: '',
@@ -466,6 +581,12 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       setDeviceSearchTerm('');
       setShowDeviceDropdown(false);
       setSelectedKbArticle(null);
+
+      // Clean up image previews
+      imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setSelectedImages([]);
+      setImagePreviewUrls([]);
+
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -888,6 +1009,65 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                 className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none resize-none h-32"
                 placeholder="Please describe the issue or request in detail..."
               />
+            </div>
+
+            {/* Image Upload Section */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1">
+                Attachments <span className="text-slate-500 text-xs">(Optional - Max 10 images, 5MB each)</span>
+              </label>
+
+              {/* Upload Button */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageSelect}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={selectedImages.length >= 10}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 text-slate-400 rounded-lg hover:bg-slate-800 hover:border-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload size={18} />
+                <span>Upload Images ({selectedImages.length}/10)</span>
+              </button>
+
+              {/* Image Preview Grid */}
+              {selectedImages.length > 0 && (
+                <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {imagePreviewUrls.map((url, index) => (
+                    <div key={index} className="relative group">
+                      <div className="aspect-square rounded-lg overflow-hidden bg-slate-950 border border-slate-700">
+                        <img
+                          src={url}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveImage(index)}
+                        className="absolute -top-2 -right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
+                        title="Remove image"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-xs text-white truncate">
+                          {selectedImages[index].name}
+                        </p>
+                        <p className="text-xs text-slate-300">
+                          {(selectedImages[index].size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* KB Article Reference (Optional) */}
