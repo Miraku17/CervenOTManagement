@@ -173,7 +173,8 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
 
   const formatTime = (time: string | null) => {
     if (!time) return '--:--';
-    return time;
+    // Remove seconds if present
+    return time.split(':').slice(0, 2).join(':');
   };
 
   const handleEdit = (schedule: WorkSchedule | null, date: string) => {
@@ -336,7 +337,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
           key={d}
           onClick={() => setSelectedDate(dateStr)}
           className={`
-            h-16 sm:h-20 md:h-24 p-1.5 sm:p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
+            min-h-[72px] sm:min-h-[90px] p-1.5 sm:p-2 border rounded-lg flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden group
             ${isSelected ? 'ring-2 ring-blue-500 border-blue-500 bg-blue-500/10' : ''}
             ${!isSelected && isToday ? 'border-blue-500/50 bg-blue-500/5' : ''}
             ${!isSelected && !isToday ? bgClass : ''}
@@ -361,7 +362,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
 
           {hasLeave ? (
             <div className="mt-auto z-10 relative">
-              <span className={`text-[10px] sm:text-xs font-medium ${
+              <span className={`text-[9px] sm:text-xs font-medium truncate w-full block ${
                 leaveRequest.status === 'approved' ? 'text-emerald-500' :
                 leaveRequest.status === 'rejected' ? 'text-red-500' :
                 'text-amber-500'
@@ -371,15 +372,15 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
             </div>
           ) : isRestDay ? (
             <div className="mt-auto z-10 relative">
-              <span className="text-[10px] sm:text-xs text-orange-500 font-medium">Rest Day</span>
+              <span className="text-[9px] sm:text-xs text-orange-500 font-medium">Rest Day</span>
             </div>
           ) : hasSchedule && schedule.shift_start && schedule.shift_end ? (
             <div className="mt-auto z-10 relative">
-              <div className="text-[10px] sm:text-xs font-medium text-slate-300">
+              <div className="text-[9px] sm:text-xs font-medium text-slate-300 leading-tight">
                 {formatTime(schedule.shift_start)}
               </div>
-              <div className="text-[8px] sm:text-[10px] text-slate-500">
-                to {formatTime(schedule.shift_end)}
+              <div className="text-[9px] sm:text-[10px] text-slate-500 leading-tight mt-0.5">
+                - {formatTime(schedule.shift_end)}
               </div>
             </div>
           ) : (
@@ -402,17 +403,17 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
       {/* Main Modal Overlay */}
       {typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         >
           <div
-            className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 max-h-[90vh] overflow-y-auto"
+            className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-xl sm:rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 h-full max-h-[85dvh] sm:max-h-[90vh] flex flex-col"
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-slate-900 border-b border-slate-800 p-4 sm:p-5 flex justify-between items-center z-10">
+            <div className="flex-shrink-0 bg-slate-900 border-b border-slate-800 p-4 sm:p-5 flex justify-between items-center z-10">
               <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-lg sm:text-2xl font-bold text-white flex items-center gap-2">
                   <CalendarIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-400" />
                   Work Schedule
                 </h2>
@@ -427,8 +428,8 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
             </div>
 
             {/* Calendar Content */}
-            <div className="p-4 sm:p-6 bg-slate-950/50">
-              <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-3 sm:p-4 md:p-6 shadow-sm">
+            <div className="flex-1 overflow-y-auto p-2 sm:p-6 bg-slate-950/50 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+              <div className="bg-slate-900/60 backdrop-blur-md border border-slate-800 rounded-xl p-3 sm:p-4 md:p-6 shadow-sm min-h-full sm:min-h-0">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
             <h3 className="text-slate-100 font-semibold flex items-center gap-2 text-base sm:text-lg">
               <CalendarIcon className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
@@ -481,14 +482,14 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               <div className="w-8 h-8 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
               {hasMounted ? renderDays() : null}
             </div>
           )}
 
-                <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-4 text-xs">
+                <div className="mt-4 pt-4 border-t border-slate-800 flex flex-wrap gap-3 sm:gap-4 text-xs pb-4 sm:pb-0">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                    <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-blue-500"></div>
                     <span className="text-slate-400">Scheduled</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -497,15 +498,15 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                   </div>
                   <div className="flex items-center gap-2">
                     <Plane className="w-3 h-3 text-emerald-500" />
-                    <span className="text-slate-300">Leave (Approved)</span>
+                    <span className="text-slate-300">Approved</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Plane className="w-3 h-3 text-amber-500" />
-                    <span className="text-slate-400">Leave (Pending)</span>
+                    <span className="text-slate-400">Pending</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Plane className="w-3 h-3 text-red-500" />
-                    <span className="text-slate-400">Leave (Rejected)</span>
+                    <span className="text-slate-400">Rejected</span>
                   </div>
                 </div>
               </div>
@@ -518,11 +519,11 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
       {/* Date Detail Modal */}
       {selectedDate && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
           onClick={() => setSelectedDate(null)}
         >
           <div
-            className="bg-slate-900 border-t sm:border border-slate-700 w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100"
+            className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100"
             onClick={e => e.stopPropagation()}
           >
             <div className="p-4 sm:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900">
