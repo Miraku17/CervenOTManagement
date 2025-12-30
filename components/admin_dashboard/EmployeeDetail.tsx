@@ -44,6 +44,10 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
   // Check if current user is Operations Manager
   const isOperationsManager = user?.position === 'Operations Manager';
 
+  // Check if user has permission to edit schedules
+  const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
+  const canEditSchedule = user?.position ? allowedPositions.includes(user.position) : false;
+
   // Fetch positions
   useEffect(() => {
     const fetchPositions = async () => {
@@ -594,6 +598,8 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
         userId={employee.id}
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
+        userPosition={user?.position}
+        canEdit={canEditSchedule}
       />
     </div>
   );

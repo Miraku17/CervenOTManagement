@@ -4,8 +4,10 @@ import { useState, useEffect } from 'react';
 import EmployeeScheduleView from '@/components/admin_dashboard/EmployeeScheduleView';
 import { Employee } from '@/types';
 import { supabase } from '@/services/supabase';
+import { useUser } from '@/hooks/useUser';
 
 export default function EmployeeSchedulePage() {
+  const { user } = useUser();
   const [employees, setEmployees] = useState<Employee[]>([]);
 
   useEffect(() => {
@@ -39,5 +41,5 @@ export default function EmployeeSchedulePage() {
     fetchEmployees();
   }, []);
 
-  return <EmployeeScheduleView employees={employees} />;
+  return <EmployeeScheduleView employees={employees} userPosition={user?.position} />;
 }

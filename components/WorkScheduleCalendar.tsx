@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane, Edit2, Save, Trash2, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { LeaveRequest } from '@/types';
 
 interface WorkSchedule {
@@ -18,14 +18,29 @@ interface WorkScheduleCalendarProps {
   userId: string;
   isOpen: boolean;
   onClose: () => void;
+  userPosition?: string;
+  canEdit?: boolean;
 }
 
-export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ userId, isOpen, onClose }) => {
+export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ userId, isOpen, onClose, userPosition, canEdit = false }) => {
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [notification, setNotification] = useState<{
+    show: boolean;
+    type: 'success' | 'error';
+    message: string;
+  }>({ show: false, type: 'success', message: '' });
+  const [editForm, setEditForm] = useState({
+    shift_start: '',
+    shift_end: '',
+    is_rest_day: false,
+  });
 
   const today = new Date();
   const [viewMonth, setViewMonth] = useState(today.getMonth());
@@ -34,6 +49,20 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  // Auto-dismiss notification after 3 seconds
+  useEffect(() => {
+    if (notification.show) {
+      const timer = setTimeout(() => {
+        setNotification({ show: false, type: 'success', message: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification.show]);
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ show: true, type, message });
+  };
 
   // Fetch leave requests for the employee
   useEffect(() => {
@@ -145,6 +174,122 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
   const formatTime = (time: string | null) => {
     if (!time) return '--:--';
     return time;
+  };
+
+  const handleEdit = (schedule: WorkSchedule | null, date: string) => {
+    if (schedule) {
+      setEditForm({
+        shift_start: schedule.shift_start || '',
+        shift_end: schedule.shift_end || '',
+        is_rest_day: schedule.is_rest_day,
+      });
+    } else {
+      setEditForm({
+        shift_start: '',
+        shift_end: '',
+        is_rest_day: false,
+      });
+    }
+    setIsEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!selectedDate) return;
+
+    setIsSaving(true);
+    try {
+      const selectedSchedule = schedulesByDate[selectedDate];
+      const method = selectedSchedule ? 'PUT' : 'POST';
+
+      const payload = {
+        employee_id: userId,
+        date: selectedDate,
+        shift_start: editForm.is_rest_day ? null : editForm.shift_start || null,
+        shift_end: editForm.is_rest_day ? null : editForm.shift_end || null,
+        is_rest_day: editForm.is_rest_day,
+      };
+
+      const response = await fetch('/api/admin/schedule', {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to save schedule');
+      }
+
+      const result = await response.json();
+
+      // Update local schedules state
+      setSchedules(prev => {
+        const index = prev.findIndex(s => s.date === selectedDate && s.employee_id === userId);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = result.data;
+          return updated;
+        }
+        return [...prev, result.data];
+      });
+
+      setIsEditing(false);
+      showNotification('success', 'Schedule updated successfully');
+    } catch (error: any) {
+      console.error('Error saving schedule:', error);
+      showNotification('error', error.message || 'Failed to save schedule');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDelete = () => {
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!selectedDate) return;
+
+    const selectedSchedule = schedulesByDate[selectedDate];
+    if (!selectedSchedule) return;
+
+    setShowDeleteConfirm(false);
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/admin/schedule', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedSchedule.id }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to delete schedule');
+      }
+
+      // Remove from local state
+      setSchedules(prev => prev.filter(s => s.id !== selectedSchedule.id));
+      setSelectedDate(null);
+      setIsEditing(false);
+      showNotification('success', 'Schedule deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting schedule:', error);
+      showNotification('error', error.message || 'Failed to delete schedule');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    const selectedSchedule = selectedDate ? schedulesByDate[selectedDate] : null;
+    if (selectedSchedule) {
+      setEditForm({
+        shift_start: selectedSchedule.shift_start || '',
+        shift_end: selectedSchedule.shift_end || '',
+        is_rest_day: selectedSchedule.is_rest_day,
+      });
+    }
   };
 
   const renderDays = () => {
@@ -387,12 +532,23 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                 </h3>
                 <p className="text-slate-400 text-xs">Schedule Details</p>
               </div>
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-              >
-                <X className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {canEdit && !selectedLeaveRequest && !isEditing && (
+                  <button
+                    onClick={() => handleEdit(selectedSchedule, selectedDate)}
+                    className="p-2 hover:bg-slate-800 rounded-full text-blue-400 hover:text-blue-300 transition-colors"
+                    title="Edit schedule"
+                  >
+                    <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              </div>
             </div>
 
             <div className="p-3 sm:p-5 bg-slate-900/50 space-y-4">
@@ -452,7 +608,87 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
               )}
 
               {/* Schedule Section */}
-              {selectedSchedule ? (
+              {isEditing ? (
+                <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-sm space-y-4">
+                  <div className="flex items-center justify-between mb-2 pb-3 border-b border-slate-700">
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Edit Schedule</span>
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-600">
+                      <input
+                        type="checkbox"
+                        id="is_rest_day"
+                        checked={editForm.is_rest_day}
+                        onChange={(e) => setEditForm({ ...editForm, is_rest_day: e.target.checked })}
+                        className="w-4 h-4 text-orange-500 bg-slate-700 border-slate-600 rounded focus:ring-orange-500"
+                      />
+                      <label htmlFor="is_rest_day" className="text-sm font-medium text-slate-300">
+                        Mark as Rest Day
+                      </label>
+                    </div>
+
+                    {!editForm.is_rest_day && (
+                      <>
+                        <div>
+                          <label className="text-xs text-slate-400 uppercase block mb-2 font-semibold">
+                            Start Time
+                          </label>
+                          <input
+                            type="time"
+                            value={editForm.shift_start}
+                            onChange={(e) => setEditForm({ ...editForm, shift_start: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+                            style={{ colorScheme: 'dark' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label className="text-xs text-slate-400 uppercase block mb-2 font-semibold">
+                            End Time
+                          </label>
+                          <input
+                            type="time"
+                            value={editForm.shift_end}
+                            onChange={(e) => setEditForm({ ...editForm, shift_end: e.target.value })}
+                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+                            style={{ colorScheme: 'dark' }}
+                          />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                      >
+                        <Save className="w-4 h-4" />
+                        {isSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      {selectedSchedule && (
+                        <button
+                          onClick={handleDelete}
+                          disabled={isSaving}
+                          className="p-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                          title="Delete schedule"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : selectedSchedule ? (
                 selectedSchedule.is_rest_day ? (
                   <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
                     <Coffee className="w-12 h-12 text-orange-500 mx-auto mb-3" />
@@ -470,7 +706,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                       <div>
                         <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Start Time</span>
                         <div className="flex items-center gap-2 font-mono text-lg text-white">
-                          <Clock className="w-4 h-4 text-blue-400" />
+                          <Clock className="w-4 h-4 text-white" />
                           {formatTime(selectedSchedule.shift_start)}
                         </div>
                       </div>
@@ -478,7 +714,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                       <div>
                         <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">End Time</span>
                         <div className="flex items-center gap-2 font-mono text-lg text-white">
-                          <Clock className="w-4 h-4 text-rose-400" />
+                          <Clock className="w-4 h-4 text-white" />
                           {formatTime(selectedSchedule.shift_end)}
                         </div>
                       </div>
@@ -489,9 +725,98 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                 <div className="text-center py-10 text-slate-500 flex flex-col items-center">
                   <CalendarIcon className="w-10 h-10 mb-3 opacity-30" />
                   <p className="text-sm">No schedule found for this date</p>
+                  {canEdit && (
+                    <button
+                      onClick={() => handleEdit(null, selectedDate)}
+                      className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                      Add Schedule
+                    </button>
+                  )}
                 </div>
               )}
             </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-white">Delete Schedule</h3>
+                  <p className="text-sm text-slate-400">This action cannot be undone</p>
+                </div>
+              </div>
+
+              <p className="text-slate-300 mb-6">
+                Are you sure you want to delete this schedule entry? This will permanently remove the schedule for{' '}
+                <span className="font-semibold text-white">
+                  {selectedDate && hasMounted ? new Date(selectedDate).toLocaleDateString(undefined, {
+                    weekday: 'short',
+                    month: 'long',
+                    day: 'numeric'
+                  }) : ''}
+                </span>.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={isSaving}
+                  className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  {isSaving ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Notification Modal */}
+      {notification.show && typeof document !== 'undefined' && createPortal(
+        <div className="fixed top-4 right-4 z-[99999] animate-in slide-in-from-top-2 duration-300">
+          <div className={`
+            flex items-center gap-3 px-4 py-3 rounded-lg shadow-2xl border min-w-[300px]
+            ${notification.type === 'success'
+              ? 'bg-emerald-500 border-emerald-400 text-white'
+              : 'bg-red-500 border-red-400 text-white'}
+          `}>
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+            ) : (
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+            )}
+            <p className="text-sm font-medium flex-1">{notification.message}</p>
+            <button
+              onClick={() => setNotification({ show: false, type: 'success', message: '' })}
+              className="p-1 hover:bg-white/20 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>,
         document.body
