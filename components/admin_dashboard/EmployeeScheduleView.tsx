@@ -5,9 +5,10 @@ import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 
 interface EmployeeScheduleViewProps {
   employees: Employee[];
+  userPosition?: string;
 }
 
-const EmployeeScheduleView: React.FC<EmployeeScheduleViewProps> = ({ employees }) => {
+const EmployeeScheduleView: React.FC<EmployeeScheduleViewProps> = ({ employees, userPosition }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [showResults, setShowResults] = useState(false);
@@ -43,6 +44,10 @@ const EmployeeScheduleView: React.FC<EmployeeScheduleViewProps> = ({ employees }
   const handleClearSelection = () => {
     setSelectedEmployee(null);
   };
+
+  // Check if user has permission to edit schedules
+  const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
+  const canEdit = userPosition ? allowedPositions.includes(userPosition) : false;
 
   return (
     <div className="bg-slate-900 p-8 rounded-xl shadow-lg">
@@ -160,6 +165,8 @@ const EmployeeScheduleView: React.FC<EmployeeScheduleViewProps> = ({ employees }
             userId={selectedEmployee.id}
             isOpen={isScheduleOpen}
             onClose={() => setIsScheduleOpen(false)}
+            userPosition={userPosition}
+            canEdit={canEdit}
           />
         </>
       ) : (
