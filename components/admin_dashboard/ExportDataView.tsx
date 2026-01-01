@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Employee } from '@/types';
 import { Search, User, X, FileDown } from 'lucide-react';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx-js-style';
 
 interface ExportDataViewProps {
   employees: Employee[];
@@ -40,103 +40,268 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
     employee.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const convertToExcel = (data: any[]) => {
+  const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[]) => {
     if (!data || data.length === 0) return null;
 
     // Get unique dates and sort them
-    const uniqueDates = Array.from(new Set(data.map(row => row.date))).sort();
+    const allDates = Array.from(new Set(data.map(row => row.date))).sort();
+    if (allDates.length === 0) return null;
 
-    // Group data by employee for DTR Summary
-    const employeeData = new Map<string, {
-      name: string;
-      employeeId: string;
-      dateHours: Map<string, { hours: number; hasActiveSession: boolean }>;
-      totalHours: number;
-    }>();
+    const startDate = allDates[0];
+    const endDate = allDates[allDates.length - 1];
 
-    // Process each attendance record
-    for (const row of data) {
-      const firstName = row.profiles?.first_name || '';
-      const lastName = row.profiles?.last_name || '';
-      const fullName = `${firstName} ${lastName}`.trim();
-      const employeeId = row.profiles?.employee_id || 'NA';
-      const date = row.date;
-      const isActiveSession = row.is_active_session || false;
+    // Generate all dates in range
+    const dateRange: string[] = [];
+    let currentDate = new Date(startDate);
+    const end = new Date(endDate);
+    while (currentDate <= end) {
+      dateRange.push(currentDate.toISOString().split('T')[0]);
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
 
-      // Use the calculated total_hours from API (already has lunch deduction applied)
-      let totalHours = row.total_hours || 0;
-
-      const employeeKey = `${fullName}_${employeeId}`;
-      if (!employeeData.has(employeeKey)) {
-        employeeData.set(employeeKey, {
-          name: fullName,
-          employeeId: employeeId,
-          dateHours: new Map(),
-          totalHours: 0
-        });
+    // Group attendance by user_id and date
+    const attendanceMap = new Map<string, Map<string, any[]>>();
+    for (const record of data) {
+      const userId = record.user_id;
+      if (!attendanceMap.has(userId)) {
+        attendanceMap.set(userId, new Map());
       }
+      const userAttendance = attendanceMap.get(userId)!;
+      if (!userAttendance.has(record.date)) {
+        userAttendance.set(record.date, []);
+      }
+      userAttendance.get(record.date)!.push(record);
+    }
 
-      const empData = employeeData.get(employeeKey)!;
-      // Handle multiple sessions per day by accumulating hours from completed sessions
-      // and tracking if there's any active session
-      const currentDateData = empData.dateHours.get(date) || { hours: 0, hasActiveSession: false };
-
-      if (isActiveSession) {
-        // Mark that this date has an active session
-        empData.dateHours.set(date, {
-          hours: currentDateData.hours,
-          hasActiveSession: true
-        });
-      } else {
-        // Add hours from completed session
-        empData.dateHours.set(date, {
-          hours: currentDateData.hours + totalHours,
-          hasActiveSession: currentDateData.hasActiveSession
-        });
-        empData.totalHours += totalHours;
+    // Create leave map (user_id -> dates that are leaves)
+    const leaveMap = new Map<string, Set<string>>();
+    if (leaveRequests) {
+      for (const leave of leaveRequests) {
+        if (!leaveMap.has(leave.employee_id)) {
+          leaveMap.set(leave.employee_id, new Set());
+        }
+        // Add all dates in the leave range
+        let leaveDate = new Date(leave.start_date);
+        const leaveEnd = new Date(leave.end_date);
+        while (leaveDate <= leaveEnd) {
+          const dateStr = leaveDate.toISOString().split('T')[0];
+          leaveMap.get(leave.employee_id)!.add(dateStr);
+          leaveDate.setDate(leaveDate.getDate() + 1);
+        }
       }
     }
 
-    // ==================== SHEET 1: DTR SUMMARY ====================
-    const dtrData: any[][] = [];
+    // Create rest day map (user_id -> dates that are rest days)
+    const restDayMap = new Map<string, Set<string>>();
+    if (schedules) {
+      for (const schedule of schedules) {
+        if (schedule.is_rest_day) {
+          if (!restDayMap.has(schedule.employee_id)) {
+            restDayMap.set(schedule.employee_id, new Set());
+          }
+          restDayMap.get(schedule.employee_id)!.add(schedule.date);
+        }
+      }
+    }
 
-    // Add headers
-    dtrData.push(['Employee Name', 'Employee ID', ...uniqueDates, 'Total Hours']);
+    // Get unique employees sorted by name
+    const employeeMap = new Map<string, { name: string; employeeId: string; userId: string }>();
+    for (const record of data) {
+      const userId = record.user_id;
+      if (!employeeMap.has(userId)) {
+        const firstName = record.profiles?.first_name || '';
+        const lastName = record.profiles?.last_name || '';
+        const fullName = `${firstName} ${lastName}`.trim();
+        const employeeId = record.profiles?.employee_id || 'NA';
+        employeeMap.set(userId, { name: fullName, employeeId, userId });
+      }
+    }
 
-    // Sort employees by name and add rows
-    const sortedEmployees = Array.from(employeeData.values()).sort((a, b) =>
+    const sortedEmployees = Array.from(employeeMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name)
     );
 
-    for (const emp of sortedEmployees) {
-      const row = [
-        emp.name,
-        emp.employeeId,
-        ...uniqueDates.map(date => {
-          const dateData = emp.dateHours.get(date);
-          if (!dateData) return '';
+    // Build the daily attendance report
+    const reportData: any[][] = [];
+    const rowStyles: { row: number; type: 'title' | 'header' | 'data' | 'leave' | 'restday' | 'total' }[] = [];
 
-          // If there's only an active session (no completed hours), show "Active"
-          if (dateData.hasActiveSession && dateData.hours === 0) {
-            return 'Active';
+    // Title row
+    reportData.push(['Print Attendance Report - Daily Attendance (New Attendance System)']);
+    rowStyles.push({ row: 0, type: 'title' });
+    reportData.push([]); // Empty row
+
+    let currentRow = 2;
+
+    for (const employee of sortedEmployees) {
+      // Add header row for each employee section
+      reportData.push(['Date', 'Employee Name', 'Employee ID', 'Time In', 'Time Out', 'Total Hours', 'Session Status']);
+      rowStyles.push({ row: currentRow, type: 'header' });
+      currentRow++;
+
+      const userAttendance = attendanceMap.get(employee.userId) || new Map();
+      const userLeaves = leaveMap.get(employee.userId) || new Set();
+      const userRestDays = restDayMap.get(employee.userId) || new Set();
+
+      let completedDays = 0;
+
+      // Process each date in the range
+      for (const date of dateRange) {
+        if (userLeaves.has(date)) {
+          // Leave day
+          reportData.push([date, '', '', '', '', '', 'LEAVE']);
+          rowStyles.push({ row: currentRow, type: 'leave' });
+          currentRow++;
+        } else if (userRestDays.has(date)) {
+          // Rest day
+          reportData.push([date, '', '', '', '', '', 'REST DAY']);
+          rowStyles.push({ row: currentRow, type: 'restday' });
+          currentRow++;
+        } else if (userAttendance.has(date)) {
+          // Attendance records for this date
+          const records = userAttendance.get(date)!;
+          for (const record of records) {
+            const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : '';
+            const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : '';
+            const status = record.time_out ? 'Completed' : 'Active';
+
+            // Calculate total hours from time_in and time_out
+            let totalHours = '';
+            if (record.time_in && record.time_out) {
+              const timeInDate = new Date(record.time_in);
+              const timeOutDate = new Date(record.time_out);
+              const diffMs = timeOutDate.getTime() - timeInDate.getTime();
+              const hours = diffMs / (1000 * 60 * 60);
+              totalHours = hours.toFixed(2);
+            }
+
+            reportData.push([
+              date,
+              employee.name,
+              employee.employeeId,
+              timeIn,
+              timeOut,
+              totalHours,
+              status
+            ]);
+            rowStyles.push({ row: currentRow, type: 'data' });
+            currentRow++;
+
+            if (status === 'Completed') {
+              completedDays++;
+            }
           }
-          // If there are completed hours and an active session, show hours + "(Active)"
-          if (dateData.hasActiveSession && dateData.hours > 0) {
-            return `${dateData.hours.toFixed(2)} (Active)`;
-          }
-          // Otherwise just show the hours
-          return dateData.hours.toFixed(2);
-        }),
-        emp.totalHours.toFixed(2)
-      ];
-      dtrData.push(row);
+        }
+        // If no attendance, leave, or rest day, skip the date (no row)
+      }
+
+      // Add total row
+      reportData.push(['Total', completedDays.toString(), '', '', '', '', '']);
+      rowStyles.push({ row: currentRow, type: 'total' });
+      currentRow++;
+      reportData.push([]); // Empty row before next employee
+      currentRow++;
     }
 
-    // Create workbook and add sheet
+    // Create workbook
     const workbook = XLSX.utils.book_new();
-    const dtrSheet = XLSX.utils.aoa_to_sheet(dtrData);
+    const worksheet = XLSX.utils.aoa_to_sheet(reportData);
 
-    XLSX.utils.book_append_sheet(workbook, dtrSheet, 'DTR Summary');
+    // Apply styling
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 12 },  // Date
+      { wch: 25 },  // Employee Name
+      { wch: 12 },  // Employee ID
+      { wch: 12 },  // Time In
+      { wch: 12 },  // Time Out
+      { wch: 12 },  // Total Hours
+      { wch: 15 }   // Session Status
+    ];
+
+    // Apply cell styles
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+      const rowStyle = rowStyles.find(rs => rs.row === R);
+
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+        if (!worksheet[cellAddress]) continue;
+
+        const cell = worksheet[cellAddress];
+
+        // Initialize cell style
+        if (!cell.s) cell.s = {};
+
+        // Apply styles based on row type
+        if (rowStyle) {
+          switch (rowStyle.type) {
+            case 'title':
+              cell.s = {
+                fill: { fgColor: { rgb: "000000" } },
+                font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
+                alignment: { horizontal: "left", vertical: "center" }
+              };
+              break;
+            case 'header':
+              cell.s = {
+                fill: { fgColor: { rgb: "4472C4" } },
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } }
+                }
+              };
+              break;
+            case 'data':
+              const isEvenRow = R % 2 === 0;
+              cell.s = {
+                fill: { fgColor: { rgb: isEvenRow ? "D9E2F3" : "FFFFFF" } },
+                alignment: { horizontal: "left", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } }
+                }
+              };
+              break;
+            case 'leave':
+            case 'restday':
+              cell.s = {
+                fill: { fgColor: { rgb: "FFFF00" } },
+                font: { bold: true },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } }
+                }
+              };
+              break;
+            case 'total':
+              cell.s = {
+                fill: { fgColor: { rgb: "4472C4" } },
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                alignment: { horizontal: "left", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } }
+                }
+              };
+              break;
+          }
+        }
+      }
+    }
+
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Attendance');
 
     return workbook;
   };
@@ -295,7 +460,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       // Use appropriate conversion function based on export type
       const workbook = exportType === 'overtime'
         ? convertOvertimeToExcel(result.overtimeV2)
-        : convertToExcel(result.data);
+        : convertToExcel(result.data, result.leaveRequests, result.schedules);
 
       if (!workbook) {
         alert('Failed to generate Excel file.');
@@ -303,7 +468,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
       }
 
       // Write workbook to binary string
-      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
       const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -415,7 +580,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
                 className="w-4 h-4 text-slate-400 bg-slate-900 border-slate-600 focus:ring-slate-500 focus:ring-1"
               />
               <div className="flex-1">
-                <div className="text-white font-medium">Full Attendance with Overtime</div>
+                <div className="text-white font-medium">Full Attendance</div>
                 <div className="text-xs text-slate-500 mt-0.5">DTR summary and detailed records with overtime data</div>
               </div>
             </label>

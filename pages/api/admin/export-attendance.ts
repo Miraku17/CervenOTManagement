@@ -291,7 +291,43 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     );
 
-    return res.status(200).json({ data, overtimeV2: overtimeV2WithProfiles });
+    // Fetch leave requests for the date range
+    let leaveQuery = supabase
+      .from('leave_requests')
+      .select('employee_id, start_date, end_date, leave_type, status')
+      .eq('status', 'approved')
+      .lte('start_date', endDate as string)
+      .gte('end_date', startDate as string);
+
+    if (userId) {
+      leaveQuery = leaveQuery.eq('employee_id', userId);
+    } else if (userIds.length > 0) {
+      leaveQuery = leaveQuery.in('employee_id', userIds);
+    }
+
+    const { data: leaveData } = await leaveQuery;
+
+    // Fetch working schedules for the date range
+    let scheduleQuery = supabase
+      .from('working_schedules')
+      .select('employee_id, date, is_rest_day')
+      .gte('date', startDate as string)
+      .lte('date', endDate as string);
+
+    if (userId) {
+      scheduleQuery = scheduleQuery.eq('employee_id', userId);
+    } else if (userIds.length > 0) {
+      scheduleQuery = scheduleQuery.in('employee_id', userIds);
+    }
+
+    const { data: scheduleData } = await scheduleQuery;
+
+    return res.status(200).json({
+      data,
+      overtimeV2: overtimeV2WithProfiles,
+      leaveRequests: leaveData || [],
+      schedules: scheduleData || []
+    });
 
   } catch (error: any) {
     console.error('Export attendance error:', error);
