@@ -89,7 +89,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const userId = req.user.id;
-    const { fileData } = req.body;
+    const { fileData, fileName } = req.body;
 
     if (!fileData) {
       return res.status(400).json({ error: 'No file data provided' });
@@ -110,6 +110,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'No data found in file' });
     }
 
+    // Filter out completely empty rows and track original row numbers
+    const nonEmptyData = data
+      .map((row, index) => ({ row, originalIndex: index }))
+      .filter(({ row }) =>
+        row['Category'] || row['Brand'] || row['Model'] || row['Serial Number']
+      );
+
+    // Create import log entry
+    const { data: importLog, error: importLogError } = await supabaseAdmin
+      .from('import_logs')
+      .insert({
+        import_type: 'assets',
+        file_name: fileName || 'unknown.xlsx',
+        imported_by: userId,
+        total_rows: nonEmptyData.length, // Count only non-empty rows
+        started_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (importLogError || !importLog) {
+      console.error('Error creating import log:', importLogError);
+      // Continue with import even if logging fails
+    }
+
     const result: ImportResult = {
       success: 0,
       failed: 0,
@@ -117,16 +142,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     };
 
     // Process each row
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
-      const rowNumber = i + 2; // Excel row number (header is row 1)
+    for (let i = 0; i < nonEmptyData.length; i++) {
+      const { row, originalIndex } = nonEmptyData[i];
+      const rowNumber = originalIndex + 2; // Excel row number (header is row 1)
 
       try {
-        // Skip completely empty rows
-        const isEmpty = !row['Category'] && !row['Brand'] && !row['Model'] && !row['Serial Number'];
-        if (isEmpty) {
-          continue; // Skip this row without counting it as success or failure
-        }
 
         // Validate required fields
         if (!row['Category']) {
@@ -222,9 +242,45 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
+    // Save errors to database if import log was created
+    if (importLog && result.errors.length > 0) {
+      const errorRecords = result.errors.map(err => ({
+        import_log_id: importLog.id,
+        row_number: err.row,
+        error_message: err.error,
+        row_data: err.data,
+      }));
+
+      const { error: errorsInsertError } = await supabaseAdmin
+        .from('import_errors')
+        .insert(errorRecords);
+
+      if (errorsInsertError) {
+        console.error('Error saving import errors:', errorsInsertError);
+      }
+    }
+
+    // Update import log with final results
+    if (importLog) {
+      const { error: updateError } = await supabaseAdmin
+        .from('import_logs')
+        .update({
+          success_count: result.success,
+          failed_count: result.failed,
+          status: result.failed === 0 ? 'completed' : (result.success === 0 ? 'failed' : 'partial'),
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', importLog.id);
+
+      if (updateError) {
+        console.error('Error updating import log:', updateError);
+      }
+    }
+
     return res.status(200).json({
       message: 'Import completed',
       result,
+      importLogId: importLog?.id, // Return the log ID for reference
     });
   } catch (error: any) {
     console.error('Error importing file:', error);
