@@ -325,13 +325,13 @@ export default function TicketsPage() {
                 className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition-all cursor-pointer shadow-md shadow-slate-950/30"
               >
                 {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-slate-800">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-mono text-slate-400">#{ticket.rcc_reference_number}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase`}>
+                <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
+                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
+                    <span className="text-sm font-mono text-slate-400 shrink-0">#{ticket.rcc_reference_number}</span>
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase shrink-0`}>
                       {ticket.status.replace(/_/g, ' ')}
                     </span>
-                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${getSeverityColor(ticket.sev)}`}>
+                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${getSeverityColor(ticket.sev)} shrink-0`}>
                       <AlertTriangle size={11} />
                       {ticket.sev}
                     </span>
@@ -339,7 +339,7 @@ export default function TicketsPage() {
                   {canDeleteTicket && (
                     <button
                       onClick={(e) => handleDeleteClick(ticket.id, e)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors shrink-0"
                       title="Delete ticket"
                     >
                       <Trash2 size={16} />
