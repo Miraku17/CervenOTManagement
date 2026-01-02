@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet, Loader2, History, ChevronDown } from 'lucide-react';
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
+import ImportLogsModal from '@/components/ticketing/ImportLogsModal';
+import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '@/hooks/useAuth';
@@ -49,6 +51,7 @@ export default function AssetInventoryPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isImportLogsModalOpen, setIsImportLogsModalOpen] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [editItem, setEditItem] = useState<Asset | null>(null);
@@ -56,10 +59,13 @@ export default function AssetInventoryPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [importingFileName, setImportingFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
+  const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
+  const actionsDropdownRef = useRef<HTMLDivElement>(null);
   
   // Toast notification state
   const [toast, setToast] = useState<{
@@ -78,6 +84,19 @@ export default function AssetInventoryPage() {
       setToast({ show: false, type, message: '' });
     }, 3000);
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
+        setIsActionsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -406,6 +425,7 @@ export default function AssetInventoryPage() {
     }
 
     setIsImporting(true);
+    setImportingFileName(file.name);
     try {
       // Read file as base64
       const reader = new FileReader();
@@ -419,7 +439,10 @@ export default function AssetInventoryPage() {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ fileData }),
+            body: JSON.stringify({
+              fileData,
+              fileName: file.name
+            }),
           });
 
           const data = await response.json();
@@ -449,6 +472,7 @@ export default function AssetInventoryPage() {
           showToast('error', error.message || 'Failed to import file');
         } finally {
           setIsImporting(false);
+          setImportingFileName('');
           // Reset file input
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -460,6 +484,7 @@ export default function AssetInventoryPage() {
       console.error('Error reading file:', error);
       showToast('error', error.message || 'Failed to read file');
       setIsImporting(false);
+      setImportingFileName('');
     }
   };
 
@@ -523,14 +548,14 @@ export default function AssetInventoryPage() {
                   <button
                     onClick={() => setDeleteId(null)}
                     disabled={isDeleting}
-                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-md transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => handleDelete(deleteId)}
                     disabled={isDeleting}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-md transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 flex items-center gap-2"
                   >
                     {isDeleting ? (
                       <>
@@ -548,56 +573,89 @@ export default function AssetInventoryPage() {
         );
       })()}
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Asset Inventory</h1>
           <p className="text-slate-400">Manage company assets, equipment, and hardware.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex flex-wrap gap-3">
             {!isReadOnly && !isEditOnlyUser && (
-              <>
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-                >
-                  <Plus size={20} />
-                  <span>Add Asset</span>
-                </button>
-                <button
-                  onClick={handleDownloadTemplate}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-                >
-                  <FileSpreadsheet size={20} />
-                  <span>Download Template</span>
-                </button>
-                <button
-                  onClick={handleImportClick}
-                  disabled={isImporting}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
-                >
-                  {isImporting ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" />
-                      <span>Importing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={20} />
-                      <span>Import XLSX</span>
-                    </>
-                  )}
-                </button>
-              </>
-            )}
-            {!isReadOnly && (
               <button
-                  onClick={handlePrint}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
-                >
-                  <Printer size={20} />
-                  <span>Print Report</span>
-                </button>
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-all shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
+              >
+                <Plus size={20} />
+                <span>Add Asset</span>
+              </button>
             )}
+            
+            <div className="relative" ref={actionsDropdownRef}>
+              <button
+                onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
+              >
+                <span>Actions</span>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${isActionsDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {isActionsDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-1 space-y-1">
+                    {!isReadOnly && !isEditOnlyUser && (
+                      <>
+                        <button
+                          onClick={() => {
+                            handleDownloadTemplate();
+                            setIsActionsDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                        >
+                          <FileSpreadsheet size={16} />
+                          <span>Download Template</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            handleImportClick();
+                            setIsActionsDropdownOpen(false);
+                          }}
+                          disabled={isImporting}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isImporting ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <Upload size={16} />
+                          )}
+                          <span>{isImporting ? 'Importing...' : 'Import XLSX'}</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsImportLogsModalOpen(true);
+                            setIsActionsDropdownOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                        >
+                          <History size={16} />
+                          <span>Import History</span>
+                        </button>
+                      </>
+                    )}
+                    {!isReadOnly && (
+                      <button
+                        onClick={() => {
+                          handlePrint();
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <Printer size={16} />
+                        <span>Print Report</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
         </div>
       </div>
 
@@ -622,12 +680,12 @@ export default function AssetInventoryPage() {
             className="w-full bg-slate-950 border border-slate-800 text-slate-200 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
             />
         </div>
-        <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-colors">
+        <div className="flex flex-wrap gap-3">
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-all active:scale-95 whitespace-nowrap">
                 <Filter size={18} />
                 <span>Status</span>
             </button>
-             <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-colors">
+             <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-all active:scale-95 whitespace-nowrap">
                 <Monitor size={18} />
                 <span>Type</span>
             </button>
@@ -736,7 +794,7 @@ export default function AssetInventoryPage() {
                                 {!isReadOnly && (
                                   <button
                                     onClick={(e) => handleEdit(asset, e)}
-                                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-colors"
+                                    className="p-2 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10 rounded-lg transition-all active:scale-95"
                                     title="Edit asset"
                                   >
                                     <Edit2 size={16} />
@@ -749,7 +807,7 @@ export default function AssetInventoryPage() {
                                       e.stopPropagation();
                                       setDeleteId(asset.id);
                                     }}
-                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-all active:scale-95"
                                     title="Delete asset"
                                   >
                                     <Trash2 size={16} />
@@ -777,6 +835,16 @@ export default function AssetInventoryPage() {
         onClose={handleCloseDetailModal}
         editItem={selectedAssetForDetail}
         isViewingDetail={true}
+      />
+
+      <ImportLogsModal
+        isOpen={isImportLogsModalOpen}
+        onClose={() => setIsImportLogsModalOpen(false)}
+      />
+
+      <ImportLoadingModal
+        isOpen={isImporting}
+        fileName={importingFileName}
       />
     </div>
   );

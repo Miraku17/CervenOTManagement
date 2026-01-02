@@ -13,14 +13,42 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    
-    const { month, year } = req.query;
 
-    // Use authenticated user's ID instead of query parameter
-    const userId = req.user?.id;
+    const { month, year, userId: requestedUserId } = req.query;
 
-    if (!userId) {
+    // Get authenticated user's ID
+    const authenticatedUserId = req.user?.id;
+
+    if (!authenticatedUserId) {
       return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if user has permission to view other employees' schedules
+    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
+
+    // Fetch the authenticated user's profile to check their position
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('position_id, positions(name)')
+      .eq('id', authenticatedUserId)
+      .single();
+
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError);
+      return res.status(500).json({ error: 'Failed to fetch user profile' });
+    }
+
+    const positionName = (profile?.positions as any)?.name;
+    const canViewOtherSchedules = positionName && allowedPositions.includes(positionName);
+
+    // Determine which user's schedule to fetch
+    let userId: string;
+    if (requestedUserId && typeof requestedUserId === 'string' && canViewOtherSchedules) {
+      // Admin/Manager viewing another employee's schedule
+      userId = requestedUserId;
+    } else {
+      // Regular user or no userId specified - show own schedule
+      userId = authenticatedUserId;
     }
 
     // Build date range filter if month and year are provided
