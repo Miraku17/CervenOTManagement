@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import '@/styles/globals.css';
+import { AuthListener } from '@/components/AuthListener';
 
 export const metadata: Metadata = {
   title: 'Cerventech Inc. - Employee Portal',
@@ -16,7 +17,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body suppressHydrationWarning>{children}</body>
+      <body suppressHydrationWarning>
+        <AuthListener />
+        {children}
+      </body>
     </html>
   );
 }
