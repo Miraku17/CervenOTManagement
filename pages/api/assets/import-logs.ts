@@ -39,6 +39,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // For each log, fetch its errors
     const logsWithErrors = await Promise.all(
       (logs || []).map(async (log) => {
+        if (!supabaseAdmin) {
+          return { ...log, errors: [] };
+        }
+
         const { data: errors, error: errorsError } = await supabaseAdmin
           .from('import_errors')
           .select('*')
