@@ -365,12 +365,14 @@ export default function StoreInventoryPage() {
       allItems = filteredItems;
     }
 
-    // Sort inventory alphabetically by brand name
-    const sortedItems = [...allItems].sort((a, b) => {
-      const nameA = a.brands?.name || '';
-      const nameB = b.brands?.name || '';
-      return nameA.localeCompare(nameB);
-    });
+    // Sort and filter inventory (only non-deleted items)
+    const sortedItems = allItems
+      .filter(item => !item.deleted_at)
+      .sort((a, b) => {
+        const nameA = a.brands?.name || '';
+        const nameB = b.brands?.name || '';
+        return nameA.localeCompare(nameB);
+      });
 
     try {
       // Add logo
@@ -402,10 +404,8 @@ export default function StoreInventoryPage() {
       month: 'long',
       day: 'numeric',
     });
-    const activeCount = sortedItems.filter(item => !item.deleted_at).length;
-    const deletedCount = sortedItems.filter(item => item.deleted_at).length;
     doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Active: ${activeCount} | Deleted: ${deletedCount} | Total: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
+    doc.text(`Total Items: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
 
     // Prepare table data
     const tableColumn = [
@@ -417,12 +417,8 @@ export default function StoreInventoryPage() {
       'Model',
       'Store',
       'Station',
-      'Created By',
-      'Created At',
-      'Updated By',
-      'Updated At',
-      'Deleted By',
-      'Deleted At',
+      'Warranty',
+      'Warranty Date',
     ];
 
     const tableRows = sortedItems.map((item) => [
@@ -434,12 +430,8 @@ export default function StoreInventoryPage() {
       item.models?.name || 'N/A',
       `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
       item.stations?.name || 'N/A',
-      item.created_by_user ? `${item.created_by_user.first_name} ${item.created_by_user.last_name}` : 'N/A',
-      item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A',
-      item.updated_by_user ? `${item.updated_by_user.first_name} ${item.updated_by_user.last_name}` : 'N/A',
-      item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
-      item.deleted_by_user ? `${item.deleted_by_user.first_name} ${item.deleted_by_user.last_name}` : 'N/A',
-      item.deleted_at ? new Date(item.deleted_at).toLocaleDateString() : 'N/A',
+      item.under_warranty ? 'Yes' : 'No',
+      item.warranty_date ? new Date(item.warranty_date).toLocaleDateString() : 'N/A',
     ]);
 
     // Add table
@@ -448,8 +440,8 @@ export default function StoreInventoryPage() {
       body: tableRows,
       startY: 54,
       styles: {
-        fontSize: 7,
-        cellPadding: 2,
+        fontSize: 8,
+        cellPadding: 3,
       },
       headStyles: {
         fillColor: [15, 23, 42], // Slate 900
@@ -460,30 +452,16 @@ export default function StoreInventoryPage() {
         fillColor: [248, 250, 252], // Light gray
       },
       columnStyles: {
-        0: { cellWidth: 22 },  // Item Details
-        1: { cellWidth: 18 },  // Serial Number
-        2: { cellWidth: 16 },  // Status
-        3: { cellWidth: 18 },  // Category
-        4: { cellWidth: 18 },  // Brand
-        5: { cellWidth: 18 },  // Model
-        6: { cellWidth: 20 },  // Store
-        7: { cellWidth: 18 },  // Station
-        8: { cellWidth: 22 },  // Created By
-        9: { cellWidth: 18 },  // Created At
-        10: { cellWidth: 22 }, // Updated By
-        11: { cellWidth: 18 }, // Updated At
-        12: { cellWidth: 22 }, // Deleted By
-        13: { cellWidth: 18 }, // Deleted At
-      },
-      didParseCell: function(data) {
-        // Highlight deleted rows in red (only body rows, not headers)
-        if (data.section === 'body') {
-          const rowIndex = data.row.index;
-          if (sortedItems[rowIndex]?.deleted_at) {
-            data.cell.styles.fillColor = [255, 230, 230]; // Light red background
-            data.cell.styles.textColor = [180, 0, 0]; // Dark red text
-          }
-        }
+        0: { cellWidth: 35 },  // Item Details
+        1: { cellWidth: 30 },  // Serial Number
+        2: { cellWidth: 20 },  // Status
+        3: { cellWidth: 30 },  // Category
+        4: { cellWidth: 30 },  // Brand
+        5: { cellWidth: 30 },  // Model
+        6: { cellWidth: 35 },  // Store
+        7: { cellWidth: 25 },  // Station
+        8: { cellWidth: 20 },  // Warranty
+        9: { cellWidth: 25 },  // Warranty Date
       },
     });
 
