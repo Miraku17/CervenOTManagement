@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 import * as XLSX from 'xlsx';
 
 // Disable body parser to handle file upload
@@ -87,14 +88,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    const { fileData } = req.body;
     const userId = req.user?.id;
-    const userPosition = req.user?.position;
 
-    // Check for restricted positions
-    if (userPosition === 'Field Engineer') {
-      return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers' });
+    // Check if user has permission to manage store inventory
+    if (!userId) {
+      return res.status(401).json({ error: 'User not authenticated' });
     }
+
+    const hasPermission = await userHasPermission(userId, 'manage_store_inventory');
+    if (!hasPermission) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to import store inventory.'
+      });
+    }
+
+    const { fileData } = req.body;
 
     if (!fileData) {
       return res.status(400).json({
