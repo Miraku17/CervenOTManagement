@@ -49,7 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ?.filter(employee => !activeUserIds.has(employee.id))
       .map(async (employee) => {
         // Get their last clock out time
-        const { data: lastAttendance } = await supabase
+        const { data: lastAttendance } = await supabase!
           .from('attendance')
           .select('time_out')
           .eq('user_id', employee.id)
