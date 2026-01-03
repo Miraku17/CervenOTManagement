@@ -576,7 +576,7 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            <>
+            {hasPermission('manage_store_inventory') && (<>
                 <button
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
                   onClick={() => setIsModalOpen(true)}
