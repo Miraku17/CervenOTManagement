@@ -24,16 +24,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (todayError) throw todayError;
 
-    // Get total employees
+    // Get total employees (role = 'employee')
     const { count: totalEmployees, error: employeeError } = await supabase
       .from('profiles')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'employee');
 
     if (employeeError) throw employeeError;
 
     // Calculate today's stats
     const clockedInCount = todayAttendance?.length || 0;
     const activeNow = todayAttendance?.filter(a => !a.time_out).length || 0;
+    const inactiveNow = (totalEmployees || 0) - activeNow;
 
     // Get this week's total hours
     const startOfWeek = new Date();
@@ -64,6 +66,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         totalEmployees: totalEmployees || 0,
         clockedInToday: clockedInCount,
         activeNow: activeNow,
+        inactiveNow: inactiveNow,
         overtimeRequests: overtimeRequests || 0,
         weeklyHours: totalHours,
       }

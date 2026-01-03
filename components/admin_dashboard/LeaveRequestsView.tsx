@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { differenceInDays, parseISO } from 'date-fns';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
@@ -44,6 +45,7 @@ interface LeaveRequestsViewProps {
 
 const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true }) => {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
@@ -383,8 +385,8 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
     // You might want to refetch employee data if the leave credits are displayed
   };
 
-  // Check if the current user is Operations Manager
-  const isOperationsManager = user?.position === 'Operations Manager';
+  // Check if the current user can manage leave credits
+  const canManageLeaveCredits = hasPermission('manage_leave_credits');
 
   if (isLoading && requests.length === 0) {
      return (
@@ -421,7 +423,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
           <p className="text-slate-400 mt-1">Manage employee leave applications</p>
         </div>
 
-        {isOperationsManager && (
+        {canManageLeaveCredits && (
           <div className="relative" ref={dropdownRef}>
             <button
               onClick={() => setShowLeaveCreditsDropdown(!showLeaveCreditsDropdown)}
