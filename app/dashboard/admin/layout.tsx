@@ -66,7 +66,7 @@ export default function AdminLayout({
 
   // Check if user has access to edit time
   const hasEditTimeAccess = () => {
-    return userPosition === 'Operations Manager';
+    return hasPermission('edit_time_entries');
   };
 
   // Check if user has access to leave requests
@@ -81,15 +81,7 @@ export default function AdminLayout({
 
   // Check if user has access to reports
   const hasReportsAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Operations Manager',
-      'Technical Support Lead',
-      'Technical Support Engineer',
-      'Help Desk Lead',
-      'Operations Technical Lead'
-    ];
-    return authorizedPositions.includes(userPosition);
+    return hasPermission('view_reports');
   };
 
   const handleNavigate = (path: string) => {

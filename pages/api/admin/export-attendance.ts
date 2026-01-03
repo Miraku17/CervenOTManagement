@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
@@ -19,27 +20,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Check if user has required position
-    const { data: userProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', req.user?.id)
-      .single();
+    // Check if user has export_data permission
+    const hasPermission = await userHasPermission(req.user?.id || '', 'export_data');
 
-    if (profileError) {
-      throw profileError;
-    }
-
-    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer', 'Help Desk Lead', 'Operations Technical Lead'];
-
-    if (!allowedPositions.includes(userPosition)) {
+    if (!hasPermission) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager, Technical Support Lead, Technical Support Engineer, Help Desk Lead, and Operations Technical Lead can export reports'
+        error: 'Forbidden: You do not have permission to export reports'
       });
     }
   } catch (error: any) {
-    console.error('Error checking user position:', error);
+    console.error('Error checking user permission:', error);
     return res.status(500).json({ error: 'Failed to verify user permissions' });
   }
 

@@ -5,9 +5,10 @@ import * as XLSX from 'xlsx-js-style';
 
 interface ExportDataViewProps {
   employees: Employee[];
+  canExport?: boolean;
 }
 
-const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
+const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = true }) => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [exportType, setExportType] = useState<'attendance' | 'overtime'>('attendance');
@@ -602,35 +603,45 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Section 1: Export All */}
-        <div className="bg-slate-800/30 p-6 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
-          <h3 className="text-xl font-bold text-white mb-2">Bulk Export</h3>
-          <p className="text-slate-400 mb-6 text-sm">
-            Download attendance records for all employees within the selected date range.
+      {!canExport ? (
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-6 text-center">
+          <p className="text-amber-400">
+            You have permission to view reports but not to export data.
           </p>
-          <button
-            onClick={handleExportAll}
-            disabled={isExportingAll || isExportingIndividual}
-            className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-blue-900/30 transition-all duration-200 flex items-center justify-center gap-2 ${
-              isExportingAll ? 'opacity-50 cursor-not-allowed' : ''
-            }`}
-          >
-            {isExportingAll ? (
-              <>
-                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                Exporting...
-              </>
-            ) : (
-              <>
-                <FileDown size={20} />
-                Export All to Excel
-              </>
-            )}
-          </button>
+          <p className="text-slate-400 text-sm mt-2">
+            Contact your administrator if you need export access.
+          </p>
         </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Section 1: Export All */}
+          <div className="bg-slate-800/30 p-6 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors">
+            <h3 className="text-xl font-bold text-white mb-2">Bulk Export</h3>
+            <p className="text-slate-400 mb-6 text-sm">
+              Download attendance records for all employees within the selected date range.
+            </p>
+            <button
+              onClick={handleExportAll}
+              disabled={isExportingAll || isExportingIndividual}
+              className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-lg hover:shadow-blue-900/30 transition-all duration-200 flex items-center justify-center gap-2 ${
+                isExportingAll ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
+            >
+              {isExportingAll ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <FileDown size={20} />
+                  Export All to Excel
+                </>
+              )}
+            </button>
+          </div>
 
-        {/* Section 2: Individual Export */}
+          {/* Section 2: Individual Export */}
         <div className="bg-slate-800/30 p-6 rounded-xl border border-slate-700 hover:border-slate-600 transition-colors relative">
           <h3 className="text-xl font-bold text-white mb-2">Individual Export</h3>
           <p className="text-slate-400 mb-6 text-sm">
@@ -721,7 +732,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees }) => {
             )}
           </button>
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

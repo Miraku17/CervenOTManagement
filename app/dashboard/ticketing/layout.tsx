@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/services/supabase';
 
@@ -12,6 +13,7 @@ export default function TicketingLayout({
   children: React.ReactNode;
 }) {
   const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -57,8 +59,7 @@ export default function TicketingLayout({
   const hasStoresAccess = isAdmin;
 
   // Check if user has access to store inventory
-  // Store Inventory: admin OR employee role (basically everyone)
-  const hasStoreInventoryAccess = isAdmin || user !== null; // Everyone who is logged in
+  const hasStoreInventoryAccess = hasPermission('manage_store_inventory');
 
   // Check if user has access to asset inventory
   // Asset Inventory: ONLY positions "asset", "assets", "operations manager", or "field engineer"
@@ -72,6 +73,9 @@ export default function TicketingLayout({
   // Check if user has access to tickets
   // Tickets: All authenticated users have access
   const hasTicketsAccess = true;
+
+  // Check if user has access to overview
+  const hasOverviewAccess = hasPermission('view_ticket_overview');
 
   const SidebarContent = () => (
     <>
@@ -109,8 +113,8 @@ export default function TicketingLayout({
           </div>
         </div>
 
-        {/* Analytics Section - Hidden for asset positions */}
-        {isAdmin && userPositionLower !== 'asset' && userPositionLower !== 'assets' && (
+        {/* Analytics Section */}
+        {hasOverviewAccess && (
           <div>
             <SidebarLabel>Analytics</SidebarLabel>
             <div className="space-y-1">
@@ -243,7 +247,7 @@ export default function TicketingLayout({
   );
 
   // Show loading state while fetching user info
-  if (authLoading || isLoadingRole) {
+  if (authLoading || isLoadingRole || permissionsLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950">
         <div className="flex flex-col items-center gap-4">

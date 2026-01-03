@@ -8,8 +8,10 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
+import { ShieldAlert } from 'lucide-react';
 
 interface InventoryItem {
   id: string;
@@ -62,16 +64,17 @@ interface InventoryItem {
 }
 
 export default function StoreInventoryPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
-  
+
   // State definitions
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  const isLoadingAccess = authLoading || permissionsLoading;
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -134,42 +137,6 @@ export default function StoreInventoryPage() {
     }, 3000);
   };
 
-  // Access control check
-  // Store Inventory: accessible by admin OR employee role (basically everyone)
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, positions(name)')
-          .eq('id', user.id)
-          .single();
-
-        const userRole = profile?.role;
-        const userPosition = (profile?.positions as any)?.name;
-        
-        // Check for read-only access (Field Engineer)
-        if (userPosition === 'Field Engineer') {
-          setIsReadOnly(true);
-        }
-
-        const hasAccess = userRole === 'admin' || userRole === 'employee';
-
-        if (!hasAccess) {
-          router.push('/dashboard/ticketing/tickets');
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        router.push('/dashboard/ticketing/tickets');
-      } finally {
-        setCheckingAccess(false);
-      }
-    };
-
-    checkAccess();
-  }, [user?.id, router]);
 
   useEffect(() => {
     fetchInventory();
@@ -190,12 +157,42 @@ export default function StoreInventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (checkingAccess) {
+  // Show loading state while checking permissions
+  if (isLoadingAccess) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          <p className="text-slate-400">Verifying access...</p>
+          <p className="text-slate-400">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only check permission AFTER loading is complete
+  const hasAccess = hasPermission('manage_store_inventory');
+
+  // Show access denied if no permission
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <ShieldAlert className="w-10 h-10 text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+            <p className="text-slate-400">You don't have permission to access store inventory.</p>
+            <p className="text-slate-500 text-sm mt-2">
+              If you believe you should have access, please contact your administrator.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/ticketing/tickets')}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+          >
+            Go to Tickets
+          </button>
         </div>
       </div>
     );
@@ -579,8 +576,7 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            {!isReadOnly && (
-              <>
+            <>
                 <button
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
                   onClick={() => setIsModalOpen(true)}
@@ -923,8 +919,7 @@ export default function StoreInventoryPage() {
                             </td>
                             <td className="p-4 text-slate-400">{item.stations?.name || <span className="text-slate-600">—</span>}</td>
                             <td className="p-4 text-right">
-                              {!isReadOnly && (
-                                <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -945,8 +940,7 @@ export default function StoreInventoryPage() {
                                   >
                                     <Trash2 size={16} />
                                   </button>
-                                </div>
-                              )}
+                              </div>
                             </td>
                         </tr>
                       ))
