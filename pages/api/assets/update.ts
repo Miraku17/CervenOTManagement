@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
@@ -38,11 +39,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const hasEditAccess = editAccess?.can_edit === true;
 
-    // Check if user has position-based access or edit access from table
-    const userPosition = req.user?.position?.toLowerCase();
-    const hasPositionAccess = userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager';
+    // Check if user has permission
+    const hasManageAssets = await userHasPermission(userId, 'manage_assets');
 
-    if (!hasPositionAccess && !hasEditAccess) {
+    if (!hasManageAssets && !hasEditAccess) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to update assets' });
     }
 

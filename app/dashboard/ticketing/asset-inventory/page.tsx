@@ -8,6 +8,7 @@ import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
 
@@ -45,6 +46,7 @@ interface Asset {
 
 export default function AssetInventoryPage() {
   const { user } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   
   // State definitions
@@ -61,7 +63,7 @@ export default function AssetInventoryPage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importingFileName, setImportingFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isReadOnly, setIsReadOnly] = useState(false);
+  const [isReadOnly, setIsReadOnly] = useState(false); // Can be used for other read-only cases if needed
   const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
   const [checkingAccess, setCheckingAccess] = useState(true);
   const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
@@ -73,9 +75,6 @@ export default function AssetInventoryPage() {
     type: 'success' | 'error';
     message: string;
   }>({ show: false, type: 'success', message: '' });
-
-  // Access control check
-  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -100,6 +99,7 @@ export default function AssetInventoryPage() {
 
   useEffect(() => {
     const checkAccess = async () => {
+      if (permissionsLoading) return;
       if (!user?.id) return;
 
       try {
@@ -116,28 +116,15 @@ export default function AssetInventoryPage() {
           setIsEditOnlyUser(true);
         }
 
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('positions(name)')
-          .eq('id', user.id)
-          .single();
-
-        const position = (profile?.positions as any)?.name?.toLowerCase();
-        setUserPosition(position || null);
-
-        // Check for read-only access (Field Engineer) - but not for edit-only user
-        if (position === 'field engineer' && !isEditOnly) {
-          setIsReadOnly(true);
-        }
-
-        const hasAccess = position === 'asset' || position === 'assets' || position === 'operations manager' || position === 'field engineer' || isEditOnly;
+        const canManageAssets = hasPermission('manage_assets');
+        const hasAccess = canManageAssets || isEditOnly;
 
         if (!hasAccess) {
           router.push('/dashboard/ticketing/tickets');
         }
       } catch (error) {
         console.error('Error checking access:', error);
-        // Check if user has edit-only access even if profile fetch fails
+        // Check if user has edit-only access even if other checks fail
         const { data: editAccess } = await supabase
           .from('assets_edit_access')
           .select('can_edit')
@@ -157,7 +144,7 @@ export default function AssetInventoryPage() {
     };
 
     checkAccess();
-  }, [user?.id, router]);
+  }, [user?.id, router, permissionsLoading, hasPermission]);
 
   useEffect(() => {
     fetchAssets();
@@ -182,7 +169,7 @@ export default function AssetInventoryPage() {
     }
   };
 
-  if (checkingAccess) {
+  if (checkingAccess || permissionsLoading) {
     return (
       <div className="flex items-center justify-center h-screen bg-slate-950">
         <div className="flex flex-col items-center gap-4">
@@ -692,9 +679,8 @@ export default function AssetInventoryPage() {
         </div>
       </div>
 
-      {/* Stats Overview - Hidden for asset positions */}
-      {userPosition !== 'asset' && userPosition !== 'assets' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <div className="flex items-start justify-between">
                     <div>
@@ -733,7 +719,6 @@ export default function AssetInventoryPage() {
                 </div>
             </div>
         </div>
-      )}
 
       {/* Inventory Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -801,7 +786,7 @@ export default function AssetInventoryPage() {
                                   </button>
                                 )}
                                 {/* Assets manager and operations manager can delete, but not edit-only user */}
-                                {!isEditOnlyUser && (userPosition === 'asset' || userPosition === 'assets' || userPosition === 'operations manager') && (
+                                {!isEditOnlyUser && hasPermission('manage_assets') && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();

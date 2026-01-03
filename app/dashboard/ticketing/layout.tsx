@@ -62,13 +62,12 @@ export default function TicketingLayout({
   const hasStoreInventoryAccess = hasPermission('manage_store_inventory');
 
   // Check if user has access to asset inventory
-  // Asset Inventory: ONLY positions "asset", "assets", "operations manager", or "field engineer"
-  const userPositionLower = userPosition?.toLowerCase();
-  const hasAssetInventoryAccess = userPositionLower === 'asset' || userPositionLower === 'assets' || userPositionLower === 'operations manager' || userPositionLower === 'field engineer';
+  // Asset Inventory: Permission-based access
+  const hasAssetInventoryAccess = hasPermission('manage_assets');
 
   // Check if user has access to audit logs
-  // Audit Logs: ONLY Operations Manager position
-  const hasAuditLogsAccess = userPosition === 'Operations Manager';
+  // Audit Logs: Permission-based access
+  const hasAuditLogsAccess = hasPermission('view_audit_logs');
 
   // Check if user has access to tickets
   // Tickets: All authenticated users have access

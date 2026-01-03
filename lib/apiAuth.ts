@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from './supabase-server';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { userHasPermission } from './permissions';
 
 export interface AuthenticatedRequest extends NextApiRequest {
   user?: {
@@ -16,6 +17,7 @@ export const withAuth = (
   options?: {
     requireRole?: string | string[];
     requirePosition?: string | string[];
+    requirePermission?: string | string[];
   }
 ) => {
   return async (req: NextApiRequest, res: NextApiResponse) => {
@@ -121,7 +123,7 @@ export const withAuth = (
 
       // Check authorization
       if (options) {
-        const { requireRole, requirePosition } = options;
+        const { requireRole, requirePosition, requirePermission } = options;
         
         const allowedRoles = requireRole 
           ? (Array.isArray(requireRole) ? requireRole : [requireRole]) 
@@ -131,9 +133,14 @@ export const withAuth = (
           ? (Array.isArray(requirePosition) ? requirePosition : [requirePosition]) 
           : [];
 
+        const requiredPermissions = requirePermission
+          ? (Array.isArray(requirePermission) ? requirePermission : [requirePermission])
+          : [];
+
         // Determine if specific restrictions are in place
         const hasRoleRestriction = allowedRoles.length > 0;
         const hasPositionRestriction = allowedPositions.length > 0;
+        const hasPermissionRestriction = requiredPermissions.length > 0;
 
         // Assume authorized initially, then check restrictions
         let isAuthorized = true;
@@ -144,7 +151,7 @@ export const withAuth = (
           }
         }
 
-        if (hasPositionRestriction) {
+        if (hasPositionRestriction && isAuthorized) {
           // Case-insensitive position comparison
           const userPositionLower = position?.toLowerCase();
           const allowedPositionsLower = allowedPositions.map(p => p.toLowerCase());
@@ -153,7 +160,29 @@ export const withAuth = (
           }
         }
 
-        if ((hasRoleRestriction || hasPositionRestriction) && !isAuthorized) {
+        if (hasPermissionRestriction && isAuthorized) {
+          // Check if user has ANY of the required permissions (OR logic for array)
+          // Or should it be AND? Typically allow if they have AT LEAST ONE of the allowed permissions/roles?
+          // Usually requirePermission: ['perm1'] means MUST have perm1.
+          // requirePermission: ['perm1', 'perm2'] could mean perm1 OR perm2, or perm1 AND perm2.
+          // Given `requireRole` is usually OR (admin OR manager), let's assume OR for permissions too for flexibility,
+          // but usually permissions are specific. 
+          // Let's implement as: User must have AT LEAST ONE of the listed permissions.
+          
+          let hasPermission = false;
+          for (const perm of requiredPermissions) {
+            const hasIt = await userHasPermission(user.id, perm);
+            if (hasIt) {
+              hasPermission = true;
+              break;
+            }
+          }
+          if (!hasPermission) {
+            isAuthorized = false;
+          }
+        }
+
+        if ((hasRoleRestriction || hasPositionRestriction || hasPermissionRestriction) && !isAuthorized) {
            return res.status(403).json({ error: 'Forbidden' });
         }
       }
