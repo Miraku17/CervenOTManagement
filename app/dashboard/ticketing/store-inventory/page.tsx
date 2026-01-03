@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Search, Filter, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet } from 'lucide-react';
+import { Plus, Search, Filter, Package, Box, AlertCircle, Loader2, ChevronDown, X, Edit2, Trash2, CheckCircle, Printer, Upload, FileSpreadsheet, History } from 'lucide-react';
 import StoreInventoryModal from '@/components/ticketing/StoreInventoryModal';
 import StoreInventoryDetailModal from '@/components/ticketing/StoreInventoryDetailModal';
+import ImportStoreInventoryLogsModal from '@/components/ticketing/ImportStoreInventoryLogsModal';
+import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -96,6 +98,13 @@ export default function StoreInventoryPage() {
   const [detailItem, setDetailItem] = useState<InventoryItem | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
+  // Import History State
+  const [isImportLogsModalOpen, setIsImportLogsModalOpen] = useState(false);
+  
+  // Actions Dropdown State
+  const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
+  const actionsDropdownRef = useRef<HTMLDivElement>(null);
+
   // Toast notification state
   const [toast, setToast] = useState<{
     show: boolean;
@@ -105,6 +114,7 @@ export default function StoreInventoryPage() {
 
   // Import states
   const [isImporting, setIsImporting] = useState(false);
+  const [importingFileName, setImportingFileName] = useState<string>('');
   const [importErrors, setImportErrors] = useState<Array<{ row: number; error: string; data?: any }>>([]);
   const [showImportErrors, setShowImportErrors] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -150,6 +160,9 @@ export default function StoreInventoryPage() {
       }
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
         setShowCategoryDropdown(false);
+      }
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
+        setIsActionsDropdownOpen(false);
       }
     };
 
@@ -288,6 +301,7 @@ export default function StoreInventoryPage() {
     }
 
     setIsImporting(true);
+    setImportingFileName(file.name);
     try {
       // Read file as base64
       const reader = new FileReader();
@@ -301,7 +315,10 @@ export default function StoreInventoryPage() {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ fileData }),
+            body: JSON.stringify({
+              fileData,
+              fileName: file.name
+            }),
           });
 
           const data = await response.json();
@@ -333,6 +350,7 @@ export default function StoreInventoryPage() {
           showToast('error', error.message || 'Failed to import file');
         } finally {
           setIsImporting(false);
+          setImportingFileName('');
           // Reset file input
           if (fileInputRef.current) {
             fileInputRef.current.value = '';
@@ -344,6 +362,7 @@ export default function StoreInventoryPage() {
       console.error('Error reading file:', error);
       showToast('error', error.message || 'Failed to read file');
       setIsImporting(false);
+      setImportingFileName('');
     }
   };
 
@@ -553,47 +572,79 @@ export default function StoreInventoryPage() {
           <h1 className="text-2xl font-bold text-white">Store Inventory</h1>
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3">
-            {hasPermission('manage_store_inventory') && (<>
+        <div className="flex flex-wrap gap-3">
+            {hasPermission('manage_store_inventory') && (
+              <button
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
+                onClick={() => setIsModalOpen(true)}
+              >
+                <Plus size={20} />
+                <span>Add Item</span>
+              </button>
+            )}
+
+            {hasPermission('manage_store_inventory') && (
+              <div className="relative" ref={actionsDropdownRef}>
                 <button
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-                  onClick={() => setIsModalOpen(true)}
+                  onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
                 >
-                  <Plus size={20} />
-                  <span>Add Item</span>
+                  <span>Actions</span>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${isActionsDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <button
-                  onClick={handleDownloadTemplate}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-colors shadow-lg shadow-emerald-900/20"
-                >
-                  <FileSpreadsheet size={20} />
-                  <span>Download Template</span>
-                </button>
-                <button
-                  onClick={handleImportClick}
-                  disabled={isImporting}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/50 disabled:cursor-not-allowed text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
-                >
-                  {isImporting ? (
-                    <>
-                      <Loader2 size={20} className="animate-spin" />
-                      <span>Importing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={20} />
-                      <span>Import XLSX</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  onClick={handlePrint}
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
-                >
-                  <Printer size={20} />
-                  <span>Print Report</span>
-                </button>
-              </>
+
+                {isActionsDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="p-1 space-y-1">
+                      <button
+                        onClick={() => {
+                          handleDownloadTemplate();
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <FileSpreadsheet size={16} />
+                        <span>Download Template</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleImportClick();
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        disabled={isImporting}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isImporting ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <Upload size={16} />
+                        )}
+                        <span>{isImporting ? 'Importing...' : 'Import XLSX'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsImportLogsModalOpen(true);
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <History size={16} />
+                        <span>Import History</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          handlePrint();
+                          setIsActionsDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                      >
+                        <Printer size={16} />
+                        <span>Print Report</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
         </div>
       </div>
@@ -934,6 +985,18 @@ export default function StoreInventoryPage() {
           </div>
          )}
       </div>
+
+      {/* Import History Modal */}
+      <ImportStoreInventoryLogsModal
+        isOpen={isImportLogsModalOpen}
+        onClose={() => setIsImportLogsModalOpen(false)}
+      />
+
+      <ImportLoadingModal
+        isOpen={isImporting}
+        fileName={importingFileName}
+        title="Importing Store Inventory"
+      />
 
       {/* Store Inventory Modal */}
       <StoreInventoryModal
