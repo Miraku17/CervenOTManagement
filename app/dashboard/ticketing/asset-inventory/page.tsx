@@ -808,6 +808,7 @@ export default function AssetInventoryPage() {
       <ImportLoadingModal
         isOpen={isImporting}
         fileName={importingFileName}
+        title="Importing Assets"
       />
     </div>
   );
