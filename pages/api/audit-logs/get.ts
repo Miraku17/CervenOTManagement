@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 interface AuditLog {
   id: string;
@@ -26,22 +27,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    // Check if user has Operations Manager position
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', req.user?.id)
-      .single();
-
-    if (profileError) {
-      throw profileError;
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Unauthorized' });
     }
 
-    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
+    // Check if user has view_audit_logs permission
+    const hasAccess = await userHasPermission(req.user.id, 'view_audit_logs');
 
-    if (userPosition !== 'Operations Manager') {
+    if (!hasAccess) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Managers can access audit logs'
+        error: 'Forbidden: You do not have permission to view audit logs'
       });
     }
 

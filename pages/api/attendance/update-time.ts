@@ -2,6 +2,7 @@ import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { fromZonedTime } from 'date-fns-tz';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
@@ -13,22 +14,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Security Check: Verify user has "Operations Manager" position
+  // Security Check: Verify user has edit_time_entries permission
   if (!req.user || !req.user.id) {
      return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const { data: callerProfile, error: callerError } = await supabase
-    .from('profiles')
-    .select('positions(name)')
-    .eq('id', req.user.id)
-    .single();
+  const hasPermission = await userHasPermission(req.user.id, 'edit_time_entries');
 
-  const callerPosition = callerProfile?.positions ? (callerProfile.positions as any).name : null;
-
-  if (callerError || callerPosition !== 'Operations Manager') {
-    return res.status(403).json({ 
-      error: 'Forbidden: Only Operations Managers allowed to edit time records.' 
+  if (!hasPermission) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to edit time records.'
     });
   }
 

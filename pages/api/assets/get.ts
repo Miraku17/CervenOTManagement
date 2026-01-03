@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -11,6 +12,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
+    }
+
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // Check permissions
+    const hasManageAssets = await userHasPermission(userId, 'manage_assets');
+    
+    // Check edit access
+    let hasEditAccess = false;
+    if (!hasManageAssets) {
+      const { data: editAccess } = await supabaseAdmin
+        .from('assets_edit_access')
+        .select('can_edit')
+        .eq('profile_id', userId)
+        .single();
+      hasEditAccess = editAccess?.can_edit === true;
+    }
+
+    if (!hasManageAssets && !hasEditAccess) {
+      return res.status(403).json({ error: 'Forbidden: You do not have permission to view assets' });
     }
 
     const { data: assets, error } = await supabaseAdmin
@@ -85,4 +109,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requirePosition: ['asset', 'operations manager', 'field engineer'] });
+export default withAuth(handler);

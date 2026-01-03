@@ -1,6 +1,7 @@
 import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
@@ -23,35 +24,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Use the authenticated user ID from withAuth middleware
     const actualAdminId = req.user?.id || adminId;
 
-    // Verify user has authorization to approve/reject
-    const { data: adminProfile, error: profileError } = await supabase
-      .from('profiles')
-      .select('positions(name)')
-      .eq('id', actualAdminId)
-      .single();
-
-    if (profileError || !adminProfile) {
-      return res.status(403).json({ message: 'Unable to verify user permissions' });
+    // Check level-specific authorization using permissions
+    if (level === 'level1') {
+      const hasPermission = await userHasPermission(actualAdminId, 'approve_overtime_level1');
+      if (!hasPermission) {
+        return res.status(403).json({
+          error: 'Forbidden: You do not have permission for level 1 approval'
+        });
+      }
     }
 
-    const adminPosition = (adminProfile.positions as any)?.name;
-
-    // Check level-specific authorization
-    const level1Positions = ['Admin Tech', 'Technical Support Engineer', 'Technical Support Lead', 'Operations Technical Lead'];
-    const level2Positions = ['Operations Manager', 'Admin Tech'];
-
-    if (level === 'level1' && (!adminPosition || !level1Positions.includes(adminPosition))) {
-      return res.status(403).json({
-        message: 'Access denied. You do not have permission for level 1 approval.',
-        position: adminPosition
-      });
-    }
-
-    if (level === 'level2' && (!adminPosition || !level2Positions.includes(adminPosition))) {
-      return res.status(403).json({
-        message: 'Access denied. You do not have permission for level 2 approval.',
-        position: adminPosition
-      });
+    if (level === 'level2') {
+      const hasPermission = await userHasPermission(actualAdminId, 'approve_overtime_level2');
+      if (!hasPermission) {
+        return res.status(403).json({
+          error: 'Forbidden: You do not have permission for level 2 approval'
+        });
+      }
     }
 
     // Get current overtime request to check current status

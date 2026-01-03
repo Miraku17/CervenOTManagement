@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -17,28 +18,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
-  // Check if user is admin
-  if (req.user.role !== 'admin') {
-    return res.status(403).json({ error: 'Unauthorized. Admin access required.' });
-  }
-
   try {
-    // Check if user has Operations Manager position
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('positions(name)')
-      .eq('id', req.user.id)
-      .single();
-
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
-      return res.status(500).json({ error: 'Failed to verify user permissions' });
-    }
-
-    const userPosition = (userProfile as any)?.positions?.name;
-    if (userPosition !== 'Operations Manager') {
+    // Check if user has permission to manage leave credits
+    const hasPermission = await userHasPermission(req.user.id, 'manage_leave_credits');
+    if (!hasPermission) {
       return res.status(403).json({
-        error: 'Unauthorized. Only Operations Manager can update leave credits.'
+        error: 'Forbidden: You do not have permission to update leave credits.'
       });
     }
 

@@ -288,4 +288,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requirePosition: ['asset', 'operations manager'] });
+export default withAuth(handler, { requirePermission: 'manage_assets' });

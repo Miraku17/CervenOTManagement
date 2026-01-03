@@ -1,6 +1,7 @@
 import { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
@@ -12,6 +13,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Check if user has view_overtime permission
+    const hasPermission = await userHasPermission(req.user?.id || '', 'view_overtime');
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to view overtime requests'
+      });
+    }
     // Fetch all overtime requests from overtime_v2
     const { data: overtimeData, error: overtimeError } = await supabase
       .from('overtime_v2')

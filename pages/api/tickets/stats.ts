@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -8,11 +9,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Check for restricted positions (even if admin)
-  const userPosition = req.user?.position?.toLowerCase() || '';
-  const restrictedPositions = ['asset', 'asset lead', 'asset associate'];
-  if (restrictedPositions.includes(userPosition)) {
-    return res.status(403).json({ error: 'Forbidden: Access denied for your position' });
+  // Check if user has view_ticket_overview permission
+  const hasPermission = await userHasPermission(req.user?.id || '', 'view_ticket_overview');
+
+  if (!hasPermission) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to view ticket statistics'
+    });
   }
 
   try {

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
 import { History, Search, Filter, Calendar, User, Package, FileText, Loader2, ChevronDown } from 'lucide-react';
@@ -21,6 +22,7 @@ interface AuditLog {
 
 export default function AuditLogsPage() {
   const { user } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,38 +32,11 @@ export default function AuditLogsPage() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // Access control check - Operations Manager only
-  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  // Access control check
+  const hasAccess = hasPermission('view_audit_logs');
 
   useEffect(() => {
-    const checkAccess = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('position_id, positions(name)')
-          .eq('id', user.id)
-          .single();
-
-        const userPosition = profile?.positions && (profile.positions as any).name;
-
-        if (userPosition === 'Operations Manager') {
-          setHasAccess(true);
-        } else {
-          setHasAccess(false);
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        setHasAccess(false);
-      }
-    };
-
-    checkAccess();
-  }, [user, router]);
-
-  useEffect(() => {
-    if (hasAccess === true) {
+    if (hasAccess) {
       fetchAuditLogs();
     }
   }, [hasAccess]);
@@ -149,19 +124,19 @@ export default function AuditLogsPage() {
   });
 
   // Show loading while checking access
-  if (hasAccess === null) {
+  if (permissionsLoading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          <p className="text-slate-400">Checking access...</p>
+          <p className="text-slate-400">Checking permissions...</p>
         </div>
       </div>
     );
   }
 
-  // Show access denied if user doesn't have Operations Manager position
-  if (hasAccess === false) {
+  // Show access denied if user doesn't have permission
+  if (!hasAccess) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[400px]">
         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 max-w-md text-center">
@@ -170,7 +145,7 @@ export default function AuditLogsPage() {
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Access Denied</h2>
           <p className="text-slate-400 mb-4">
-            Only users with the <span className="text-blue-400 font-semibold">Operations Manager</span> position can access audit logs.
+            You do not have permission to view audit logs.
           </p>
           <button
             onClick={() => router.push('/dashboard/ticketing')}

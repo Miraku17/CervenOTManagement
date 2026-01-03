@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, UserCheck, TrendingUp, Loader2 } from 'lucide-react';
+import { Users, Clock, UserCheck, TrendingUp, Loader2, UserX } from 'lucide-react';
 import { Employee } from '@/types';
 import { ActiveEmployeesModal } from './ActiveEmployeesModal';
+import { InactiveEmployeesModal } from './InactiveEmployeesModal';
 
 interface DashboardHomeProps {
   employees: Employee[];
@@ -11,6 +12,7 @@ interface DashboardStats {
   totalEmployees: number;
   clockedInToday: number;
   activeNow: number;
+  inactiveNow: number;
   overtimeRequests: number;
   weeklyHours: number;
 }
@@ -64,6 +66,19 @@ interface ActiveEmployee {
   longitude: number | null;
 }
 
+interface InactiveEmployee {
+  id: string;
+  employeeName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  employeeId: string;
+  position: string;
+  avatarSeed: string;
+  lastClockOut: string | null;
+  lastClockOutRaw: string | null;
+}
+
 const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
@@ -71,6 +86,9 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeEmployees, setActiveEmployees] = useState<ActiveEmployee[]>([]);
   const [isLoadingActiveEmployees, setIsLoadingActiveEmployees] = useState(false);
+  const [isInactiveModalOpen, setIsInactiveModalOpen] = useState(false);
+  const [inactiveEmployees, setInactiveEmployees] = useState<InactiveEmployee[]>([]);
+  const [isLoadingInactiveEmployees, setIsLoadingInactiveEmployees] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -118,6 +136,27 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
     fetchActiveEmployees();
   };
 
+  const fetchInactiveEmployees = async () => {
+    setIsLoadingInactiveEmployees(true);
+    try {
+      const response = await fetch('/api/dashboard/inactive-employees');
+      const data = await response.json();
+
+      if (data.inactiveEmployees) {
+        setInactiveEmployees(data.inactiveEmployees);
+      }
+    } catch (error) {
+      console.error('Error fetching inactive employees:', error);
+    } finally {
+      setIsLoadingInactiveEmployees(false);
+    }
+  };
+
+  const handleInactiveNowClick = () => {
+    setIsInactiveModalOpen(true);
+    fetchInactiveEmployees();
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -128,7 +167,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
         <StatCard
           title="Total Employees"
           value={stats?.totalEmployees.toString() || '0'}
@@ -150,6 +189,14 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           icon={<UserCheck className="text-violet-400" />}
           color="violet"
           onClick={handleActiveNowClick}
+        />
+        <StatCard
+          title="Inactive Now"
+          value={stats?.inactiveNow.toString() || '0'}
+          change="Not working"
+          icon={<UserX className="text-slate-400" />}
+          color="slate"
+          onClick={handleInactiveNowClick}
         />
         <StatCard
           title="Weekly Hours"
@@ -272,6 +319,14 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
         onClose={() => setIsModalOpen(false)}
         employees={activeEmployees}
         isLoading={isLoadingActiveEmployees}
+      />
+
+      {/* Inactive Employees Modal */}
+      <InactiveEmployeesModal
+        isOpen={isInactiveModalOpen}
+        onClose={() => setIsInactiveModalOpen(false)}
+        employees={inactiveEmployees}
+        isLoading={isLoadingInactiveEmployees}
       />
     </div>
   );

@@ -5,33 +5,25 @@ import EditTimeView from '@/components/admin_dashboard/EditTimeView';
 import { Employee } from '@/types';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import { X } from 'lucide-react';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ShieldAlert } from 'lucide-react';
 
 export default function EditTimePage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [userPosition, setUserPosition] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
 
-  useEffect(() => {
-    const fetchUserPosition = async () => {
-      if (!user?.id) return;
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('positions(name)')
-        .eq('id', user.id)
-        .single();
-
-      setUserPosition((profile?.positions as any)?.name || null);
-      setLoading(false);
-    };
-
-    fetchUserPosition();
-  }, [user?.id]);
+  const isLoading = authLoading || permissionsLoading;
 
   useEffect(() => {
     const fetchEmployees = async () => {
+      if (isLoading || !user?.id) return;
+
+      // Only fetch if user has permission
+      if (!hasPermission('edit_time_entries')) return;
+
+      setIsLoadingEmployees(true);
       try {
         const { data: { session } } = await supabase.auth.getSession();
 
@@ -55,36 +47,48 @@ export default function EditTimePage() {
         setEmployees(data.employees);
       } catch (error) {
         console.error('Error fetching employees:', error);
+      } finally {
+        setIsLoadingEmployees(false);
       }
     };
 
     fetchEmployees();
-  }, []);
+  }, [user?.id, isLoading, hasPermission]);
 
-  const hasEditTimeAccess = () => {
-    return userPosition === 'Operations Manager';
-  };
-
-  if (loading) {
+  // Show loading state while checking permissions
+  if (isLoading || isLoadingEmployees) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400">
+            {isLoadingEmployees ? 'Loading employees...' : 'Checking permissions...'}
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (!hasEditTimeAccess()) {
+  // Only check permission AFTER loading is complete
+  const hasAccess = hasPermission('edit_time_entries');
+
+  // Show access denied if no permission
+  if (!hasAccess) {
     return (
-      <div className="p-6 flex items-center justify-center min-h-[400px]">
-        <div className="text-center space-y-4">
-          <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
-            <X className="w-8 h-8 text-red-400" />
+      <div className="max-w-2xl mx-auto mt-12">
+        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-8 text-center">
+          <div className="flex justify-center mb-4">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
+              <ShieldAlert size={32} className="text-red-500" />
+            </div>
           </div>
-          <div>
-            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
-            <p className="text-slate-400">You don't have permission to edit time records.</p>
-            <p className="text-slate-500 text-sm mt-2">Only Operations Managers can access this feature.</p>
-          </div>
+          <h2 className="text-2xl font-bold text-white mb-3">Access Denied</h2>
+          <p className="text-slate-300 mb-2">
+            You don't have permission to edit time records.
+          </p>
+          <p className="text-sm text-slate-400 mt-4">
+            If you believe you should have access, please contact your administrator.
+          </p>
         </div>
       </div>
     );

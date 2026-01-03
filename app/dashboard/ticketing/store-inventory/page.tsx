@@ -8,8 +8,10 @@ import { ConfirmModal } from '@/components/ConfirmModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
+import { ShieldAlert } from 'lucide-react';
 
 interface InventoryItem {
   id: string;
@@ -62,16 +64,17 @@ interface InventoryItem {
 }
 
 export default function StoreInventoryPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
-  
+
   // State definitions
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isReadOnly, setIsReadOnly] = useState(false);
-  const [checkingAccess, setCheckingAccess] = useState(true);
+
+  const isLoadingAccess = authLoading || permissionsLoading;
 
   // Filter states
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -134,42 +137,6 @@ export default function StoreInventoryPage() {
     }, 3000);
   };
 
-  // Access control check
-  // Store Inventory: accessible by admin OR employee role (basically everyone)
-  useEffect(() => {
-    const checkAccess = async () => {
-      if (!user?.id) return;
-
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, positions(name)')
-          .eq('id', user.id)
-          .single();
-
-        const userRole = profile?.role;
-        const userPosition = (profile?.positions as any)?.name;
-        
-        // Check for read-only access (Field Engineer)
-        if (userPosition === 'Field Engineer') {
-          setIsReadOnly(true);
-        }
-
-        const hasAccess = userRole === 'admin' || userRole === 'employee';
-
-        if (!hasAccess) {
-          router.push('/dashboard/ticketing/tickets');
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        router.push('/dashboard/ticketing/tickets');
-      } finally {
-        setCheckingAccess(false);
-      }
-    };
-
-    checkAccess();
-  }, [user?.id, router]);
 
   useEffect(() => {
     fetchInventory();
@@ -190,12 +157,42 @@ export default function StoreInventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  if (checkingAccess) {
+  // Show loading state while checking permissions
+  if (isLoadingAccess) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-          <p className="text-slate-400">Verifying access...</p>
+          <p className="text-slate-400">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only check permission AFTER loading is complete
+  const hasAccess = hasPermission('manage_store_inventory');
+
+  // Show access denied if no permission
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <ShieldAlert className="w-10 h-10 text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+            <p className="text-slate-400">You don't have permission to access store inventory.</p>
+            <p className="text-slate-500 text-sm mt-2">
+              If you believe you should have access, please contact your administrator.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/ticketing/tickets')}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+          >
+            Go to Tickets
+          </button>
         </div>
       </div>
     );
@@ -368,12 +365,14 @@ export default function StoreInventoryPage() {
       allItems = filteredItems;
     }
 
-    // Sort inventory alphabetically by brand name
-    const sortedItems = [...allItems].sort((a, b) => {
-      const nameA = a.brands?.name || '';
-      const nameB = b.brands?.name || '';
-      return nameA.localeCompare(nameB);
-    });
+    // Sort and filter inventory (only non-deleted items)
+    const sortedItems = allItems
+      .filter(item => !item.deleted_at)
+      .sort((a, b) => {
+        const nameA = a.brands?.name || '';
+        const nameB = b.brands?.name || '';
+        return nameA.localeCompare(nameB);
+      });
 
     try {
       // Add logo
@@ -405,10 +404,8 @@ export default function StoreInventoryPage() {
       month: 'long',
       day: 'numeric',
     });
-    const activeCount = sortedItems.filter(item => !item.deleted_at).length;
-    const deletedCount = sortedItems.filter(item => item.deleted_at).length;
     doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Active: ${activeCount} | Deleted: ${deletedCount} | Total: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
+    doc.text(`Total Items: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
 
     // Prepare table data
     const tableColumn = [
@@ -420,12 +417,8 @@ export default function StoreInventoryPage() {
       'Model',
       'Store',
       'Station',
-      'Created By',
-      'Created At',
-      'Updated By',
-      'Updated At',
-      'Deleted By',
-      'Deleted At',
+      'Warranty',
+      'Warranty Date',
     ];
 
     const tableRows = sortedItems.map((item) => [
@@ -437,12 +430,8 @@ export default function StoreInventoryPage() {
       item.models?.name || 'N/A',
       `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
       item.stations?.name || 'N/A',
-      item.created_by_user ? `${item.created_by_user.first_name} ${item.created_by_user.last_name}` : 'N/A',
-      item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A',
-      item.updated_by_user ? `${item.updated_by_user.first_name} ${item.updated_by_user.last_name}` : 'N/A',
-      item.updated_at ? new Date(item.updated_at).toLocaleDateString() : 'N/A',
-      item.deleted_by_user ? `${item.deleted_by_user.first_name} ${item.deleted_by_user.last_name}` : 'N/A',
-      item.deleted_at ? new Date(item.deleted_at).toLocaleDateString() : 'N/A',
+      item.under_warranty ? 'Yes' : 'No',
+      item.warranty_date ? new Date(item.warranty_date).toLocaleDateString() : 'N/A',
     ]);
 
     // Add table
@@ -451,8 +440,8 @@ export default function StoreInventoryPage() {
       body: tableRows,
       startY: 54,
       styles: {
-        fontSize: 7,
-        cellPadding: 2,
+        fontSize: 8,
+        cellPadding: 3,
       },
       headStyles: {
         fillColor: [15, 23, 42], // Slate 900
@@ -463,30 +452,16 @@ export default function StoreInventoryPage() {
         fillColor: [248, 250, 252], // Light gray
       },
       columnStyles: {
-        0: { cellWidth: 22 },  // Item Details
-        1: { cellWidth: 18 },  // Serial Number
-        2: { cellWidth: 16 },  // Status
-        3: { cellWidth: 18 },  // Category
-        4: { cellWidth: 18 },  // Brand
-        5: { cellWidth: 18 },  // Model
-        6: { cellWidth: 20 },  // Store
-        7: { cellWidth: 18 },  // Station
-        8: { cellWidth: 22 },  // Created By
-        9: { cellWidth: 18 },  // Created At
-        10: { cellWidth: 22 }, // Updated By
-        11: { cellWidth: 18 }, // Updated At
-        12: { cellWidth: 22 }, // Deleted By
-        13: { cellWidth: 18 }, // Deleted At
-      },
-      didParseCell: function(data) {
-        // Highlight deleted rows in red (only body rows, not headers)
-        if (data.section === 'body') {
-          const rowIndex = data.row.index;
-          if (sortedItems[rowIndex]?.deleted_at) {
-            data.cell.styles.fillColor = [255, 230, 230]; // Light red background
-            data.cell.styles.textColor = [180, 0, 0]; // Dark red text
-          }
-        }
+        0: { cellWidth: 35 },  // Item Details
+        1: { cellWidth: 30 },  // Serial Number
+        2: { cellWidth: 20 },  // Status
+        3: { cellWidth: 30 },  // Category
+        4: { cellWidth: 30 },  // Brand
+        5: { cellWidth: 30 },  // Model
+        6: { cellWidth: 35 },  // Store
+        7: { cellWidth: 25 },  // Station
+        8: { cellWidth: 20 },  // Warranty
+        9: { cellWidth: 25 },  // Warranty Date
       },
     });
 
@@ -579,8 +554,7 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            {!isReadOnly && (
-              <>
+            {hasPermission('manage_store_inventory') && (<>
                 <button
                   className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
                   onClick={() => setIsModalOpen(true)}
@@ -923,8 +897,7 @@ export default function StoreInventoryPage() {
                             </td>
                             <td className="p-4 text-slate-400">{item.stations?.name || <span className="text-slate-600">—</span>}</td>
                             <td className="p-4 text-right">
-                              {!isReadOnly && (
-                                <div className="flex items-center justify-end gap-2">
+                              <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -945,8 +918,7 @@ export default function StoreInventoryPage() {
                                   >
                                     <Trash2 size={16} />
                                   </button>
-                                </div>
-                              )}
+                              </div>
                             </td>
                         </tr>
                       ))
