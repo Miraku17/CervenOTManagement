@@ -20,6 +20,7 @@ export default function TicketingLayout({
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
+  const [hasAssetEditAccess, setHasAssetEditAccess] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -49,6 +50,28 @@ export default function TicketingLayout({
     checkUserRole();
   }, [user?.id]);
 
+  // Check if user has edit-only access to assets
+  useEffect(() => {
+    const checkAssetEditAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: editAccess } = await supabase
+          .from('assets_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .single();
+
+        setHasAssetEditAccess(editAccess?.can_edit === true);
+      } catch (error) {
+        // User not in assets_edit_access table, which is fine
+        setHasAssetEditAccess(false);
+      }
+    };
+
+    checkAssetEditAccess();
+  }, [user?.id]);
+
   const handleNavigate = (path: string) => {
     router.push(path);
     setIsMobileMenuOpen(false);
@@ -62,16 +85,15 @@ export default function TicketingLayout({
   const hasStoreInventoryAccess = hasPermission('manage_store_inventory');
 
   // Check if user has access to asset inventory
-  // Asset Inventory: Permission-based access
-  const hasAssetInventoryAccess = hasPermission('manage_assets');
+  // Asset Inventory: Permission-based access OR edit-only access from assets_edit_access table
+  const hasAssetInventoryAccess = hasPermission('manage_assets') || hasAssetEditAccess;
 
   // Check if user has access to audit logs
   // Audit Logs: Permission-based access
   const hasAuditLogsAccess = hasPermission('view_audit_logs');
 
   // Check if user has access to tickets
-  // Tickets: All authenticated users have access
-  const hasTicketsAccess = true;
+  const hasTicketsAccess = hasPermission('manage_tickets');
 
   // Check if user has access to overview
   const hasOverviewAccess = hasPermission('view_ticket_overview');

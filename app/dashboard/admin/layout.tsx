@@ -234,7 +234,7 @@ export default function AdminLayout({
           </div>
 
           {/* Apps Section */}
-          {!isLoadingPosition && userPosition !== null && (
+          {!isLoadingPosition && userPosition !== null && hasPermission('manage_tickets') && (
             <div>
               <SidebarLabel>Apps</SidebarLabel>
               <div className="space-y-1">
@@ -370,7 +370,7 @@ export default function AdminLayout({
                 onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
               />
             )}
-            {!isLoadingPosition && userPosition !== null && (
+            {!isLoadingPosition && userPosition !== null && hasPermission('manage_tickets') && (
               <>
                 {userPosition.toLowerCase() === 'asset' || userPosition.toLowerCase() === 'assets' ? (
                   <SidebarItem

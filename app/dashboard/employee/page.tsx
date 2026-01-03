@@ -55,6 +55,7 @@ const EmployeeDashboard: React.FC = () => {
   // Admin check
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
+  const [hasAssetEditAccess, setHasAssetEditAccess] = useState(false);
 
   // Overtime history refresh key
   const [overtimeHistoryRefreshKey, setOvertimeHistoryRefreshKey] = useState(0);
@@ -75,6 +76,28 @@ const EmployeeDashboard: React.FC = () => {
     };
 
     checkAdminStatus();
+  }, [user?.id]);
+
+  // Check if user has edit-only access to assets
+  useEffect(() => {
+    const checkAssetEditAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: editAccess } = await supabase
+          .from('assets_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .single();
+
+        setHasAssetEditAccess(editAccess?.can_edit === true);
+      } catch (error) {
+        // User not in assets_edit_access table, which is fine
+        setHasAssetEditAccess(false);
+      }
+    };
+
+    checkAssetEditAccess();
   }, [user?.id]);
 
   // Check for active clock-in session from database
@@ -376,14 +399,32 @@ const EmployeeDashboard: React.FC = () => {
           });
         },
         (error) => {
+          // Map error codes to readable strings
+          const errorTypes = {
+            1: 'PERMISSION_DENIED',
+            2: 'POSITION_UNAVAILABLE',
+            3: 'TIMEOUT'
+          };
+
+          const errorType = errorTypes[error.code as keyof typeof errorTypes] || 'UNKNOWN_ERROR';
+
           console.error('Geolocation error:', {
-            message: error.message,
+            type: errorType,
             code: error.code,
-            PERMISSION_DENIED: error.PERMISSION_DENIED,
-            POSITION_UNAVAILABLE: error.POSITION_UNAVAILABLE,
-            TIMEOUT: error.TIMEOUT
+            message: error.message
           });
-          reject(error);
+
+          // Create a more descriptive error message
+          let userFriendlyMessage = error.message;
+          if (error.code === 1) {
+            userFriendlyMessage = 'Location permission denied. Please enable location access in your browser settings.';
+          } else if (error.code === 2) {
+            userFriendlyMessage = 'Unable to determine your location. Please check your device settings.';
+          } else if (error.code === 3) {
+            userFriendlyMessage = 'Location request timed out. Please try again.';
+          }
+
+          reject(new Error(userFriendlyMessage));
         },
         {
           enableHighAccuracy: highAccuracy,
@@ -744,21 +785,23 @@ const EmployeeDashboard: React.FC = () => {
                         <BookOpen className="w-4 h-4 text-slate-400" />
                         <span>Knowledge Base</span>
                       </button>
-                      <button
-                        onClick={() => {
-                          // Redirect based on user position
-                          if (userPosition === 'asset' || userPosition === 'assets') {
-                            router.push('/dashboard/ticketing/asset-inventory');
-                          } else {
-                            router.push('/dashboard/ticketing/tickets');
-                          }
-                          setIsActionsMenuOpen(false);
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
-                      >
-                        <Ticket className="w-4 h-4 text-slate-400" />
-                        <span>{userPosition === 'asset' || userPosition === 'assets' ? 'Assets' : 'Ticketing'}</span>
-                      </button>
+                      {(hasPermission('manage_tickets') || hasAssetEditAccess) && (
+                        <button
+                          onClick={() => {
+                            // Redirect based on user position or asset edit access
+                            if (userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess) {
+                              router.push('/dashboard/ticketing/asset-inventory');
+                            } else {
+                              router.push('/dashboard/ticketing/tickets');
+                            }
+                            setIsActionsMenuOpen(false);
+                          }}
+                          className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                        >
+                          <Ticket className="w-4 h-4 text-slate-400" />
+                          <span>{userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess ? 'Assets' : 'Ticketing'}</span>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -838,21 +881,23 @@ const EmployeeDashboard: React.FC = () => {
                 <span className="font-medium text-sm">Knowledge Base</span>
               </button>
 
-              <button
-                onClick={() => {
-                  // Redirect based on user position
-                  if (userPosition === 'asset' || userPosition === 'assets') {
-                    router.push('/dashboard/ticketing/asset-inventory');
-                  } else {
-                    router.push('/dashboard/ticketing/tickets');
-                  }
-                  setIsMobileMenuOpen(false); // Close menu after clicking
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
-              >
-                <Ticket size={18} />
-                <span className="font-medium text-sm">{userPosition === 'asset' || userPosition === 'assets' ? 'Assets' : 'Ticketing'}</span>
-              </button>
+              {(hasPermission('manage_tickets') || hasAssetEditAccess) && (
+                <button
+                  onClick={() => {
+                    // Redirect based on user position or asset edit access
+                    if (userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess) {
+                      router.push('/dashboard/ticketing/asset-inventory');
+                    } else {
+                      router.push('/dashboard/ticketing/tickets');
+                    }
+                    setIsMobileMenuOpen(false); // Close menu after clicking
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
+                >
+                  <Ticket size={18} />
+                  <span className="font-medium text-sm">{userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess ? 'Assets' : 'Ticketing'}</span>
+                </button>
+              )}
 
               {isAdmin && (
                 <button

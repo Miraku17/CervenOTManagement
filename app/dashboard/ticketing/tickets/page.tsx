@@ -5,8 +5,10 @@ import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
 import { useRouter } from 'next/navigation';
+import { ShieldAlert } from 'lucide-react';
 
 // Define the Ticket interface to match the API response and Modal props
 interface Ticket {
@@ -54,6 +56,7 @@ interface Ticket {
 
 export default function TicketsPage() {
   const { user } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
@@ -101,7 +104,7 @@ export default function TicketsPage() {
     };
 
     checkUserRole();
-  }, [user?.id, router]);
+  }, [user?.id]);
 
   const canCreateTicket = userPosition !== 'Field Engineer';
   const canDeleteTicket = userPosition === 'Operations Manager';
@@ -124,10 +127,10 @@ export default function TicketsPage() {
   };
 
   useEffect(() => {
-    if (!checkingRole) {
+    if (!permissionsLoading && !checkingRole && hasPermission('manage_tickets')) {
       fetchTickets();
     }
-  }, [checkingRole]);
+  }, [permissionsLoading, checkingRole, hasPermission]);
 
   const handleTicketClick = (ticket: Ticket) => {
     setSelectedTicket(ticket);
@@ -220,13 +223,42 @@ export default function TicketsPage() {
     }
   };
 
-  // Show loading while checking role or fetching tickets
-  if (checkingRole || loading) {
+  // Show loading while checking permissions or fetching tickets
+  if (permissionsLoading || checkingRole || loading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-slate-400">Loading tickets...</p>
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-slate-400">{loading ? 'Loading tickets...' : 'Checking permissions...'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Only check permission AFTER loading is complete
+  const hasAccess = hasPermission('manage_tickets');
+
+  // Show access denied if no permission
+  if (!hasAccess) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-center space-y-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-red-500/10 flex items-center justify-center">
+            <ShieldAlert className="w-10 h-10 text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white mb-2">Access Denied</h3>
+            <p className="text-slate-400">You don't have permission to access tickets.</p>
+            <p className="text-slate-500 text-sm mt-2">
+              If you believe you should have access, please contact your administrator.
+            </p>
+          </div>
+          <button
+            onClick={() => router.push('/dashboard/ticketing')}
+            className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+          >
+            Go Back
+          </button>
         </div>
       </div>
     );
