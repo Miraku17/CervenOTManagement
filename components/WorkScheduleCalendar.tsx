@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane, Edit2, Save, Trash2, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
 import type { LeaveRequest } from '@/types';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface WorkSchedule {
   id: string;
@@ -23,6 +24,22 @@ interface WorkScheduleCalendarProps {
 }
 
 export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ userId, isOpen, onClose, userPosition, canEdit = false }) => {
+  // Use permissions hook directly in this component
+  const { permissions } = usePermissions();
+
+  // Check edit permission internally
+  const canEditSchedules = useMemo(() => {
+    const hasPermission = permissions.includes('edit_all_schedules');
+    console.log('📅 WorkScheduleCalendar - Internal permission check:', hasPermission, 'permissions:', permissions);
+    return hasPermission;
+  }, [permissions]);
+
+  // Debug: Log canEdit prop
+  useEffect(() => {
+    console.log('📅 WorkScheduleCalendar - canEdit prop (legacy):', canEdit);
+    console.log('📅 WorkScheduleCalendar - canEditSchedules (internal):', canEditSchedules);
+  }, [canEdit, canEditSchedules]);
+
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -534,7 +551,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                 <p className="text-slate-400 text-xs">Schedule Details</p>
               </div>
               <div className="flex items-center gap-2">
-                {canEdit && !selectedLeaveRequest && !isEditing && (
+                {canEditSchedules && !selectedLeaveRequest && !isEditing && (
                   <button
                     onClick={() => handleEdit(selectedSchedule, selectedDate)}
                     className="p-2 hover:bg-slate-800 rounded-full text-blue-400 hover:text-blue-300 transition-colors"
@@ -726,7 +743,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                 <div className="text-center py-10 text-slate-500 flex flex-col items-center">
                   <CalendarIcon className="w-10 h-10 mb-3 opacity-30" />
                   <p className="text-sm">No schedule found for this date</p>
-                  {canEdit && (
+                  {canEditSchedules && (
                     <button
                       onClick={() => handleEdit(null, selectedDate)}
                       className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"

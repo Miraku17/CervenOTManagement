@@ -2,6 +2,7 @@ import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { differenceInDays, parseISO } from 'date-fns';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,22 +28,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Check if user has required position
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', req.user?.id)
-      .single();
+    // Check if user has approve_leave permission
+    const hasPermission = await userHasPermission(req.user?.id || '', 'approve_leave');
 
-    if (profileError) {
-      throw profileError;
-    }
-
-    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-
-    if (userPosition !== 'Operations Manager') {
+    if (!hasPermission) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager can update leave requests'
+        error: 'Forbidden: You do not have permission to approve/reject leave requests'
       });
     }
 

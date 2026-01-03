@@ -42,10 +42,14 @@ interface ConfirmationState {
 }
 
 interface OvertimeRequestsViewProps {
-  userPosition: string | null;
+  canApproveLevel1: boolean;
+  canApproveLevel2: boolean;
 }
 
-const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPosition }) => {
+const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
+  canApproveLevel1,
+  canApproveLevel2
+}) => {
   const { user } = useAuth();
   const [requests, setRequests] = useState<OvertimeRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -63,10 +67,10 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
 
   useEffect(() => {
     // Fetch requests immediately since access is already verified by the page
-    if (user?.id && userPosition) {
+    if (user?.id) {
       fetchRequests();
     }
-  }, [user?.id, userPosition]);
+  }, [user?.id]);
 
   const fetchRequests = async () => {
     // Keep loading true only on initial load if desired, or just rely on refreshing logic
@@ -88,30 +92,6 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
     }
   };
 
-  // Helper functions to determine user's approval level
-  const isLevel1Approver = () => {
-    if (!userPosition) return false;
-    const level1Positions = ['Admin Tech', 'Technical Support Engineer', 'Operations Technical Lead'];
-    return level1Positions.includes(userPosition);
-  };
-
-  const isLevel2Approver = () => {
-    if (!userPosition) return false;
-    const level2Positions = ['Operations Manager', 'Admin Tech'];
-    return level2Positions.includes(userPosition);
-  };
-
-  // Check if user has any access to overtime requests
-  const hasOvertimeAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Admin Tech',
-      'Technical Support Engineer',
-      'Operations Technical Lead',
-      'Operations Manager'
-    ];
-    return authorizedPositions.includes(userPosition);
-  };
 
   const formatTime = (time: string) => {
     const [hours, minutes] = time.split(':');
@@ -365,7 +345,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
                     </p>
                   )}
                 </div>
-                {isLevel2Approver() && (
+                {canApproveLevel2 && (
                   <>
                     <div>
                       <label className="text-xs text-slate-500 uppercase font-medium">Level 2 Status</label>
@@ -466,11 +446,6 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
           <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-slate-300">
             <span className="font-bold text-white">{requests.filter(r => !r.final_status || r.final_status === 'pending').length}</span> Pending Requests
           </div>
-          {userPosition && (
-            <div className="bg-blue-500/10 px-4 py-2 rounded-lg border border-blue-500/30 text-blue-400">
-              <span className="font-semibold">{userPosition}</span>
-            </div>
-          )}
         </div>
       </div>
 
@@ -484,8 +459,8 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
                 <th className="px-6 py-4">Time Period</th>
                 <th className="px-6 py-4">Hours</th>
                 <th className="px-6 py-4">Level 1 Status</th>
-                {isLevel2Approver() && <th className="px-6 py-4">Level 2 Status</th>}
-                {isLevel2Approver() && <th className="px-6 py-4">Final Status</th>}
+                {canApproveLevel2 && <th className="px-6 py-4">Level 2 Status</th>}
+                {canApproveLevel2 && <th className="px-6 py-4">Final Status</th>}
                 <th className="px-6 py-4">Reason</th>
                 <th className="px-6 py-4 text-center">Actions</th>
               </tr>
@@ -493,7 +468,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
             <tbody className="divide-y divide-slate-800/50">
               {requests.length === 0 ? (
                 <tr>
-                  <td colSpan={isLevel2Approver() ? 9 : 7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={canApproveLevel2 ? 9 : 7} className="px-6 py-12 text-center text-slate-500">
                     <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
                     <p>No overtime requests found</p>
                   </td>
@@ -501,8 +476,8 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
               ) : (
                 requests.map((request) => {
                   // Determine what actions the current user can take
-                  const canLevel1Approve = isLevel1Approver() && (!request.level1_status || request.level1_status === 'pending');
-                  const canLevel2Approve = isLevel2Approver() && request.level1_status === 'approved' && (!request.level2_status || request.level2_status === 'pending');
+                  const canLevel1Approve = canApproveLevel1 && (!request.level1_status || request.level1_status === 'pending');
+                  const canLevel2Approve = canApproveLevel2 && request.level1_status === 'approved' && (!request.level2_status || request.level2_status === 'pending');
                   const showActions = canLevel1Approve || canLevel2Approve;
 
                   return (
@@ -560,7 +535,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
                       )}
                     </td>
                     {/* Level 2 Status */}
-                    {isLevel2Approver() && (
+                    {canApproveLevel2 && (
                       <td className="px-6 py-4">
                         {request.level2_status ? (
                           <div className="flex flex-col items-start gap-1">
@@ -581,7 +556,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({ userPositio
                       </td>
                     )}
                     {/* Final Status */}
-                    {isLevel2Approver() && (
+                    {canApproveLevel2 && (
                       <td className="px-6 py-4">
                         {request.final_status ? (
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.final_status)}`}>

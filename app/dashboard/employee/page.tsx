@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { ProfileHeader } from '@/components/ProfileHeader';
 import { TimeTracker } from '@/components/TimeTracker';
 import { CalendarView } from '@/components/CalendarView';
@@ -12,6 +12,7 @@ import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
 import { WorkLog } from '@/types';
 import { useRouter } from 'next/navigation';
@@ -19,7 +20,21 @@ import { formatInTimeZone } from 'date-fns-tz';
 
 const EmployeeDashboard: React.FC = () => {
   const { user, logout, isLoggingOut, loading: authLoading } = useAuth();
+  const { hasPermission, permissions, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
+
+  // Debug: Log permissions when they change
+  useEffect(() => {
+    console.log('🔑 User permissions:', permissions);
+    console.log('✏️ Can edit schedules:', hasPermission('edit_all_schedules'));
+  }, [permissions, hasPermission]);
+
+  // Compute canEdit reactively based on permissions
+  const canEditSchedules = useMemo(() => {
+    const result = permissions.includes('edit_all_schedules');
+    console.log('🎯 Computed canEditSchedules:', result, 'from permissions:', permissions);
+    return result;
+  }, [permissions]);
   const [activeLog, setActiveLog] = useState<WorkLog | null>(null);
   const [workLogs, setWorkLogs] = useState<WorkLog[]>([]);
   const [isClocking, setIsClocking] = useState(false);
@@ -643,6 +658,7 @@ const EmployeeDashboard: React.FC = () => {
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
         userId={user?.id || ''}
+        canEdit={!permissionsLoading && canEditSchedules}
       />
 
       {/* Navbar */}

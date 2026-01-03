@@ -16,6 +16,7 @@ import {
   BookOpen
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter, usePathname } from 'next/navigation';
 import { supabase } from '@/services/supabase';
 
@@ -25,6 +26,7 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const { logout, isLoggingOut, user } = useAuth();
+  const { hasPermission } = usePermissions();
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -59,15 +61,7 @@ export default function AdminLayout({
 
   // Check if user has access to overtime requests
   const hasOvertimeAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Admin Tech',
-      'Technical Support Engineer',
-      'Technical Support Lead',
-      'Operations Technical Lead',
-      'Operations Manager'
-    ];
-    return authorizedPositions.includes(userPosition);
+    return hasPermission('view_overtime');
   };
 
   // Check if user has access to edit time
@@ -77,24 +71,12 @@ export default function AdminLayout({
 
   // Check if user has access to leave requests
   const hasLeaveRequestsAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Operations Manager',
-      'Technical Support Lead',
-      'Technical Support Engineer'
-    ];
-    return authorizedPositions.includes(userPosition);
+    return hasPermission('view_leave');
   };
 
   // Check if user has access to import schedule
   const hasImportScheduleAccess = () => {
-    if (!userPosition) return false;
-    const authorizedPositions = [
-      'Operations Manager',
-      'Technical Support Lead',
-      'Technical Support Engineer'
-    ];
-    return authorizedPositions.includes(userPosition);
+    return hasPermission('import_schedule');
   };
 
   // Check if user has access to reports
@@ -178,12 +160,14 @@ export default function AdminLayout({
                 isActive={isActive('/dashboard/admin/employees')}
                 onClick={() => handleNavigate('/dashboard/admin/employees')}
               />
-              <SidebarItem
-                icon={<Calendar size={18} />}
-                label="Employee Schedule"
-                isActive={isActive('/dashboard/admin/employee-schedule')}
-                onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
-              />
+              {hasPermission('view_all_schedules') && (
+                <SidebarItem
+                  icon={<Calendar size={18} />}
+                  label="Employee Schedule"
+                  isActive={isActive('/dashboard/admin/employee-schedule')}
+                  onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
+                />
+              )}
               {hasImportScheduleAccess() && (
                 <SidebarItem
                   icon={<FileUp size={18} />}
@@ -386,12 +370,14 @@ export default function AdminLayout({
                 onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
               />
             )}
-            <SidebarItem
-              icon={<Calendar size={24} />}
-              label="Employee Schedule"
-              isActive={isActive('/dashboard/admin/employee-schedule')}
-              onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
-            />
+            {hasPermission('view_all_schedules') && (
+              <SidebarItem
+                icon={<Calendar size={24} />}
+                label="Employee Schedule"
+                isActive={isActive('/dashboard/admin/employee-schedule')}
+                onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
+              />
+            )}
             {!isLoadingPosition && userPosition !== null && (
               <>
                 {userPosition.toLowerCase() === 'asset' || userPosition.toLowerCase() === 'assets' ? (

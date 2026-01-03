@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,24 +14,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Check if user has required position
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', req.user?.id)
-      .single();
+    // Check if user has view_leave permission
+    const hasPermission = await userHasPermission(req.user?.id || '', 'view_leave');
 
-    if (profileError) {
-      throw profileError;
-    }
-
-    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-
-    // Allow Operations Manager, Technical Support Lead, and Technical Support Engineer
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
-    if (!allowedPositions.includes(userPosition)) {
+    if (!hasPermission) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager, Technical Support Lead, and Technical Support Engineer can access leave requests'
+        error: 'Forbidden: You do not have permission to view leave requests'
       });
     }
 

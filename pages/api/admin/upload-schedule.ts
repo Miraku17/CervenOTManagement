@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { parse } from 'csv-parse';
 import { parse as parseDate } from 'date-fns';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 const weekDaysMap: Record<string, number> = {
   Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6,
@@ -32,23 +33,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Check if user has required position
-    const { data: userProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', req.user?.id)
-      .single();
+    // Check if user has import_schedule permission
+    const hasPermission = await userHasPermission(req.user?.id || '', 'import_schedule');
 
-    if (profileError) {
-      throw profileError;
-    }
-
-    const userPosition = userProfile?.positions && (userProfile.positions as any).name;
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
-
-    if (!allowedPositions.includes(userPosition)) {
+    if (!hasPermission) {
       return res.status(403).json({
-        error: 'Forbidden: Only Operations Manager, Technical Support Lead, and Technical Support Engineer can import schedules'
+        error: 'Forbidden: You do not have permission to import schedules'
       });
     }
   } catch (error: any) {

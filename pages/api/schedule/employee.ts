@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -24,22 +25,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Check if user has permission to view other employees' schedules
-    const allowedPositions = ['Operations Manager', 'Technical Support Lead', 'Technical Support Engineer'];
-
-    // Fetch the authenticated user's profile to check their position
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('position_id, positions(name)')
-      .eq('id', authenticatedUserId)
-      .single();
-
-    if (profileError) {
-      console.error('Error fetching user profile:', profileError);
-      return res.status(500).json({ error: 'Failed to fetch user profile' });
-    }
-
-    const positionName = (profile?.positions as any)?.name;
-    const canViewOtherSchedules = positionName && allowedPositions.includes(positionName);
+    const canViewOtherSchedules = await userHasPermission(authenticatedUserId, 'view_all_schedules');
 
     // Determine which user's schedule to fetch
     let userId: string;
