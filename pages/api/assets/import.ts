@@ -10,6 +10,7 @@ export const config = {
       sizeLimit: '10mb',
     },
   },
+  maxDuration: 300, // 5 minutes timeout for large imports
 };
 
 interface ImportRow {
@@ -308,18 +309,45 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // PHASE 2: ALL VALIDATIONS PASSED - NOW ACTUALLY IMPORT THE DATA
     console.log('Phase 2: All validations passed. Importing data...');
 
+    // Create caches to avoid repeated database lookups
+    const categoryCache = new Map<string, string>(); // category name -> id
+    const brandCache = new Map<string, string>(); // brand name -> id
+    const modelCache = new Map<string, string>(); // model name -> id
+
     for (let i = 0; i < nonEmptyData.length; i++) {
       const { row, originalIndex } = nonEmptyData[i];
       const rowNumber = originalIndex + 2;
+
+      // Log progress every 50 rows
+      if (i > 0 && i % 50 === 0) {
+        console.log(`Progress: ${i}/${nonEmptyData.length} rows processed...`);
+      }
 
       try {
         const underWarranty = row['Under Warranty'].toLowerCase() === 'yes';
         const warrantyDate = row['Warranty Date'] ? row['Warranty Date'].toString().trim() : null;
 
-        // Get or create category, brand, model
-        const categoryId = await getOrCreateRecord('categories', 'name', row['Category']);
-        const brandId = await getOrCreateRecord('brands', 'name', row['Brand']);
-        const modelId = await getOrCreateRecord('models', 'name', row['Model']);
+        // Get or create category, brand, model (with caching)
+        const categoryKey = row['Category'].toString().trim().toUpperCase();
+        let categoryId = categoryCache.get(categoryKey);
+        if (!categoryId) {
+          categoryId = await getOrCreateRecord('categories', 'name', row['Category']);
+          if (categoryId) categoryCache.set(categoryKey, categoryId);
+        }
+
+        const brandKey = row['Brand'].toString().trim().toUpperCase();
+        let brandId = brandCache.get(brandKey);
+        if (!brandId) {
+          brandId = await getOrCreateRecord('brands', 'name', row['Brand']);
+          if (brandId) brandCache.set(brandKey, brandId);
+        }
+
+        const modelKey = row['Model'].toString().trim().toUpperCase();
+        let modelId = modelCache.get(modelKey);
+        if (!modelId) {
+          modelId = await getOrCreateRecord('models', 'name', row['Model']);
+          if (modelId) modelCache.set(modelKey, modelId);
+        }
 
         // Check if asset with same serial number already exists
         const { data: existingAsset } = await supabaseAdmin
@@ -377,6 +405,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         });
       }
     }
+
+    console.log(`Import completed: ${result.success} successful, ${result.failed} failed, ${result.created} created, ${result.updated} updated`);
 
     // Save errors to database if import log was created
     if (importLog && result.errors.length > 0) {
