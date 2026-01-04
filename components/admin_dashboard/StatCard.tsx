@@ -105,16 +105,16 @@ export const StatCard: React.FC<StatCardProps> = ({
         </div>
         
         <div className={`
-          p-3 rounded-xl 
+          p-3 rounded-xl
           ${styles.bg} ${styles.border} border
           ${styles.text}
           shadow-sm group-hover:shadow-md
           transition-all duration-300
         `}>
-          {React.cloneElement(icon as React.ReactElement, { 
-            size: 24, 
-            strokeWidth: 2 
-          })}
+          {React.cloneElement(icon as React.ReactElement<any>, {
+            size: 24,
+            strokeWidth: 2
+          } as any)}
         </div>
       </div>
 
