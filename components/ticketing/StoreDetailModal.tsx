@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Edit2, Save, Store as StoreIcon, MapPin, Phone, User, Calendar, Trash2, CheckCircle } from 'lucide-react';
 import { Store } from '@/types';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { usePermissions } from '@/hooks/usePermissions';
 
 interface StoreDetailModalProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface StoreDetailModalProps {
 }
 
 const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, store, onUpdate }) => {
+  const { hasPermission } = usePermissions();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     store_name: '',
@@ -139,20 +141,26 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
           <div className="flex items-center gap-2">
             {!isEditing && (
                 <>
-                    <button
-                        onClick={() => setIsDeleteModalOpen(true)}
-                        className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                        title="Delete Store"
-                    >
-                        <Trash2 size={20} />
-                    </button>
-                    <button
-                        onClick={() => setIsEditing(true)}
-                        className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
-                        title="Edit Store"
-                    >
-                        <Edit2 size={20} />
-                    </button>
+                    {/* Only Operations Manager can delete stores */}
+                    {hasPermission('delete_stores') && (
+                      <button
+                          onClick={() => setIsDeleteModalOpen(true)}
+                          className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                          title="Delete Store"
+                      >
+                          <Trash2 size={20} />
+                      </button>
+                    )}
+                    {/* Operations Manager, Tech Support Lead, Tech Support Engineer can edit stores */}
+                    {hasPermission('manage_stores') && (
+                      <button
+                          onClick={() => setIsEditing(true)}
+                          className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
+                          title="Edit Store"
+                      >
+                          <Edit2 size={20} />
+                      </button>
+                    )}
                 </>
             )}
             <button 
