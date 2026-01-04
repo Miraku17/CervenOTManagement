@@ -41,6 +41,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const searchTerm = (req.query.search as string) || '';
+    const statusFilter = (req.query.status as string) || '';
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
@@ -89,8 +90,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (fetchError) throw fetchError;
 
-    // Filter assets based on search term (search across all fields)
+    // Filter assets based on search term (search across all fields) and status
     let filteredAssets = allAssetsWithDetails || [];
+    
+    // Apply status filter
+    if (statusFilter && statusFilter !== 'All') {
+      filteredAssets = filteredAssets.filter((asset: any) => asset.status === statusFilter);
+    }
+
+    // Apply search filter
     if (searchTerm) {
       const searchLower = searchTerm.toLowerCase();
       filteredAssets = filteredAssets.filter((asset: any) => {

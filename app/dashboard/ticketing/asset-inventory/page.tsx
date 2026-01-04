@@ -69,6 +69,11 @@ export default function AssetInventoryPage() {
   const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
   const actionsDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Filter state
+  const [statusFilter, setStatusFilter] = useState('All');
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
@@ -101,6 +106,9 @@ export default function AssetInventoryPage() {
     const handleClickOutside = (event: MouseEvent) => {
       if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
         setIsActionsDropdownOpen(false);
+      }
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
       }
     };
 
@@ -161,7 +169,7 @@ export default function AssetInventoryPage() {
 
   useEffect(() => {
     fetchAssets();
-  }, [currentPage, pageSize, searchTerm]);
+  }, [currentPage, pageSize, searchTerm, statusFilter]);
 
   // Reset to page 1 when search term changes
   useEffect(() => {
@@ -174,7 +182,8 @@ export default function AssetInventoryPage() {
     try {
       setLoading(true);
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      const response = await fetch(`/api/assets/get?page=${currentPage}&limit=${pageSize}${searchParam}`);
+      const statusParam = statusFilter && statusFilter !== 'All' ? `&status=${encodeURIComponent(statusFilter)}` : '';
+      const response = await fetch(`/api/assets/get?page=${currentPage}&limit=${pageSize}${searchParam}${statusParam}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -688,14 +697,40 @@ export default function AssetInventoryPage() {
             />
         </div>
         <div className="flex flex-wrap gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-all active:scale-95 whitespace-nowrap">
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border ${statusFilter !== 'All' ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300'} rounded-xl hover:border-slate-600 transition-all active:scale-95 whitespace-nowrap`}
+              >
                 <Filter size={18} />
-                <span>Status</span>
-            </button>
-             <button className="flex items-center gap-2 px-4 py-2.5 bg-slate-950 border border-slate-800 text-slate-300 rounded-xl hover:border-slate-600 transition-all active:scale-95 whitespace-nowrap">
-                <Monitor size={18} />
-                <span>Type</span>
-            </button>
+                <span>{statusFilter === 'All' ? 'Status' : statusFilter}</span>
+                <ChevronDown size={16} className={`ml-1 transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+              
+              {isStatusDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="p-1 space-y-1">
+                    {['All', 'Available', 'In Use', 'Under Repair', 'Broken'].map((status) => (
+                      <button
+                        key={status}
+                        onClick={() => {
+                          setStatusFilter(status);
+                          setIsStatusDropdownOpen(false);
+                          setCurrentPage(1); // Reset to first page
+                        }}
+                        className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                          statusFilter === status
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
         </div>
       </div>
 
