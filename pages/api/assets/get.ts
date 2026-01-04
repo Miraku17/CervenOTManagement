@@ -37,19 +37,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to view assets' });
     }
 
-    // Get pagination parameters from query
+    // Get pagination and search parameters from query
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
+    const searchTerm = (req.query.search as string) || '';
     const from = (page - 1) * limit;
     const to = from + limit - 1;
-
-    // Get total count
-    const { count: totalCount, error: countError } = await supabaseAdmin
-      .from('asset_inventory')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
-
-    if (countError) throw countError;
 
     // Get stats (count all assets, not just current page)
     const { data: allAssets, error: statsError } = await supabaseAdmin
@@ -60,13 +53,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (statsError) throw statsError;
 
     const stats = {
-      totalAssets: totalCount || 0,
+      totalAssets: allAssets?.length || 0,
       withSerialNumber: allAssets?.filter(a => a.serial_number).length || 0,
       uniqueCategories: new Set(allAssets?.map(a => a.category_id).filter(Boolean)).size || 0,
     };
 
-    // Get paginated data
-    const { data: assets, error } = await supabaseAdmin
+    // Fetch all assets with joined data (we'll filter in memory for search)
+    const { data: allAssetsWithDetails, error: fetchError } = await supabaseAdmin
       .from('asset_inventory')
       .select(`
         id,
@@ -91,11 +84,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           name
         )
       `)
-      .is('deleted_at', null) // Only fetch non-deleted assets
-      .order('created_at', { ascending: false })
-      .range(from, to);
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (fetchError) throw fetchError;
+
+    // Filter assets based on search term (search across all fields)
+    let filteredAssets = allAssetsWithDetails || [];
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredAssets = filteredAssets.filter((asset: any) => {
+        return (
+          asset.serial_number?.toLowerCase().includes(searchLower) ||
+          asset.categories?.name?.toLowerCase().includes(searchLower) ||
+          asset.brands?.name?.toLowerCase().includes(searchLower) ||
+          asset.models?.name?.toLowerCase().includes(searchLower) ||
+          asset.status?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Apply pagination to filtered results
+    const totalCount = filteredAssets.length;
+    const assets = filteredAssets.slice(from, to + 1);
 
     // Fetch user details separately for created_by and updated_by
     const assetsWithUsers = await Promise.all(

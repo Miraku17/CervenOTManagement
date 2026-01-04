@@ -161,11 +161,11 @@ export default function AssetInventoryPage() {
 
   useEffect(() => {
     fetchAssets();
-  }, [currentPage, pageSize]);
+  }, [currentPage, pageSize, searchTerm]);
 
   // Reset to page 1 when search term changes
   useEffect(() => {
-    if (searchTerm) {
+    if (searchTerm !== '') {
       setCurrentPage(1);
     }
   }, [searchTerm]);
@@ -173,7 +173,8 @@ export default function AssetInventoryPage() {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/assets/get?page=${currentPage}&limit=${pageSize}`);
+      const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
+      const response = await fetch(`/api/assets/get?page=${currentPage}&limit=${pageSize}${searchParam}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -412,6 +413,13 @@ export default function AssetInventoryPage() {
       return;
     }
 
+    // Validate file size (rough estimate: 1MB should be plenty for 1000 rows)
+    const maxFileSize = 5 * 1024 * 1024; // 5MB
+    if (file.size > maxFileSize) {
+      showToast('error', 'File is too large. Maximum file size is 5MB (approximately 1000 rows).');
+      return;
+    }
+
     setIsImporting(true);
     setImportingFileName(file.name);
     try {
@@ -495,16 +503,8 @@ export default function AssetInventoryPage() {
     }
   };
 
-  // Filter assets based on search term
-  const filteredAssets = assets.filter((asset) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      asset.categories?.name.toLowerCase().includes(searchLower) ||
-      asset.brands?.name.toLowerCase().includes(searchLower) ||
-      asset.models?.name.toLowerCase().includes(searchLower) ||
-      asset.serial_number?.toLowerCase().includes(searchLower)
-    );
-  });
+  // Assets are already filtered by the API based on search term
+  const filteredAssets = assets;
 
   return (
     <div className="space-y-6">
