@@ -35,16 +35,19 @@ interface ImportResult {
 async function getOrCreateRecord(
   table: string,
   nameField: string,
-  value: string,
+  value: any,
   additionalFields?: Record<string, any>
 ): Promise<string | null> {
-  if (!value || value.trim() === '') return null;
+  // Convert to string first (in case Excel parsed it as a number)
+  const stringValue = value ? value.toString().trim() : '';
+
+  if (!stringValue) return null;
 
   if (!supabaseAdmin) {
     throw new Error('Database connection not available');
   }
 
-  const trimmedValue = value.trim();
+  const trimmedValue = stringValue;
 
   // Try to find existing record
   const { data: existing, error: findError } = await supabaseAdmin
@@ -237,7 +240,39 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         // Parse warranty information
         const underWarrantyValue = row['Under Warranty']?.toString().toLowerCase();
         const underWarranty = underWarrantyValue === 'yes';
-        const warrantyDate = underWarranty && row['Warranty Date'] ? row['Warranty Date'].toString() : null;
+
+        // Validate and convert warranty date
+        let warrantyDate: string | null = null;
+        if (row['Warranty Date']) {
+          const rawDate = row['Warranty Date'];
+
+          // Check if it's an Excel serial number (number)
+          if (typeof rawDate === 'number') {
+            // Convert Excel serial date to JS Date
+            // Excel dates are days since 1900-01-01 (with leap year bug)
+            const excelEpoch = new Date(1900, 0, 1);
+            const daysOffset = rawDate > 59 ? rawDate - 2 : rawDate - 1;
+            const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+
+            // Convert to YYYY-MM-DD for database
+            const year = jsDate.getFullYear();
+            const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+            const day = String(jsDate.getDate()).padStart(2, '0');
+            warrantyDate = `${year}-${month}-${day}`;
+          } else {
+            // It's a string - check if it's in MM/DD/YYYY format
+            const dateString = rawDate.toString().trim();
+            const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+
+            if (!dateRegex.test(dateString)) {
+              throw new Error('Warranty Date must be in MM/DD/YYYY format (e.g., 12/31/2025). Use Excel\'s default date format.');
+            }
+
+            // Convert MM/DD/YYYY to YYYY-MM-DD for database
+            const [month, day, year] = dateString.split('/');
+            warrantyDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
 
         // Get or create store
         let storeId: string | null = null;

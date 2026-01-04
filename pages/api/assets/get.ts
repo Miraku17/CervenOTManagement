@@ -21,7 +21,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Check permissions
     const hasManageAssets = await userHasPermission(userId, 'manage_assets');
-    
+
     // Check edit access
     let hasEditAccess = false;
     if (!hasManageAssets) {
@@ -37,6 +37,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to view assets' });
     }
 
+    // Get pagination parameters from query
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // Get total count
+    const { count: totalCount, error: countError } = await supabaseAdmin
+      .from('asset_inventory')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
+
+    if (countError) throw countError;
+
+    // Get stats (count all assets, not just current page)
+    const { data: allAssets, error: statsError } = await supabaseAdmin
+      .from('asset_inventory')
+      .select('serial_number, category_id')
+      .is('deleted_at', null);
+
+    if (statsError) throw statsError;
+
+    const stats = {
+      totalAssets: totalCount || 0,
+      withSerialNumber: allAssets?.filter(a => a.serial_number).length || 0,
+      uniqueCategories: new Set(allAssets?.map(a => a.category_id).filter(Boolean)).size || 0,
+    };
+
+    // Get paginated data
     const { data: assets, error } = await supabaseAdmin
       .from('asset_inventory')
       .select(`
@@ -63,7 +92,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `)
       .is('deleted_at', null) // Only fetch non-deleted assets
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
     if (error) throw error;
 
@@ -101,7 +131,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     return res.status(200).json({
       assets: assetsWithUsers || [],
-      count: assetsWithUsers?.length || 0,
+      stats,
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+      },
     });
   } catch (error: any) {
     console.error('Error fetching assets:', error);
