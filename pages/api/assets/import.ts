@@ -129,6 +129,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         row['Category'] || row['Brand'] || row['Model'] || row['Serial Number']
       );
 
+    // Check row count limits
+    const MAX_ROWS = 1000;
+    const WARNING_THRESHOLD = 500;
+
+    if (nonEmptyData.length > MAX_ROWS) {
+      return res.status(400).json({
+        error: `File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import. Please split your file into smaller batches.`,
+        rowCount: nonEmptyData.length,
+        maxAllowed: MAX_ROWS,
+      });
+    }
+
+    if (nonEmptyData.length > WARNING_THRESHOLD) {
+      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take 30-60 seconds to complete.`);
+    }
+
     // Create import log entry
     const { data: importLog, error: importLogError } = await supabaseAdmin
       .from('import_logs')
@@ -329,21 +345,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         // Get or create category, brand, model (with caching)
         const categoryKey = row['Category'].toString().trim().toUpperCase();
-        let categoryId = categoryCache.get(categoryKey);
+        let categoryId: string | null | undefined = categoryCache.get(categoryKey);
         if (!categoryId) {
           categoryId = await getOrCreateRecord('categories', 'name', row['Category']);
           if (categoryId) categoryCache.set(categoryKey, categoryId);
         }
 
         const brandKey = row['Brand'].toString().trim().toUpperCase();
-        let brandId = brandCache.get(brandKey);
+        let brandId: string | null | undefined = brandCache.get(brandKey);
         if (!brandId) {
           brandId = await getOrCreateRecord('brands', 'name', row['Brand']);
           if (brandId) brandCache.set(brandKey, brandId);
         }
 
         const modelKey = row['Model'].toString().trim().toUpperCase();
-        let modelId = modelCache.get(modelKey);
+        let modelId: string | null | undefined = modelCache.get(modelKey);
         if (!modelId) {
           modelId = await getOrCreateRecord('models', 'name', row['Model']);
           if (modelId) modelCache.set(modelKey, modelId);
