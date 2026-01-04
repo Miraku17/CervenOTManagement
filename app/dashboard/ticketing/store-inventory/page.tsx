@@ -323,24 +323,34 @@ export default function StoreInventoryPage() {
 
           const data = await response.json();
 
+          // Handle validation errors (400 status)
+          if (response.status === 400 && data.result?.errors) {
+            console.error('Validation errors:', data.result.errors);
+
+            showToast('error', `❌ Import failed! ${data.result.failed} error(s) found. Nothing was imported.`);
+
+            // Open import logs modal to show detailed errors
+            setIsImportLogsModalOpen(true);
+
+            setIsImporting(false);
+            setImportingFileName('');
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+
           if (!response.ok) {
             throw new Error(data.error || 'Failed to import file');
           }
 
-          // Show success message with details
+          // Show success message - all items imported
           const { result } = data;
-          let message = `Import completed! ${result.success} items imported successfully.`;
-          if (result.failed > 0) {
-            message += ` ${result.failed} items failed.`;
-          }
+          showToast('success', `✅ Import successful! ${result.success} items imported.`);
 
-          showToast(result.failed > 0 ? 'error' : 'success', message);
-
-          // Store and display errors if any
+          // Log any unexpected errors (shouldn't happen after validation)
           if (result.errors && result.errors.length > 0) {
-            console.error('Import errors:', result.errors);
-            setImportErrors(result.errors);
-            setShowImportErrors(true);
+            console.error('Unexpected import errors:', result.errors);
           }
 
           // Refresh inventory
