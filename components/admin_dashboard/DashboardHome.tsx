@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Clock, UserCheck, TrendingUp, Loader2, UserX } from 'lucide-react';
+import { Users, FileClock, UserCheck, UserX, BarChart3, Loader2, MessageSquare } from 'lucide-react';
 import { Employee } from '@/types';
 import { ActiveEmployeesModal } from './ActiveEmployeesModal';
 import { InactiveEmployeesModal } from './InactiveEmployeesModal';
+import { StatCard } from './StatCard';
 
 interface DashboardHomeProps {
   employees: Employee[];
@@ -172,21 +173,21 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           title="Total Employees"
           value={stats?.totalEmployees.toString() || '0'}
           change={`${stats?.clockedInToday || 0} clocked in today`}
-          icon={<Users className="text-blue-400" />}
+          icon={<Users />}
           color="blue"
         />
         <StatCard
           title="Overtime Requests"
           value={stats?.overtimeRequests.toString() || '0'}
           change="This week"
-          icon={<Clock className="text-amber-400" />}
+          icon={<FileClock />}
           color="amber"
         />
         <StatCard
           title="Active Now"
           value={stats?.activeNow.toString() || '0'}
           change="Currently working"
-          icon={<UserCheck className="text-violet-400" />}
+          icon={<UserCheck />}
           color="violet"
           onClick={handleActiveNowClick}
         />
@@ -194,7 +195,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           title="Inactive Now"
           value={stats?.inactiveNow.toString() || '0'}
           change="Not working"
-          icon={<UserX className="text-slate-400" />}
+          icon={<UserX />}
           color="slate"
           onClick={handleInactiveNowClick}
         />
@@ -202,7 +203,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
           title="Weekly Hours"
           value={stats?.weeklyHours.toString() || '0'}
           change="This week aggregated"
-          icon={<TrendingUp className="text-emerald-400" />}
+          icon={<BarChart3 />}
           color="emerald"
         />
       </div>
@@ -292,9 +293,7 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
                         {log.overtimeRequest && log.overtimeRequest.comment && (
                           <div className="mt-2 pt-2 border-t border-slate-800/50">
                             <div className="flex items-start gap-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-400 mt-0.5 shrink-0">
-                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                              </svg>
+                              <MessageSquare size={10} className="text-amber-400 mt-0.5 shrink-0" />
                               <p className="text-[10px] text-slate-400 italic line-clamp-1">"{log.overtimeRequest.comment}"</p>
                             </div>
                           </div>
@@ -331,32 +330,5 @@ const DashboardHome: React.FC<DashboardHomeProps> = ({ employees }) => {
     </div>
   );
 };
-
-const StatCard: React.FC<{
-  title: string;
-  value: string;
-  change: string;
-  icon: React.ReactNode;
-  color: string;
-  onClick?: () => void;
-}> = ({ title, value, change, icon, color, onClick }) => (
-  <div
-    className={`bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl hover:border-slate-700 transition-all ${
-      onClick ? 'cursor-pointer hover:bg-slate-800/50' : ''
-    }`}
-    onClick={onClick}
-  >
-    <div className="flex justify-between items-start mb-4">
-      <div>
-        <p className="text-slate-400 text-sm font-medium mb-1">{title}</p>
-        <h3 className="text-2xl font-bold text-white">{value}</h3>
-      </div>
-      <div className={`p-3 rounded-xl bg-${color}-500/10`}>
-        {icon}
-      </div>
-    </div>
-    <p className="text-xs text-slate-500">{change}</p>
-  </div>
-);
 
 export default DashboardHome;

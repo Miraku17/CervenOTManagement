@@ -281,8 +281,8 @@ export default function AdminLayout({
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 md:hidden flex flex-col p-4">
-          <div className="flex justify-between items-center mb-8">
+        <div className="fixed inset-0 z-50 bg-slate-950/95 md:hidden flex flex-col">
+          <div className="flex justify-between items-center p-4 mb-4 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <img
                 src="/cerventech.png"
@@ -295,7 +295,7 @@ export default function AdminLayout({
               <X size={24} />
             </button>
           </div>
-          <nav className="space-y-4 flex-1">
+          <nav className="space-y-4 flex-1 overflow-y-auto px-4">
             <SidebarItem
               icon={<LayoutDashboard size={24} />}
               label="Dashboard"
@@ -397,11 +397,11 @@ export default function AdminLayout({
             )}
           </nav>
 
-          <div className="p-4 border-t border-slate-800 mt-auto">
+          <div className="p-4 border-t border-slate-800">
             <button
               onClick={logout}
               disabled={isLoggingOut}
-              className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900"
+              className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-4 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800"
             >
               {isLoggingOut ? (
                 <>

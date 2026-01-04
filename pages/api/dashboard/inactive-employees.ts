@@ -16,7 +16,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const today = new Date().toISOString().split('T')[0];
 
-    // Get all active (role = 'employee') users
+    // Get all users (role = 'employee' or 'admin')
     const { data: allEmployees, error: employeesError } = await supabase
       .from('profiles')
       .select(`
@@ -27,7 +27,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         employee_id,
         positions(name)
       `)
-      .eq('role', 'employee')
+      .in('role', ['employee', 'admin'])
       .order('first_name', { ascending: true });
 
     if (employeesError) throw employeesError;

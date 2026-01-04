@@ -19,22 +19,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get today's attendance
     const { data: todayAttendance, error: todayError } = await supabase
       .from('attendance')
-      .select('*')
+      .select('user_id, time_out')
       .eq('date', today);
 
     if (todayError) throw todayError;
 
-    // Get total employees (role = 'employee')
+    // Get total employees (role = 'employee' or 'admin')
     const { count: totalEmployees, error: employeeError } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .eq('role', 'employee');
+      .in('role', ['employee', 'admin']);
 
     if (employeeError) throw employeeError;
 
     // Calculate today's stats
-    const clockedInCount = todayAttendance?.length || 0;
-    const activeNow = todayAttendance?.filter(a => !a.time_out).length || 0;
+    // Count unique users who clocked in today (regardless of clock out status)
+    const clockedInTodaySet = new Set(todayAttendance?.map(a => a.user_id) || []);
+    const clockedInCount = clockedInTodaySet.size;
+
+    // Count unique active users (those with at least one session without time_out)
+    const activeUserIds = new Set(
+      todayAttendance?.filter(a => !a.time_out).map(a => a.user_id) || []
+    );
+    const activeNow = activeUserIds.size;
     const inactiveNow = (totalEmployees || 0) - activeNow;
 
     // Get this week's total hours
