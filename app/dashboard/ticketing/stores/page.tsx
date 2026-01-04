@@ -9,11 +9,12 @@ import ImportStoresModal from '@/components/ticketing/ImportStoresModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
-import { supabase } from '@/services/supabase';
 
 export default function StoresPage() {
   const { user } = useAuth();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,31 +22,22 @@ export default function StoresPage() {
   const [searchTerm, setSearchTerm] = useState('');
 
   // Access control check
-  // Stores: accessible by admin role only (no position requirement)
+  // Stores: accessible by users with view_stores permission (all except HR and Accounting)
   useEffect(() => {
     const checkAccess = async () => {
       if (!user?.id) return;
 
-      try {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
+      // Wait for permissions to load before checking
+      if (permissionsLoading) return;
 
-        const isAdmin = profile?.role === 'admin';
-
-        if (!isAdmin) {
-          router.push('/dashboard/ticketing/tickets');
-        }
-      } catch (error) {
-        console.error('Error checking access:', error);
-        router.push('/dashboard/ticketing/tickets');
+      // Check if user has view_stores permission
+      if (!hasPermission('view_stores')) {
+        router.push('/dashboard/employee');
       }
     };
 
     checkAccess();
-  }, [user?.id, router]);
+  }, [user?.id, hasPermission, permissionsLoading, router]);
 
   // Detail Modal State
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
@@ -170,20 +162,25 @@ export default function StoresPage() {
           <p className="text-slate-400">Manage your store locations and details.</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
-            <button
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-            >
-              <Plus size={20} />
-              <span>Add Store</span>
-            </button>
-            <button
-              onClick={() => setIsImportModalOpen(true)}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-colors shadow-lg shadow-green-900/20"
-            >
-              <Upload size={20} />
-              <span>Import XLSX</span>
-            </button>
+            {/* Only Operations Manager, Tech Support Lead, and Tech Support Engineer can create/import */}
+            {hasPermission('manage_stores') && (
+              <>
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+                >
+                  <Plus size={20} />
+                  <span>Add Store</span>
+                </button>
+                <button
+                  onClick={() => setIsImportModalOpen(true)}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-500 text-white rounded-xl transition-colors shadow-lg shadow-green-900/20"
+                >
+                  <Upload size={20} />
+                  <span>Import XLSX</span>
+                </button>
+              </>
+            )}
             <button
                 onClick={handlePrintAllStoresPDF}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"

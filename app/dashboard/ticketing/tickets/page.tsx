@@ -127,8 +127,13 @@ export default function TicketsPage() {
   };
 
   useEffect(() => {
-    if (!permissionsLoading && !checkingRole && hasPermission('manage_tickets')) {
-      fetchTickets();
+    if (!permissionsLoading && !checkingRole) {
+      if (hasPermission('manage_tickets')) {
+        fetchTickets();
+      } else {
+        // User doesn't have permission, stop loading to show access denied message
+        setLoading(false);
+      }
     }
   }, [permissionsLoading, checkingRole, hasPermission]);
 

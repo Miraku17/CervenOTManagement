@@ -66,16 +66,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(new URL('/dashboard/employee', request.url));
     }
 
-    // Ticketing access control - employees can only access tickets
-    if (pathname.startsWith('/dashboard/ticketing') && userRole !== 'admin') {
-      const restrictedTicketingPaths = [
-        '/dashboard/ticketing/stores',
-      ];
-
-      if (restrictedTicketingPaths.some(path => pathname.startsWith(path))) {
-        return NextResponse.redirect(new URL('/dashboard/ticketing/tickets', request.url));
-      }
-    }
+    // Permission-based access control is now handled at the page level
+    // Removed hard-coded ticketing restrictions to allow permission-based access
 
     // Redirect generic /dashboard root to employee dashboard
     if (pathname === '/dashboard' || pathname === '/dashboard/') {

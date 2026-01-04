@@ -2,6 +2,7 @@ import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import * as XLSX from 'xlsx';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 export const config = {
   api: {
@@ -19,6 +20,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
+
+  // Check if user has manage_stores permission (Operations Manager, Tech Support Lead, Tech Support Engineer)
+  const hasPermission = await userHasPermission(userId, 'manage_stores');
+  if (!hasPermission) {
+    return res.status(403).json({ error: 'You do not have permission to import stores' });
   }
 
   try {
@@ -241,4 +253,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);

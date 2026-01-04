@@ -42,12 +42,18 @@ async function getOrCreateRecord(
 
   const trimmedValue = value.trim();
 
-  // Try to find existing record
+  // Try to find existing record (use limit(1) in case of duplicates)
   const { data: existing, error: findError } = await supabaseAdmin
     .from(table)
     .select('id')
     .ilike(nameField, trimmedValue)
-    .single();
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) {
+    console.error(`Error finding ${table}:`, findError);
+    throw new Error(`Failed to find ${table}: ${findError.message}`);
+  }
 
   if (existing) {
     return existing.id;
@@ -67,7 +73,7 @@ async function getOrCreateRecord(
 
   if (createError) {
     console.error(`Error creating ${table}:`, createError);
-    throw new Error(`Failed to create ${table}: ${createError.message}`);
+    throw new Error(`Could not create ${table} - Please check that the value is valid and not a duplicate`);
   }
 
   return created.id;
@@ -150,34 +156,44 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         // Validate required fields
         if (!row['Category']) {
-          throw new Error('Category is required');
+          throw new Error('Missing Category - Please provide a category for this asset (e.g., Laptop, Monitor, Printer)');
         }
         if (!row['Brand']) {
-          throw new Error('Brand is required');
+          throw new Error('Missing Brand - Please provide a brand name for this asset (e.g., Dell, HP, Lenovo)');
         }
         if (!row['Model']) {
-          throw new Error('Model is required');
+          throw new Error('Missing Model - Please provide a model number or name for this asset');
         }
         if (!row['Serial Number']) {
-          throw new Error('Serial Number is required');
+          throw new Error('Missing Serial Number - Please provide a unique serial number for this asset');
         }
         if (!row['Under Warranty']) {
-          throw new Error('Under Warranty is required');
+          throw new Error('Missing Under Warranty - Please enter "Yes" or "No" to indicate warranty status');
         }
         if (!row['Status']) {
-          throw new Error('Status is required');
+          throw new Error('Missing Status - Please select a status: Available, In Use, Under Repair, or Broken');
         }
 
         // Validate warranty fields
         const underWarranty = row['Under Warranty'].toLowerCase() === 'yes';
         if (underWarranty && !row['Warranty Date']) {
-          throw new Error('Warranty Date is required when Under Warranty is Yes');
+          throw new Error('Missing Warranty Date - When "Under Warranty" is "Yes", you must provide a warranty expiration date in YYYY-MM-DD format (e.g., 2025-12-31)');
+        }
+
+        // Validate warranty date format if present
+        const warrantyDate = row['Warranty Date'] ? row['Warranty Date'].toString().trim() : null;
+        if (underWarranty && warrantyDate) {
+          // Check if date is in YYYY-MM-DD format or a valid date string
+          const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+          if (!dateRegex.test(warrantyDate)) {
+            throw new Error('Warranty Date must be in YYYY-MM-DD format (e.g., 2024-12-31). Please format the date column as Text in Excel and enter dates in YYYY-MM-DD format.');
+          }
         }
 
         // Validate status
         const validStatuses = ['Available', 'In Use', 'Under Repair', 'Broken', 'available', 'in use', 'under repair', 'broken'];
         if (!validStatuses.includes(row['Status'])) {
-          throw new Error('Status must be "Available", "In Use", "Under Repair", or "Broken"');
+          throw new Error(`Invalid Status "${row['Status']}" - Please use one of these options: Available, In Use, Under Repair, or Broken`);
         }
 
         // Get or create category, brand, model
@@ -186,14 +202,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const modelId = await getOrCreateRecord('models', 'name', row['Model']);
 
         if (!categoryId || !brandId || !modelId) {
-          throw new Error('Failed to create or find category, brand, or model');
+          throw new Error('Unable to process Category, Brand, or Model - Please check that these fields contain valid text values');
         }
 
         // Check if asset with same serial number already exists
         const { data: existingAsset } = await supabaseAdmin
           .from('asset_inventory')
           .select('id')
-          .ilike('serial_number', row['Serial Number'].trim())
+          .ilike('serial_number', row['Serial Number'].toString().trim())
           .single();
 
         if (existingAsset) {
@@ -205,14 +221,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               brand_id: brandId,
               model_id: modelId,
               under_warranty: underWarranty,
-              warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
+              warranty_date: underWarranty ? warrantyDate : null,
               status: row['Status'].trim(),
               updated_at: new Date().toISOString(),
               updated_by: userId,
             })
             .eq('id', existingAsset.id);
 
-          if (updateError) throw new Error(`Failed to update asset: ${updateError.message}`);
+          if (updateError) throw new Error(`Could not update asset - ${updateError.message}. Please verify all data is entered correctly`);
         } else {
           // Create new asset
           const { error: assetError } = await supabaseAdmin
@@ -221,14 +237,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               category_id: categoryId,
               brand_id: brandId,
               model_id: modelId,
-              serial_number: row['Serial Number'].trim(),
+              serial_number: row['Serial Number'].toString().trim(),
               under_warranty: underWarranty,
-              warranty_date: underWarranty && row['Warranty Date'] ? row['Warranty Date'] : null,
+              warranty_date: underWarranty ? warrantyDate : null,
               status: row['Status'].trim(),
               created_by: userId,
             });
 
-          if (assetError) throw new Error(`Failed to create asset: ${assetError.message}`);
+          if (assetError) throw new Error(`Could not create asset - ${assetError.message}. Please verify all data is entered correctly`);
         }
 
         result.success++;

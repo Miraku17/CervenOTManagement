@@ -51,7 +51,13 @@ async function getOrCreateRecord(
     .from(table)
     .select('id')
     .ilike(nameField, trimmedValue)
+    .limit(1)
     .maybeSingle();
+
+  if (findError) {
+    console.error(`Error finding ${table}:`, findError);
+    throw new Error(`Could not search for ${table} - Please contact support if this issue persists`);
+  }
 
   if (existing) {
     return existing.id;
@@ -71,7 +77,7 @@ async function getOrCreateRecord(
 
   if (createError) {
     console.error(`Error creating ${table}:`, createError);
-    throw new Error(`Failed to create ${table}: ${createError.message}`);
+    throw new Error(`Could not create ${table} - Please check that the value is valid and not a duplicate`);
   }
 
   return created.id;
@@ -218,13 +224,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (!row['Status']) missingFields.push('Status');
 
         if (missingFields.length > 0) {
-          throw new Error(`Missing required field${missingFields.length > 1 ? 's' : ''}: ${missingFields.join(', ')}`);
+          throw new Error(`Missing required information - Please fill in the following field${missingFields.length > 1 ? 's' : ''}: ${missingFields.join(', ')}`);
         }
 
         // Validate and normalize status
         const statusValue = row['Status'].toString().trim().toLowerCase();
         if (!['permanent', 'temporary'].includes(statusValue)) {
-          throw new Error(`Invalid Status "${row['Status']}". Status must be either "Permanent" or "Temporary"`);
+          throw new Error(`Invalid Status "${row['Status']}" - Please use either "Permanent" or "Temporary"`);
         }
         const status = statusValue as 'permanent' | 'temporary';
 
@@ -257,14 +263,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             .select('id')
             .single();
 
-          if (storeError) throw new Error(`Failed to create store: ${storeError.message}`);
+          if (storeError) throw new Error(`Could not create store - ${storeError.message}. Please verify Store Name and Store Code are correct`);
           storeId = newStore.id;
         }
 
         // Get or create station (required)
         const stationId = await getOrCreateRecord('stations', 'name', row['Station Name'].toString());
         if (!stationId) {
-          throw new Error('Failed to create or find station');
+          throw new Error('Unable to process Station Name - Please check that this field contains valid text');
         }
 
         // Get or create category, brand, model
@@ -273,7 +279,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const modelId = await getOrCreateRecord('models', 'name', row['Model'].toString());
 
         if (!categoryId || !brandId || !modelId) {
-          throw new Error('Failed to create or find category, brand, or model');
+          throw new Error('Unable to process Category, Brand, or Model - Please check that these fields contain valid text values');
         }
 
         // Normalize serial number
@@ -296,7 +302,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             created_by: userId,
           });
 
-        if (inventoryError) throw new Error(`Failed to create inventory: ${inventoryError.message}`);
+        if (inventoryError) throw new Error(`Could not add item to inventory - ${inventoryError.message}. Please verify all data is entered correctly`);
 
         result.success++;
       } catch (error: any) {
