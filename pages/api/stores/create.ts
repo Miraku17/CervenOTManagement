@@ -1,11 +1,23 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ error: 'User not authenticated' });
+  }
+
+  // Check if user has manage_stores permission (Operations Manager, Tech Support Lead, Tech Support Engineer)
+  const hasPermission = await userHasPermission(userId, 'manage_stores');
+  if (!hasPermission) {
+    return res.status(403).json({ error: 'You do not have permission to create stores' });
   }
 
   const { store_name, store_code, store_type, contact_no, mobile_number, store_address, city, location, group, status, managers } = req.body;
@@ -79,4 +91,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);

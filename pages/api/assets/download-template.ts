@@ -51,19 +51,48 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Add instructions sheet
     const instructions = [
-      { 'Field': 'Category', 'Description': 'Product category (Required)', 'Example': 'Desktop, Laptop, Monitor, Printer, etc.' },
-      { 'Field': 'Brand', 'Description': 'Brand name (Required)', 'Example': 'Dell, HP, Lenovo, Canon' },
-      { 'Field': 'Model', 'Description': 'Model name (Required)', 'Example': 'OptiPlex 7090, ThinkPad X1' },
-      { 'Field': 'Serial Number', 'Description': 'Unique serial number (Required)', 'Example': 'SN123456789' },
-      { 'Field': 'Under Warranty', 'Description': 'Warranty status - Yes or No (Required)', 'Example': 'Yes' },
-      { 'Field': 'Warranty Date', 'Description': 'Warranty expiration date (Required if under warranty)', 'Example': '2025-12-31' },
-      { 'Field': 'Status', 'Description': 'Asset status (Required)', 'Example': 'Available, In Use, Under Repair, Broken' }
+      { 'Section': 'IMPORTANT INSTRUCTIONS', 'Information': 'Please read carefully before filling out the template' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'HOW TO USE THIS TEMPLATE', 'Information': '' },
+      { 'Section': '1. Fill in your data', 'Information': 'Start from Row 2 (after the example row). Delete the example row after understanding the format.' },
+      { 'Section': '2. Save your file', 'Information': 'Save as .xlsx or .xls format. Do NOT save as .csv' },
+      { 'Section': '3. Upload the file', 'Information': 'Go to Asset Inventory page and click the Import button' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'FIELD REQUIREMENTS', 'Information': '' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'Category (Required)', 'Information': 'Type of asset. Examples: Desktop, Laptop, Monitor, Printer, Mouse, Keyboard' },
+      { 'Section': 'Brand (Required)', 'Information': 'Manufacturer name. Examples: Dell, HP, Lenovo, Canon, Logitech' },
+      { 'Section': 'Model (Required)', 'Information': 'Model number or name. Examples: OptiPlex 7090, ThinkPad X1, LaserJet Pro' },
+      { 'Section': 'Serial Number (Required)', 'Information': 'Unique serial number from the device. Each serial number should be unique.' },
+      { 'Section': 'Under Warranty (Required)', 'Information': 'Type exactly: Yes or No (case-insensitive)' },
+      { 'Section': 'Warranty Date', 'Information': 'CRITICAL: Format the column as TEXT first, then enter date as YYYY-MM-DD (e.g., 2025-12-31)' },
+      { 'Section': '  - Required when', 'Information': 'Under Warranty is "Yes"' },
+      { 'Section': '  - Leave empty when', 'Information': 'Under Warranty is "No"' },
+      { 'Section': 'Status (Required)', 'Information': 'Choose one: Available, In Use, Under Repair, or Broken (case-insensitive)' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'IMPORTANT DATE FORMATTING', 'Information': '' },
+      { 'Section': 'Step 1', 'Information': 'Select the entire Warranty Date column (column F)' },
+      { 'Section': 'Step 2', 'Information': 'Right-click and select "Format Cells"' },
+      { 'Section': 'Step 3', 'Information': 'Choose "Text" as the format (NOT Date)' },
+      { 'Section': 'Step 4', 'Information': 'Type dates manually as YYYY-MM-DD (example: 2025-12-31)' },
+      { 'Section': 'Why?', 'Information': 'Excel converts dates to numbers automatically. Formatting as Text prevents this.' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'COMMON MISTAKES TO AVOID', 'Information': '' },
+      { 'Section': 'X Do not leave required fields empty', 'Information': 'All fields except Warranty Date are required' },
+      { 'Section': 'X Do not use date format', 'Information': 'Do NOT format Warranty Date as Date - use Text format only' },
+      { 'Section': 'X Do not use wrong status values', 'Information': 'Only use: Available, In Use, Under Repair, or Broken' },
+      { 'Section': 'X Do not duplicate serial numbers', 'Information': 'Each asset should have a unique serial number (unless updating existing)' },
+      { 'Section': 'X Do not add extra columns', 'Information': 'Only use the provided column headers' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'NEED HELP?', 'Information': '' },
+      { 'Section': 'If import fails', 'Information': 'Read the error message carefully - it will tell you which row and what is wrong' },
+      { 'Section': 'Check row numbers', 'Information': 'Error messages show the Excel row number where the problem occurred' },
+      { 'Section': 'Example error', 'Information': 'Row 5: Missing Category - means you need to fill in Category in row 5' }
     ];
     const wsInstructions = XLSX.utils.json_to_sheet(instructions);
     wsInstructions['!cols'] = [
-      { wch: 20 }, // Field
-      { wch: 50 }, // Description
-      { wch: 35 }  // Example
+      { wch: 35 }, // Section
+      { wch: 80 }  // Information
     ];
     XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
 

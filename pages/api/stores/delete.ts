@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'DELETE') {
@@ -18,6 +19,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   if (!userId) {
     return res.status(401).json({ error: 'User not authenticated' });
+  }
+
+  // Check if user has delete_stores permission (Operations Manager only)
+  const hasPermission = await userHasPermission(userId, 'delete_stores');
+  if (!hasPermission) {
+    return res.status(403).json({ error: 'You do not have permission to delete stores. Only Operations Manager can delete stores.' });
   }
 
   try {
@@ -46,4 +53,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);

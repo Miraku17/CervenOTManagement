@@ -78,8 +78,8 @@ export default function TicketingLayout({
   };
 
   // Check if user has access to stores section
-  // Stores: ONLY admin role (no position requirement)
-  const hasStoresAccess = isAdmin;
+  // Stores: Permission-based (all positions except HR and Accounting)
+  const hasStoresAccess = hasPermission('view_stores');
 
   // Check if user has access to store inventory
   const hasStoreInventoryAccess = hasPermission('manage_store_inventory');

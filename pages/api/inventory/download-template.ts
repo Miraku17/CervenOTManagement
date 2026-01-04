@@ -66,22 +66,57 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Add instructions sheet
     const instructions = [
-      { 'Field': 'Store Name', 'Description': 'Name of the store (Required)', 'Example': 'Main Branch Store' },
-      { 'Field': 'Store Code', 'Description': 'Unique store code (Required)', 'Example': 'ST001' },
-      { 'Field': 'Station Name', 'Description': 'Station name (Required)', 'Example': 'Station A' },
-      { 'Field': 'Category', 'Description': 'Product category (Required)', 'Example': 'Desktop, Laptop, Monitor' },
-      { 'Field': 'Brand', 'Description': 'Brand name (Required)', 'Example': 'Dell, HP, Lenovo' },
-      { 'Field': 'Model', 'Description': 'Model name (Required)', 'Example': 'OptiPlex 7090' },
-      { 'Field': 'Serial Number', 'Description': 'Unique serial number (Required)', 'Example': 'SN123456789' },
-      { 'Field': 'Status', 'Description': 'Inventory status - Permanent or Temporary (Required)', 'Example': 'Permanent' },
-      { 'Field': 'Under Warranty', 'Description': 'Warranty status - Yes or No (Optional, defaults to No)', 'Example': 'Yes' },
-      { 'Field': 'Warranty Date', 'Description': 'Warranty expiration date (Optional, format: YYYY-MM-DD)', 'Example': '2025-12-31' }
+      { 'Section': 'IMPORTANT INSTRUCTIONS', 'Information': 'Please read carefully before filling out the template' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'HOW TO USE THIS TEMPLATE', 'Information': '' },
+      { 'Section': '1. Fill in your data', 'Information': 'Start from Row 2 (after the example row). Delete the example row after understanding the format.' },
+      { 'Section': '2. Save your file', 'Information': 'Save as .xlsx or .xls format. Do NOT save as .csv' },
+      { 'Section': '3. Upload the file', 'Information': 'Go to Store Inventory page and click the Import button' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'FIELD REQUIREMENTS', 'Information': '' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'Store Name (Required)', 'Information': 'Full name of the store. Examples: Main Branch Store, North Plaza Branch' },
+      { 'Section': 'Store Code (Required)', 'Information': 'Unique store identifier code. Examples: ST001, BRANCH-01, NP-STORE' },
+      { 'Section': 'Station Name (Required)', 'Information': 'Name of the station/workstation. Examples: Station A, Counter 1, POS Terminal 3' },
+      { 'Section': 'Category (Required)', 'Information': 'Type of equipment. Examples: Desktop, Laptop, Monitor, Printer, POS Terminal' },
+      { 'Section': 'Brand (Required)', 'Information': 'Manufacturer name. Examples: Dell, HP, Lenovo, Canon, Epson' },
+      { 'Section': 'Model (Required)', 'Information': 'Model number or name. Examples: OptiPlex 7090, ThinkPad X1, LaserJet Pro' },
+      { 'Section': 'Serial Number (Required)', 'Information': 'Unique serial number from the device. Can be "NO DEVICE" if no device assigned yet.' },
+      { 'Section': 'Status (Required)', 'Information': 'Type exactly: Permanent or Temporary (case-insensitive)' },
+      { 'Section': 'Under Warranty (Optional)', 'Information': 'Type: Yes or No. Leave empty to default to No' },
+      { 'Section': 'Warranty Date (Optional)', 'Information': 'CRITICAL: Format the column as TEXT first, then enter date as YYYY-MM-DD (e.g., 2025-12-31)' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'IMPORTANT DATE FORMATTING', 'Information': '' },
+      { 'Section': 'Step 1', 'Information': 'Select the entire Warranty Date column (column J)' },
+      { 'Section': 'Step 2', 'Information': 'Right-click and select "Format Cells"' },
+      { 'Section': 'Step 3', 'Information': 'Choose "Text" as the format (NOT Date)' },
+      { 'Section': 'Step 4', 'Information': 'Type dates manually as YYYY-MM-DD (example: 2025-12-31)' },
+      { 'Section': 'Why?', 'Information': 'Excel converts dates to numbers automatically. Formatting as Text prevents this.' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'STATUS VALUES', 'Information': '' },
+      { 'Section': 'Permanent', 'Information': 'Equipment permanently assigned to this store location' },
+      { 'Section': 'Temporary', 'Information': 'Equipment temporarily placed at this store location' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'COMMON MISTAKES TO AVOID', 'Information': '' },
+      { 'Section': 'X Do not leave required fields empty', 'Information': 'Store Name, Store Code, Station Name, Category, Brand, Model, Serial Number, and Status are required' },
+      { 'Section': 'X Do not use date format', 'Information': 'Do NOT format Warranty Date as Date - use Text format only' },
+      { 'Section': 'X Do not use wrong status values', 'Information': 'Only use: Permanent or Temporary (not Available, In Use, etc.)' },
+      { 'Section': 'X Do not mix up Status field', 'Information': 'Store Inventory uses Permanent/Temporary. Asset Inventory uses Available/In Use/etc.' },
+      { 'Section': 'X Do not add extra columns', 'Information': 'Only use the provided column headers' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'DUPLICATE SERIAL NUMBERS', 'Information': '' },
+      { 'Section': 'Note', 'Information': 'Store inventory ALLOWS duplicate serial numbers (useful for "NO DEVICE" or bulk imports)' },
+      { 'Section': 'Each import', 'Information': 'Creates a new inventory entry, even if the serial number exists' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'NEED HELP?', 'Information': '' },
+      { 'Section': 'If import fails', 'Information': 'Read the error message carefully - it will tell you which row and what is wrong' },
+      { 'Section': 'Check row numbers', 'Information': 'Error messages show the Excel row number where the problem occurred' },
+      { 'Section': 'Example error', 'Information': 'Row 5: Missing Store Name - means you need to fill in Store Name in row 5' }
     ];
     const wsInstructions = XLSX.utils.json_to_sheet(instructions);
     wsInstructions['!cols'] = [
-      { wch: 20 }, // Field
-      { wch: 50 }, // Description
-      { wch: 30 }  // Example
+      { wch: 35 }, // Section
+      { wch: 80 }  // Information
     ];
     XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instructions');
 
