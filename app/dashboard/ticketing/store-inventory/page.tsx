@@ -75,6 +75,7 @@ export default function StoreInventoryPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   const isLoadingAccess = authLoading || permissionsLoading;
 
@@ -83,6 +84,19 @@ export default function StoreInventoryPage() {
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [serialNumberFilter, setSerialNumberFilter] = useState<'all' | 'with' | 'without'>('all');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+
+  // Stats state
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    uniqueCategories: 0,
+    uniqueStores: 0,
+  });
 
   // Dropdown states
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -106,11 +120,11 @@ export default function StoreInventoryPage() {
   const actionsDropdownRef = useRef<HTMLDivElement>(null);
 
   // Toast notification state
-  const [toast, setToast] = useState<{
-    show: boolean;
-    type: 'success' | 'error';
-    message: string;
-  }>({ show: false, type: 'success', message: '' });
+  const [toast, setToast] = useState({
+    show: false,
+    type: 'success' as 'success' | 'error',
+    message: '',
+  });
 
   // Import states
   const [isImporting, setIsImporting] = useState(false);
@@ -122,18 +136,92 @@ export default function StoreInventoryPage() {
   const filterRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
 
+  const [filterOptions, setFilterOptions] = useState({
+    categories: [] as string[],
+    stores: [] as string[],
+    brands: [] as string[],
+  });
+
+
+  const fetchFilterOptions = async () => {
+    try {
+        const { data, error } = await supabase
+            .from('store_inventory')
+            .select(
+                `
+                categories:category_id(name),
+                stores:store_id(store_name),
+                brands:brand_id(name)
+            `)
+            .is('deleted_at', null);
+        
+        if (data) {
+            const categories = Array.from(new Set(data.map((i: any) => i.categories?.name).filter(Boolean)));
+            const stores = Array.from(new Set(data.map((i: any) => i.stores?.store_name).filter(Boolean)));
+            const brands = Array.from(new Set(data.map((i: any) => i.brands?.name).filter(Boolean)));
+            
+            setFilterOptions({
+                categories: categories.sort(),
+                stores: stores.sort(),
+                brands: brands.sort()
+            });
+        }
+    } catch (e) {
+        console.error("Error fetching filter options", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchFilterOptions();
+  }, []);
+
+
+  // Fetch stats only once (doesn't change with filters/search)
+  const fetchStats = async () => {
+    setStatsLoading(true);
+    try {
+      const response = await fetch('/api/inventory/get?page=1&limit=1');
+      const data = await response.json();
+
+      if (response.ok) {
+        setStats(data.stats || { totalItems: 0, uniqueCategories: 0, uniqueStores: 0 });
+      } else {
+        console.error('Failed to fetch stats:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    } finally {
+      setStatsLoading(false);
+    }
+  };
+
   const fetchInventory = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/inventory/get');
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: pageSize.toString(),
+        search: searchTerm,
+        category: selectedCategory || '',
+        store: selectedStore || '',
+        brand: selectedBrand || '',
+        serial_status: serialNumberFilter,
+      });
+
+      const response = await fetch(`/api/inventory/get?${params.toString()}`);
       const data = await response.json();
+
       if (response.ok) {
         setInventoryItems(data.items || []);
+        setTotalCount(data.pagination.totalCount);
+        setTotalPages(data.pagination.totalPages);
       } else {
         console.error('Failed to fetch inventory:', data.error);
+        showToast('error', 'Failed to fetch inventory');
       }
     } catch (error) {
       console.error('Error fetching inventory:', error);
+      showToast('error', 'Failed to fetch inventory');
     } finally {
       setLoading(false);
     }
@@ -147,10 +235,25 @@ export default function StoreInventoryPage() {
     }, 3000);
   };
 
-
+  // Fetch stats only once on mount
   useEffect(() => {
-    fetchInventory();
+    fetchStats();
   }, []);
+
+  // Reset to page 1 when search or filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter]);
+
+  // Fetch when page, size, search, or filters change
+  useEffect(() => {
+    // Debounce search
+    const timer = setTimeout(() => {
+      fetchInventory();
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [currentPage, pageSize, searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -213,6 +316,7 @@ export default function StoreInventoryPage() {
 
   const handleSuccess = () => {
     fetchInventory(); // Only refresh when item is successfully added or updated
+    fetchStats(); // Refresh stats after adding/updating items
     setEditItem(null); // Clear edit item
   };
 
@@ -245,15 +349,15 @@ export default function StoreInventoryPage() {
         throw new Error(data.error || 'Failed to delete item');
       }
 
-      // setIsDeleteModalOpen(false); // Removed: Modal closes only after fetchInventory and toast
       setDeleteItem(null);
       showToast('success', 'Inventory item deleted successfully!');
-      await fetchInventory(); // Refreshes table, which should re-evaluate deleteItem and close modal
-      setIsDeleteModalOpen(false); // Explicitly close modal on success
+      await fetchInventory();
+      fetchStats(); // Refresh stats after deleting item
+      setIsDeleteModalOpen(false); 
     } catch (error: any) {
       console.error('Error deleting item:', error);
       showToast('error', error.message || 'Failed to delete item');
-      setIsDeleteModalOpen(false); // Ensure modal closes on error
+      setIsDeleteModalOpen(false);
     } finally {
       setIsDeleting(false);
     }
@@ -355,6 +459,7 @@ export default function StoreInventoryPage() {
 
           // Refresh inventory
           await fetchInventory();
+          fetchStats(); // Refresh stats after importing items
         } catch (error: any) {
           console.error('Error importing file:', error);
           showToast('error', error.message || 'Failed to import file');
@@ -391,7 +496,7 @@ export default function StoreInventoryPage() {
     } catch (error) {
       console.error('Error fetching all inventory:', error);
       // Fallback to current items if fetch fails
-      allItems = filteredItems;
+      allItems = inventoryItems;
     }
 
     // Sort and filter inventory (only non-deleted items)
@@ -511,11 +616,6 @@ export default function StoreInventoryPage() {
     window.open(doc.output('bloburl'), '_blank');
   };
 
-  // Get unique values for filters
-  const uniqueCategories = Array.from(new Set(inventoryItems.map(item => item.categories?.name).filter(Boolean))) as string[];
-  const uniqueStores = Array.from(new Set(inventoryItems.map(item => item.stores?.store_name).filter(Boolean))) as string[];
-  const uniqueBrands = Array.from(new Set(inventoryItems.map(item => item.brands?.name).filter(Boolean))) as string[];
-
   // Clear all filters
   const clearAllFilters = () => {
     setSelectedCategory(null);
@@ -527,44 +627,11 @@ export default function StoreInventoryPage() {
   // Check if any filters are active
   const hasActiveFilters = selectedCategory || selectedStore || selectedBrand || serialNumberFilter !== 'all';
 
-  // Filter items based on search and filters
-  const filteredItems = inventoryItems.filter(item => {
-    // Search filter
-    const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = !searchTerm || (
-      item.serial_number?.toLowerCase().includes(searchLower) ||
-      item.categories?.name.toLowerCase().includes(searchLower) ||
-      item.brands?.name.toLowerCase().includes(searchLower) ||
-      item.models?.name.toLowerCase().includes(searchLower) ||
-      item.stores?.store_name.toLowerCase().includes(searchLower) ||
-      item.stores?.store_code.toLowerCase().includes(searchLower) ||
-      item.stations?.name.toLowerCase().includes(searchLower)
-    );
-
-    // Category filter
-    const matchesCategory = !selectedCategory || item.categories?.name === selectedCategory;
-
-    // Store filter
-    const matchesStore = !selectedStore || item.stores?.store_name === selectedStore;
-
-    // Brand filter
-    const matchesBrand = !selectedBrand || item.brands?.name === selectedBrand;
-
-    // Serial number filter
-    const matchesSerialNumber =
-      serialNumberFilter === 'all' ||
-      (serialNumberFilter === 'with' && item.serial_number) ||
-      (serialNumberFilter === 'without' && !item.serial_number);
-
-    return matchesSearch && matchesCategory && matchesStore && matchesBrand && matchesSerialNumber;
-  });
-
   return (
     <div className="space-y-6">
       {/* Toast Notification */}
       {toast.show && (
-        <div className={`fixed top-4 right-4 z-60 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${
-          toast.type === 'success'
+        <div className={`fixed top-4 right-4 z-60 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right ${ toast.type === 'success'
             ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
             : 'bg-red-500/10 border border-red-500/20 text-red-400'
         }`}>
@@ -685,9 +752,7 @@ export default function StoreInventoryPage() {
             <div ref={filterRef} className="relative">
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${
-                  hasActiveFilters ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ hasActiveFilters ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Filter size={18} />
                 <span>Filter</span>
@@ -726,7 +791,7 @@ export default function StoreInventoryPage() {
                           className="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                         >
                           <option value="">All Stores</option>
-                          {uniqueStores.map((store) => (
+                          {filterOptions.stores.map((store) => (
                             <option key={store} value={store}>{store}</option>
                           ))}
                         </select>
@@ -744,7 +809,7 @@ export default function StoreInventoryPage() {
                           className="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                         >
                           <option value="">All Brands</option>
-                          {uniqueBrands.map((brand) => (
+                          {filterOptions.brands.map((brand) => (
                             <option key={brand} value={brand}>{brand}</option>
                           ))}
                         </select>
@@ -777,9 +842,7 @@ export default function StoreInventoryPage() {
             <div ref={categoryRef} className="relative">
               <button
                 onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${
-                  selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'
-                }`}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Box size={18} />
                 <span>{selectedCategory || 'Category'}</span>
@@ -794,23 +857,21 @@ export default function StoreInventoryPage() {
                       setSelectedCategory(null);
                       setShowCategoryDropdown(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${
-                      !selectedCategory
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedCategory
                         ? 'bg-blue-500/10 text-blue-400 font-medium'
                         : 'text-slate-300 hover:bg-slate-800'
                     }`}
                   >
                     All Categories
                   </button>
-                  {uniqueCategories.map((category) => (
+                  {filterOptions.categories.map((category) => (
                     <button
                       key={category}
                       onClick={() => {
                         setSelectedCategory(category);
                         setShowCategoryDropdown(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${
-                        selectedCategory === category
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedCategory === category
                           ? 'bg-blue-500/10 text-blue-400 font-medium'
                           : 'text-slate-300 hover:bg-slate-800'
                       }`}
@@ -831,10 +892,10 @@ export default function StoreInventoryPage() {
                   <div>
                       <p className="text-slate-400 text-sm mb-1">Total Items</p>
                       <h3 className="text-2xl font-bold text-white">
-                        {loading ? (
+                        {statsLoading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                          inventoryItems.length.toLocaleString()
+                          stats.totalItems.toLocaleString()
                         )}
                       </h3>
                   </div>
@@ -848,10 +909,10 @@ export default function StoreInventoryPage() {
                   <div>
                       <p className="text-slate-400 text-sm mb-1">Categories</p>
                       <h3 className="text-2xl font-bold text-white">
-                        {loading ? (
+                        {statsLoading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                          new Set(inventoryItems.map(i => i.categories?.id).filter(Boolean)).size
+                          stats.uniqueCategories
                         )}
                       </h3>
                   </div>
@@ -865,10 +926,10 @@ export default function StoreInventoryPage() {
                   <div>
                       <p className="text-slate-400 text-sm mb-1">Stores</p>
                       <h3 className="text-2xl font-bold text-white">
-                        {loading ? (
+                        {statsLoading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
-                          new Set(inventoryItems.map(i => i.stores?.id).filter(Boolean)).size
+                          stats.uniqueStores
                         )}
                       </h3>
                   </div>
@@ -905,7 +966,7 @@ export default function StoreInventoryPage() {
                           </div>
                         </td>
                       </tr>
-                    ) : filteredItems.length === 0 ? (
+                    ) : inventoryItems.length === 0 ? (
                       <tr>
                         <td colSpan={8} className="p-12 text-center">
                           <div className="flex flex-col items-center gap-3">
@@ -920,7 +981,7 @@ export default function StoreInventoryPage() {
                         </td>
                       </tr>
                     ) : (
-                      filteredItems.map((item) => (
+                      inventoryItems.map((item) => (
                         <tr
                           key={item.id}
                           onClick={() => {
@@ -987,13 +1048,100 @@ export default function StoreInventoryPage() {
                 </tbody>
             </table>
         </div>
-         {!loading && filteredItems.length > 0 && (
-          <div className="p-4 border-t border-slate-800 flex justify-between items-center">
-            <span className="text-slate-500 text-sm">
-              Showing {filteredItems.length} of {inventoryItems.length} items
-            </span>
+         {/* Pagination Controls */}
+         {!loading && inventoryItems.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800">
+            {/* Page Info */}
+            <div className="flex items-center gap-4">
+              <p className="text-sm text-slate-400">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} items
+              </p>
+
+              {/* Page Size Selector */}
+              <div className="flex items-center gap-2">
+                <label htmlFor="pageSize" className="text-sm text-slate-400">
+                  Per page:
+                </label>
+                <select
+                  id="pageSize"
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1); // Reset to first page when changing page size
+                  }}
+                  className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Page Navigation */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+              >
+                First
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+              >
+                Previous
+              </button>
+
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${ currentPage === pageNum
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+              >
+                Next
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+              >
+                Last
+              </button>
+            </div>
           </div>
-         )}
+        )}
       </div>
 
       {/* Import History Modal */}
