@@ -3,17 +3,21 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import LexicalEditor from '@/components/LexicalEditor';
+import { compressImages } from '@/lib/imageCompression';
 
 import {
   ArrowLeft,
   Save,
-  Tag,
   Folder,
   Type,
   ChevronDown,
   X,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Video,
+  Plus,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 
 interface Category {
@@ -32,8 +36,10 @@ export default function CreateArticlePage() {
     description: '',
     content: ''
   });
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+  const [images, setImages] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -116,6 +122,24 @@ export default function CreateArticlePage() {
     setIsLoading(true);
 
     try {
+      // Convert images to base64
+      const imageData = await Promise.all(
+        images.map(async (file, index) => {
+          return new Promise<{ fileName: string; fileData: string; fileType: string }>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              resolve({
+                fileName: file.name,
+                fileData: base64,
+                fileType: file.type
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
       const response = await fetch('/api/knowledge-base/create', {
         method: 'POST',
         headers: {
@@ -127,8 +151,9 @@ export default function CreateArticlePage() {
           category: formData.category,
           description: formData.description,
           published: true,
-          tags: tags,
           kb_code: kbCode,
+          video_urls: videoUrls,
+          images: imageData,
         }),
       });
 
@@ -152,23 +177,77 @@ export default function CreateArticlePage() {
     }
   };
 
-  const handleAddTag = () => {
-    const trimmedTag = tagInput.trim();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags([...tags, trimmedTag]);
-      setTagInput('');
+  const handleAddVideoUrl = () => {
+    const trimmedUrl = videoUrlInput.trim();
+    if (trimmedUrl && !videoUrls.includes(trimmedUrl)) {
+      setVideoUrls([...videoUrls, trimmedUrl]);
+      setVideoUrlInput('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  const handleRemoveVideoUrl = (urlToRemove: string) => {
+    setVideoUrls(videoUrls.filter(url => url !== urlToRemove));
   };
 
-  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleVideoUrlInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddTag();
+      handleAddVideoUrl();
     }
+  };
+
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+
+    // Check if adding new files would exceed limit
+    if (images.length + newFiles.length > 5) {
+      setErrorMessage(`You can only upload a maximum of 5 images. Currently you have ${images.length} image(s). You can add ${5 - images.length} more.`);
+      setShowErrorModal(true);
+      e.target.value = '';
+      return;
+    }
+
+    // Filter only image files
+    const imageFiles = newFiles.filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      // Compress images (max 1MB, max dimension 1920px, quality 0.8)
+      const compressedFiles = await compressImages(imageFiles, 1, 1920, 0.8);
+
+      const newPreviews: string[] = [];
+
+      compressedFiles.forEach(file => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push(reader.result as string);
+          if (newPreviews.length === compressedFiles.length) {
+            setImages([...images, ...compressedFiles]);
+            setImagePreviews([...imagePreviews, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    } catch (error) {
+      console.error('Error compressing images:', error);
+      setErrorMessage('Failed to process images. Please try again.');
+      setShowErrorModal(true);
+    }
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setImages(images.filter((_, i) => i !== index));
+    setImagePreviews(imagePreviews.filter((_, i) => i !== index));
   };
 
   return (
@@ -308,55 +387,130 @@ export default function CreateArticlePage() {
               </div>
             </div>
 
-            {/* Tags */}
+            {/* Images */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Tag className="w-5 h-5 text-purple-500" />
-                Tags
-              </h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-green-500" />
+                  Images
+                </h3>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  images.length >= 5
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {images.length}/5
+                </span>
+              </div>
               <div className="space-y-3">
-                {/* Tag Input */}
-                <div className="flex gap-2">
+                {/* Image Upload */}
+                <label className="block">
                   <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagInputKeyDown}
-                    placeholder="Add a tag..."
-                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    className="hidden"
+                    id="image-upload"
+                    disabled={images.length >= 5}
                   />
-                  <button
-                    type="button"
-                    onClick={handleAddTag}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
-                  >
-                    Add
-                  </button>
-                </div>
+                  <div className={`flex items-center justify-center gap-2 px-4 py-3 text-white text-sm rounded-lg font-medium transition-all ${
+                    images.length >= 5
+                      ? 'bg-slate-700 cursor-not-allowed opacity-50'
+                      : 'bg-green-600 hover:bg-green-500 cursor-pointer'
+                  }`}>
+                    <Upload className="w-4 h-4" />
+                    {images.length >= 5 ? 'Maximum Reached' : 'Upload Images'}
+                  </div>
+                </label>
 
-                {/* Display Tags */}
-                {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag, index) => (
-                      <span
+                {/* Display Images */}
+                {imagePreviews.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {imagePreviews.map((preview, index) => (
+                      <div
                         key={index}
-                        className="group px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20 flex items-center gap-2"
+                        className="relative group bg-slate-950/50 border border-slate-800 rounded-lg overflow-hidden aspect-square"
                       >
-                        {tag}
+                        <img
+                          src={preview}
+                          alt={`Preview ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
                         <button
                           type="button"
-                          onClick={() => handleRemoveTag(tag)}
-                          className="hover:text-purple-100 transition-colors"
+                          onClick={() => handleRemoveImage(index)}
+                          className="absolute top-1 right-1 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
                         >
-                          <X className="w-3 h-3" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
-                      </span>
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-2">
+                          <p className="text-xs text-white truncate font-medium">{images[index]?.name}</p>
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
 
-                {tags.length === 0 && (
-                  <p className="text-slate-500 text-xs">No tags added yet. Tags help users find your article.</p>
+                {imagePreviews.length === 0 && (
+                  <div className="border-2 border-dashed border-slate-800 rounded-lg p-4 text-center">
+                    <p className="text-slate-500 text-xs">No images uploaded yet</p>
+                    <p className="text-slate-600 text-xs mt-1">JPG, PNG, WebP, GIF (Max 5)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Video URLs */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+              <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <Video className="w-5 h-5 text-blue-500" />
+                Video Links
+              </h3>
+              <div className="space-y-3">
+                {/* Video URL Input */}
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    onKeyDown={handleVideoUrlInputKeyDown}
+                    placeholder="Paste video URL..."
+                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddVideoUrl}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium transition-all flex items-center gap-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </button>
+                </div>
+
+                {/* Display Video URLs */}
+                {videoUrls.length > 0 && (
+                  <div className="space-y-2">
+                    {videoUrls.map((url, index) => (
+                      <div
+                        key={index}
+                        className="group px-3 py-2 bg-blue-500/10 text-blue-300 text-xs rounded-lg border border-blue-500/20 flex items-center justify-between gap-2"
+                      >
+                        <span className="truncate flex-1">{url}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVideoUrl(url)}
+                          className="hover:text-blue-100 transition-colors shrink-0"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {videoUrls.length === 0 && (
+                  <p className="text-slate-500 text-xs">No video links added yet. Supports YouTube, Vimeo, and other video platforms.</p>
                 )}
               </div>
             </div>

@@ -48,9 +48,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return Number((diffMinutes / 60).toFixed(2)); // Convert to hours with 2 decimals
     };
 
-    const totalHours = calculateHours(startTime, endTime);
+    let totalHours = calculateHours(startTime, endTime);
 
-    // Check if user is Operations Manager for auto-approval
+    // Check user position for special rules
     const { data: userProfile, error: positionError } = await supabase
       .from('profiles')
       .select('position_id, positions(name)')
@@ -63,6 +63,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const userPosition = userProfile?.positions && (userProfile.positions as any).name;
     const isOperationsManager = userPosition === 'Operations Manager';
+    const isFieldEngineer = userPosition === 'Field Engineer';
+
+    // Apply deduction rule for Field Engineers: if more than 1 hour, deduct 1 hour
+    if (isFieldEngineer && totalHours > 1) {
+      totalHours = totalHours - 1;
+    }
 
     // Check if user already has an overtime request for this date
     const { data: existingOvertimeRequests, error: checkError } = await supabase

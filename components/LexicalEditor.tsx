@@ -214,17 +214,20 @@ const theme = {
 };
 
 // --- Main Editor Component ---
-export default function LexicalEditor({ 
-  onChange, 
-  initialValue 
-}: { 
+export default function LexicalEditor({
+  onChange,
+  initialValue,
+  readOnly = false
+}: {
   onChange: (html: string) => void;
   initialValue?: string;
+  readOnly?: boolean;
 }) {
   const initialConfig = {
     namespace: 'CervenTechEditor',
     theme,
     onError: (error: Error) => console.error(error),
+    editable: !readOnly,
     nodes: [
       HeadingNode,
       ListNode,
@@ -242,27 +245,37 @@ export default function LexicalEditor({
 
   return (
     <LexicalComposer initialConfig={initialConfig}>
-      <div className="flex flex-col h-full rounded-xl overflow-hidden border border-slate-800 bg-slate-950/50 focus-within:ring-2 focus-within:ring-blue-500/50 focus-within:border-transparent transition-all">
-        <Toolbar />
+      <div className={clsx(
+        "flex flex-col h-full rounded-xl overflow-hidden",
+        readOnly
+          ? "border-0 bg-transparent"
+          : "border border-slate-800 bg-slate-950/50 focus-within:ring-2 focus-within:ring-blue-500/50 focus-within:border-transparent transition-all"
+      )}>
+        {!readOnly && <Toolbar />}
         <div className="relative flex-1">
           <RichTextPlugin
             contentEditable={
-              <ContentEditable 
-                className="h-full min-h-[500px] p-4 outline-none resize-none overflow-auto text-slate-300"
+              <ContentEditable
+                className={clsx(
+                  "h-full p-4 outline-none resize-none overflow-auto text-slate-300",
+                  readOnly ? "min-h-0" : "min-h-[500px]"
+                )}
               />
             }
             placeholder={
-              <div className="absolute top-4 left-4 text-slate-600 pointer-events-none">
-                Start writing your article...
-              </div>
+              !readOnly ? (
+                <div className="absolute top-4 left-4 text-slate-600 pointer-events-none">
+                  Start writing your article...
+                </div>
+              ) : null
             }
             ErrorBoundary={LexicalErrorBoundary}
           />
-          <HistoryPlugin />
-          <AutoFocusPlugin />
+          {!readOnly && <HistoryPlugin />}
+          {!readOnly && <AutoFocusPlugin />}
           <ListPlugin />
           <LinkPlugin />
-          <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+          {!readOnly && <MarkdownShortcutPlugin transformers={TRANSFORMERS} />}
           <LoadInitialStatePlugin initialValue={initialValue} />
           <OnChangePlugin onChange={(editorState) => {
              // Serialize editor state to JSON
