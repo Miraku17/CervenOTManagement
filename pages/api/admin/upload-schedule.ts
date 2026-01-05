@@ -1,6 +1,5 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
-import { parse } from 'csv-parse';
 import { parse as parseDate } from 'date-fns';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
@@ -13,12 +12,6 @@ const weekDaysMap: Record<string, number> = {
 // Validation Regex
 const TIME_REGEX = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
 const MONTH_REGEX = /^\d{4}-(0[1-9]|1[0-2])$/;
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -47,21 +40,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    let csvText = '';
-    for await (const chunk of req) {
-      csvText += chunk.toString();
-    }
+    const { records } = req.body;
 
-    const records: any[] = await new Promise((resolve, reject) => {
-      parse(csvText, { 
-        columns: true, 
-        trim: true,
-        skip_empty_lines: true 
-      }, (err, output) => {
-        if (err) reject(err);
-        else resolve(output);
-      });
-    });
+    if (!records || !Array.isArray(records)) {
+        return res.status(400).json({ error: 'Invalid request body. Expected JSON with "records" array.' });
+    }
 
     const { data: profiles, error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -127,11 +110,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // 5. Rest Days Validation & Parsing
       let restDaysArray: number[] = [];
       if (rest_days) {
-        const splitDays = rest_days.split(',').map((d: string) => d.trim());
+        const splitDays = String(rest_days).split(',').map((d: string) => d.trim());
         const invalidDays = splitDays.filter((d: string) => weekDaysMap[d] === undefined && d !== '');
         
         if (invalidDays.length > 0) {
-          errors.push(`Row ${rowNum}: Invalid rest days: ${invalidDays.join(', ')}`);
+          errors.push(`Row ${rowNum}: Invalid rest days: ${invalidDays.join(', ')}. Please use capitalized names (e.g., Mon, Tue or Monday, Tuesday).`);
           continue;
         }
 
