@@ -11,6 +11,7 @@ export const config = {
       sizeLimit: '10mb',
     },
   },
+  maxDuration: 300, // 5 minutes timeout for large imports
 };
 
 interface ImportRow {
@@ -185,6 +186,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 row['Status'];
       });
 
+    // Check row count limits
+    const MAX_ROWS = 1000;
+    const WARNING_THRESHOLD = 500;
+
+    if (nonEmptyData.length > MAX_ROWS) {
+      return res.status(400).json({
+        error: `File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import. Please split your file into smaller batches.`,
+        rowCount: nonEmptyData.length,
+        maxAllowed: MAX_ROWS,
+      });
+    }
+
+    if (nonEmptyData.length > WARNING_THRESHOLD) {
+      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take 30-60 seconds to complete.`);
+    }
+
     // Create import log entry
     const { data: importLog, error: importLogError } = await supabaseAdmin
       .from('import_logs')
@@ -209,10 +226,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       errors: [],
     };
 
+    // Create caches to avoid repeated database lookups
+    const categoryCache = new Map<string, string>(); // category name -> id
+    const brandCache = new Map<string, string>(); // brand name -> id
+    const modelCache = new Map<string, string>(); // model name -> id
+    const stationCache = new Map<string, string>(); // station name -> id
+    const storeCache = new Map<string, string>(); // store name/code -> id
+
+    console.log(`Starting import of ${nonEmptyData.length} rows...`);
+
     // Process each row
     for (let i = 0; i < nonEmptyData.length; i++) {
       const { row, originalIndex } = nonEmptyData[i];
       const rowNumber = originalIndex + 2; // Excel row number (header is row 1)
+
+      // Log progress every 50 rows
+      if (i > 0 && i % 50 === 0) {
+        console.log(`Progress: ${i}/${nonEmptyData.length} rows processed...`);
+      }
 
       try {
         // Validate required fields with specific messages
@@ -274,44 +305,75 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           }
         }
 
-        // Get or create store
+        // Get or create store (with caching)
         let storeId: string | null = null;
         const storeName = row['Store Name'].toString().trim();
         const storeCode = row['Store Code'].toString().trim();
+        const storeKey = `${storeName}|${storeCode}`.toUpperCase();
 
-        const { data: existingStore, error: findStoreError } = await supabaseAdmin
-          .from('stores')
-          .select('id')
-          .or(`store_name.ilike.${storeName},store_code.ilike.${storeCode}`)
-          .maybeSingle();
-
-        if (existingStore) {
-          storeId = existingStore.id;
+        if (storeCache.has(storeKey)) {
+          storeId = storeCache.get(storeKey)!;
         } else {
-          // Create new store
-          const { data: newStore, error: storeError } = await supabaseAdmin
+          const { data: existingStore, error: findStoreError } = await supabaseAdmin
             .from('stores')
-            .insert({
-              store_name: storeName,
-              store_code: storeCode,
-            })
             .select('id')
-            .single();
+            .or(`store_name.ilike.${storeName},store_code.ilike.${storeCode}`)
+            .maybeSingle();
 
-          if (storeError) throw new Error(`Could not create store - ${storeError.message}. Please verify Store Name and Store Code are correct`);
-          storeId = newStore.id;
+          if (existingStore && existingStore.id) {
+            storeId = existingStore.id;
+            storeCache.set(storeKey, existingStore.id);
+          } else {
+            // Create new store
+            const { data: newStore, error: storeError } = await supabaseAdmin
+              .from('stores')
+              .insert({
+                store_name: storeName,
+                store_code: storeCode,
+              })
+              .select('id')
+              .single();
+
+            if (storeError) throw new Error(`Could not create store - ${storeError.message}. Please verify Store Name and Store Code are correct`);
+            if (newStore?.id) {
+              storeId = newStore.id;
+              storeCache.set(storeKey, newStore.id);
+            }
+          }
         }
 
-        // Get or create station (required)
-        const stationId = await getOrCreateRecord('stations', 'name', row['Station Name'].toString());
+        // Get or create station (with caching)
+        const stationKey = row['Station Name'].toString().trim().toUpperCase();
+        let stationId: string | null | undefined = stationCache.get(stationKey);
+        if (!stationId) {
+          stationId = await getOrCreateRecord('stations', 'name', row['Station Name'].toString());
+          if (stationId) stationCache.set(stationKey, stationId);
+        }
         if (!stationId) {
           throw new Error('Unable to process Station Name - Please check that this field contains valid text');
         }
 
-        // Get or create category, brand, model
-        const categoryId = await getOrCreateRecord('categories', 'name', row['Category'].toString());
-        const brandId = await getOrCreateRecord('brands', 'name', row['Brand'].toString());
-        const modelId = await getOrCreateRecord('models', 'name', row['Model'].toString());
+        // Get or create category, brand, model (with caching)
+        const categoryKey = row['Category'].toString().trim().toUpperCase();
+        let categoryId: string | null | undefined = categoryCache.get(categoryKey);
+        if (!categoryId) {
+          categoryId = await getOrCreateRecord('categories', 'name', row['Category'].toString());
+          if (categoryId) categoryCache.set(categoryKey, categoryId);
+        }
+
+        const brandKey = row['Brand'].toString().trim().toUpperCase();
+        let brandId: string | null | undefined = brandCache.get(brandKey);
+        if (!brandId) {
+          brandId = await getOrCreateRecord('brands', 'name', row['Brand'].toString());
+          if (brandId) brandCache.set(brandKey, brandId);
+        }
+
+        const modelKey = row['Model'].toString().trim().toUpperCase();
+        let modelId: string | null | undefined = modelCache.get(modelKey);
+        if (!modelId) {
+          modelId = await getOrCreateRecord('models', 'name', row['Model'].toString());
+          if (modelId) modelCache.set(modelKey, modelId);
+        }
 
         if (!categoryId || !brandId || !modelId) {
           throw new Error('Unable to process Category, Brand, or Model - Please check that these fields contain valid text values');
@@ -349,6 +411,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         });
       }
     }
+
+    console.log(`Import completed: ${result.success} successful, ${result.failed} failed`);
 
     // Save errors to database if import log was created
     if (importLog && result.errors.length > 0) {

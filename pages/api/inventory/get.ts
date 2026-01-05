@@ -13,8 +13,49 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
+
+    // Get pagination and search parameters from query
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const searchTerm = (req.query.search as string) || '';
     
-    // Build the query
+    // Filter parameters
+    const categoryFilter = (req.query.category as string) || '';
+    const storeFilter = (req.query.store as string) || '';
+    const brandFilter = (req.query.brand as string) || '';
+    const serialStatusFilter = (req.query.serial_status as string) || 'all'; // 'all', 'with', 'without'
+
+    // Calculate stats from total inventory (always constant, ignores filters)
+    const { count: totalItems } = await supabaseAdmin
+      .from('store_inventory')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
+
+    // Get unique categories count
+    const { data: categoriesData } = await supabaseAdmin
+      .from('store_inventory')
+      .select('category_id')
+      .is('deleted_at', null)
+      .not('category_id', 'is', null);
+
+    const uniqueCategories = new Set(categoriesData?.map((item: any) => item.category_id)).size;
+
+    // Get unique stores count
+    const { data: storesData } = await supabaseAdmin
+      .from('store_inventory')
+      .select('store_id')
+      .is('deleted_at', null)
+      .not('store_id', 'is', null);
+
+    const uniqueStores = new Set(storesData?.map((item: any) => item.store_id)).size;
+
+    const stats = {
+      totalItems: totalItems || 0,
+      uniqueCategories,
+      uniqueStores,
+    };
+
+    // Build filtered query
     let query = supabaseAdmin
       .from('store_inventory')
       .select(`
@@ -48,26 +89,78 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           id,
           name
         )
-      `)
-      .is('deleted_at', null) // Only fetch non-deleted items
+      `, { count: 'exact' })
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
-    // Apply filters if provided
-    const { store_id, station_id } = req.query;
-    if (store_id) {
-      query = query.eq('store_id', store_id);
+    // Apply filters at database level where possible
+    // Note: Supabase doesn't support filtering on nested relations directly,
+    // so we need to filter in memory for some fields
+
+    // Fetch filtered items
+    const { data: allFilteredItems, error: fetchError } = await query;
+
+    if (fetchError) throw fetchError;
+
+    // Apply additional filters in memory (for nested relation fields)
+    let filteredItems = allFilteredItems || [];
+
+    if (categoryFilter) {
+      filteredItems = filteredItems.filter((item: any) => {
+        const categoryName = Array.isArray(item.categories) ? item.categories[0]?.name : item.categories?.name;
+        return categoryName === categoryFilter;
+      });
     }
-    if (station_id) {
-      query = query.eq('station_id', station_id);
+    if (storeFilter) {
+      filteredItems = filteredItems.filter((item: any) => {
+        const storeName = Array.isArray(item.stores) ? item.stores[0]?.store_name : item.stores?.store_name;
+        return storeName === storeFilter;
+      });
+    }
+    if (brandFilter) {
+      filteredItems = filteredItems.filter((item: any) => {
+        const brandName = Array.isArray(item.brands) ? item.brands[0]?.name : item.brands?.name;
+        return brandName === brandFilter;
+      });
     }
 
-    const { data: items, error } = await query;
+    if (serialStatusFilter === 'with') {
+      filteredItems = filteredItems.filter((item: any) => !!item.serial_number);
+    } else if (serialStatusFilter === 'without') {
+      filteredItems = filteredItems.filter((item: any) => !item.serial_number);
+    }
 
-    if (error) throw error;
+    if (searchTerm) {
+      const searchLower = searchTerm.toLowerCase();
+      filteredItems = filteredItems.filter((item: any) => {
+        const categoryName = Array.isArray(item.categories) ? item.categories[0]?.name : item.categories?.name;
+        const brandName = Array.isArray(item.brands) ? item.brands[0]?.name : item.brands?.name;
+        const modelName = Array.isArray(item.models) ? item.models[0]?.name : item.models?.name;
+        const storeName = Array.isArray(item.stores) ? item.stores[0]?.store_name : item.stores?.store_name;
+        const storeCode = Array.isArray(item.stores) ? item.stores[0]?.store_code : item.stores?.store_code;
+        const stationName = Array.isArray(item.stations) ? item.stations[0]?.name : item.stations?.name;
 
-    // Fetch user details for created_by and updated_by
+        return (
+          item.serial_number?.toLowerCase().includes(searchLower) ||
+          categoryName?.toLowerCase().includes(searchLower) ||
+          brandName?.toLowerCase().includes(searchLower) ||
+          modelName?.toLowerCase().includes(searchLower) ||
+          storeName?.toLowerCase().includes(searchLower) ||
+          storeCode?.toLowerCase().includes(searchLower) ||
+          stationName?.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+
+    // Apply pagination
+    const totalCount = filteredItems.length;
+    const from = (page - 1) * limit;
+    const to = from + limit;
+    const paginatedItems = filteredItems.slice(from, to);
+
+    // Fetch user details for the paginated items
     const inventoryItems = await Promise.all(
-      (items || []).map(async (item) => {
+      (paginatedItems || []).map(async (item) => {
         let created_by_user = null;
         let updated_by_user = null;
 
@@ -97,11 +190,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     );
 
-    if (error) throw error;
-
     return res.status(200).json({
       items: inventoryItems || [],
-      count: inventoryItems?.length || 0,
+      stats,
+      pagination: {
+        currentPage: page,
+        pageSize: limit,
+        totalCount: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+      },
     });
   } catch (error: any) {
     console.error('Error fetching inventory:', error);
