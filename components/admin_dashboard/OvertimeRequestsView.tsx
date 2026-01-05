@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
@@ -66,6 +66,8 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequest | null>(null);
   const [dateFilter, setDateFilter] = useState<string>('');
   const [employeeFilter, setEmployeeFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage] = useState<number>(10);
 
   // Filtered requests based on date and employee filters
   const filteredRequests = useMemo(() => {
@@ -89,6 +91,17 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
       return true;
     });
   }, [requests, dateFilter, employeeFilter]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRequests = filteredRequests.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [dateFilter, employeeFilter]);
 
   useEffect(() => {
     // Fetch requests immediately since access is already verified by the page
@@ -546,7 +559,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {filteredRequests.length === 0 ? (
+              {paginatedRequests.length === 0 ? (
                 <tr>
                   <td colSpan={canApproveLevel2 ? 9 : 7} className="px-6 py-12 text-center text-slate-500">
                     <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
@@ -554,7 +567,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredRequests.map((request) => {
+                paginatedRequests.map((request) => {
                   // Determine what actions the current user can take
                   const canLevel1Approve = canApproveLevel1 && (!request.level1_status || request.level1_status === 'pending');
                   const canLevel2Approve = canApproveLevel2 && request.level1_status === 'approved' && (!request.level2_status || request.level2_status === 'pending');
@@ -694,6 +707,61 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between border-t border-slate-800 pt-4">
+          <div className="text-sm text-slate-400">
+            Showing <span className="font-medium text-white">{startIndex + 1}</span> to{' '}
+            <span className="font-medium text-white">{Math.min(endIndex, filteredRequests.length)}</span> of{' '}
+            <span className="font-medium text-white">{filteredRequests.length}</span> results
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-8 h-8 rounded-lg text-sm font-medium transition-colors ${
+                      currentPage === pageNum
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
