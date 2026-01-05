@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
+import { compressImages } from '@/lib/imageCompression';
 
 interface Store {
   id: string;
@@ -371,7 +372,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   };
 
   // Handle image selection
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
     // Validate: max 10 images total
@@ -380,31 +381,35 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       return;
     }
 
-    // Validate each file
-    const validFiles: File[] = [];
-    for (const file of files) {
-      // Check file type
+    // Filter only image files
+    const imageFiles = files.filter(file => {
       if (!file.type.startsWith('image/')) {
         setError(`${file.name} is not an image file`);
-        continue;
+        return false;
       }
+      return true;
+    });
 
-      // Check file size (5MB = 5 * 1024 * 1024 bytes)
-      if (file.size > 5 * 1024 * 1024) {
-        setError(`${file.name} is too large. Maximum size is 5MB`);
-        continue;
+    if (imageFiles.length === 0) {
+      if (e.target) {
+        e.target.value = '';
       }
-
-      validFiles.push(file);
+      return;
     }
 
-    if (validFiles.length > 0) {
-      // Create preview URLs
-      const newPreviewUrls = validFiles.map(file => URL.createObjectURL(file));
+    try {
+      // Compress images (max 1MB, max dimension 1920px, quality 0.8)
+      const compressedFiles = await compressImages(imageFiles, 1, 1920, 0.8);
 
-      setSelectedImages(prev => [...prev, ...validFiles]);
+      // Create preview URLs
+      const newPreviewUrls = compressedFiles.map(file => URL.createObjectURL(file));
+
+      setSelectedImages(prev => [...prev, ...compressedFiles]);
       setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
       setError(null);
+    } catch (error) {
+      console.error('Error compressing images:', error);
+      setError('Failed to process images. Please try again.');
     }
 
     // Reset file input

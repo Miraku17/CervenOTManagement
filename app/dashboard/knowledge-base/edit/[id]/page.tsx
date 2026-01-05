@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import LexicalEditor from '@/components/LexicalEditor';
+import { compressImages } from '@/lib/imageCompression';
 
 import {
   ArrowLeft,
@@ -226,7 +227,7 @@ export default function EditArticlePage() {
     }
   };
 
-  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
 
@@ -242,21 +243,36 @@ export default function EditArticlePage() {
       return;
     }
 
-    const newPreviews: string[] = [];
+    // Filter only image files
+    const imageFiles = newFiles.filter(file => file.type.startsWith('image/'));
 
-    newFiles.forEach(file => {
-      if (file.type.startsWith('image/')) {
+    if (imageFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      // Compress images (max 1MB, max dimension 1920px, quality 0.8)
+      const compressedFiles = await compressImages(imageFiles, 1, 1920, 0.8);
+
+      const newPreviews: string[] = [];
+
+      compressedFiles.forEach(file => {
         const reader = new FileReader();
         reader.onloadend = () => {
           newPreviews.push(reader.result as string);
-          if (newPreviews.length === newFiles.length) {
-            setNewImages([...newImages, ...newFiles]);
+          if (newPreviews.length === compressedFiles.length) {
+            setNewImages([...newImages, ...compressedFiles]);
             setNewImagePreviews([...newImagePreviews, ...newPreviews]);
           }
         };
         reader.readAsDataURL(file);
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error compressing images:', error);
+      setErrorMessage('Failed to process images. Please try again.');
+      setShowErrorModal(true);
+    }
 
     // Reset input
     e.target.value = '';
