@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Check, X, Clock, AlertCircle, Loader2 } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
@@ -64,6 +64,31 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
     comment: '',
   });
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequest | null>(null);
+  const [dateFilter, setDateFilter] = useState<string>('');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('');
+
+  // Filtered requests based on date and employee filters
+  const filteredRequests = useMemo(() => {
+    return requests.filter(request => {
+      // Filter by date
+      if (dateFilter && request.overtime_date !== dateFilter) {
+        return false;
+      }
+
+      // Filter by employee (search by name or email)
+      if (employeeFilter) {
+        const searchTerm = employeeFilter.toLowerCase();
+        const fullName = `${request.requested_by.first_name} ${request.requested_by.last_name}`.toLowerCase();
+        const email = request.requested_by.email.toLowerCase();
+
+        if (!fullName.includes(searchTerm) && !email.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [requests, dateFilter, employeeFilter]);
 
   useEffect(() => {
     // Fetch requests immediately since access is already verified by the page
@@ -444,9 +469,64 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
         </div>
         <div className="flex items-center gap-4">
           <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-slate-300">
-            <span className="font-bold text-white">{requests.filter(r => !r.final_status || r.final_status === 'pending').length}</span> Pending Requests
+            <span className="font-bold text-white">{filteredRequests.filter(r => !r.final_status || r.final_status === 'pending').length}</span> Pending Requests
           </div>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter className="w-4 h-4 text-slate-400" />
+          <span className="text-sm font-medium text-slate-300">Filters</span>
+          {(dateFilter || employeeFilter) && (
+            <button
+              onClick={() => {
+                setDateFilter('');
+                setEmployeeFilter('');
+              }}
+              className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Date Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              <Calendar className="w-3 h-3 inline mr-1 text-white" />
+              Filter by Date
+            </label>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-200 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+            />
+          </div>
+
+          {/* Employee Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              <User className="w-3 h-3 inline mr-1 text-white" />
+              Search Employee
+            </label>
+            <input
+              type="text"
+              value={employeeFilter}
+              onChange={(e) => setEmployeeFilter(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
+          </div>
+        </div>
+        {(dateFilter || employeeFilter) && (
+          <div className="mt-3 text-xs text-slate-400">
+            Showing <span className="font-medium text-white">{filteredRequests.length}</span> of{' '}
+            <span className="font-medium text-white">{requests.length}</span> requests
+          </div>
+        )}
       </div>
 
       <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden shadow-xl">
@@ -466,15 +546,15 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
-              {requests.length === 0 ? (
+              {filteredRequests.length === 0 ? (
                 <tr>
                   <td colSpan={canApproveLevel2 ? 9 : 7} className="px-6 py-12 text-center text-slate-500">
                     <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                    <p>No overtime requests found</p>
+                    <p>{requests.length === 0 ? 'No overtime requests found' : 'No requests match your filters'}</p>
                   </td>
                 </tr>
               ) : (
-                requests.map((request) => {
+                filteredRequests.map((request) => {
                   // Determine what actions the current user can take
                   const canLevel1Approve = canApproveLevel1 && (!request.level1_status || request.level1_status === 'pending');
                   const canLevel2Approve = canApproveLevel2 && request.level1_status === 'approved' && (!request.level2_status || request.level2_status === 'pending');
