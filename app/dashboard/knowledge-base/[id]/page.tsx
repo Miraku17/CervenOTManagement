@@ -3,6 +3,7 @@
 import React, { useState, useEffect, ReactElement } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/services/supabase';
+import LexicalEditor from '@/components/LexicalEditor';
 import {
   ArrowLeft,
   Clock,
@@ -11,7 +12,9 @@ import {
   Tag,
   Edit,
   Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Video,
+  Image as ImageIcon
 } from 'lucide-react';
 
 interface Article {
@@ -26,6 +29,13 @@ interface Article {
   created_at: string;
   updated_at: string;
   tags?: string[];
+  video_urls?: string[];
+  images?: Array<{
+    id: string;
+    image_url: string;
+    caption?: string;
+    display_order: number;
+  }>;
 }
 
 export default function ArticlePage() {
@@ -435,9 +445,79 @@ export default function ArticlePage() {
         {/* Article Content */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm">
           <div className="prose prose-invert prose-slate max-w-none">
-            {renderLexicalContent(article.content)}
+            <LexicalEditor
+              initialValue={article.content}
+              onChange={() => {}}
+              readOnly={true}
+            />
           </div>
         </div>
+
+        {/* Images Section */}
+        {article.images && article.images.length > 0 && (
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm">
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+              <ImageIcon className="w-5 h-5 text-green-500" />
+              Images
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {article.images.map((image, index) => (
+                <div key={image.id} className="bg-slate-950/50 border border-slate-800 rounded-xl overflow-hidden">
+                  <div className="aspect-video bg-slate-900">
+                    <img
+                      src={image.image_url}
+                      alt={image.caption || `Image ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  {image.caption && (
+                    <div className="p-3">
+                      <p className="text-sm text-slate-400">{image.caption}</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Video Links Section */}
+        {article.video_urls && article.video_urls.length > 0 && (
+          <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm">
+            <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+              <Video className="w-5 h-5 text-blue-500" />
+              Related Videos
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {article.video_urls.map((url, index) => (
+                <div key={index} className="bg-slate-950/50 border border-slate-800 rounded-xl p-4">
+                  <div className="aspect-video bg-slate-900 rounded-lg overflow-hidden mb-3">
+                    <iframe
+                      src={url.includes('youtube.com') || url.includes('youtu.be')
+                        ? url.replace('watch?v=', 'embed/').replace('youtu.be/', 'youtube.com/embed/')
+                        : url.includes('vimeo.com')
+                        ? url.replace('vimeo.com/', 'player.vimeo.com/video/')
+                        : url}
+                      title={`Video ${index + 1}`}
+                      className="w-full h-full"
+                      frameBorder="0"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 break-all"
+                  >
+                    {url}
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Delete Confirmation Modal */}

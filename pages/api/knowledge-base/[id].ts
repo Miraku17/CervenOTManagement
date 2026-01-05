@@ -64,6 +64,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
+    // Fetch video URLs for this article
+    const { data: videoData } = await supabaseAdmin
+      .from('kb_videos')
+      .select('video_url')
+      .eq('kb_id', article.id)
+      .order('created_at', { ascending: true });
+
+    const videoUrls = videoData?.map((v: any) => v.video_url) || [];
+
+    // Fetch images for this article
+    const { data: imageData } = await supabaseAdmin
+      .from('kb_images')
+      .select('id, image_url, caption, display_order')
+      .eq('kb_id', article.id)
+      .order('display_order', { ascending: true });
+
+    const images = imageData || [];
+
     // Transform the data
     const categoryData = article.kb_categories as any;
     const transformedArticle = {
@@ -77,6 +95,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       author: authorName,
       author_id: article.author_id,
       tags: article.tags || [],
+      video_urls: videoUrls,
+      images: images,
       created_at: article.created_at,
       updated_at: article.updated_at,
       published: article.published

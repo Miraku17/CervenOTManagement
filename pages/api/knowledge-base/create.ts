@@ -27,6 +27,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     tags,
     published = false,
     kb_code,
+    video_urls = [],
+    images = [],
   } = req.body;
 
   // Validation
@@ -110,6 +112,92 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (articleError) {
       throw articleError;
+    }
+
+    // Insert video URLs if provided
+    if (video_urls && Array.isArray(video_urls) && video_urls.length > 0) {
+      const videoRecords = video_urls
+        .filter((url: string) => url && url.trim())
+        .map((url: string) => ({
+          kb_id: article.id,
+          video_url: url.trim(),
+        }));
+
+      if (videoRecords.length > 0) {
+        const { error: videoError } = await supabaseAdmin
+          .from('kb_videos')
+          .insert(videoRecords);
+
+        if (videoError) {
+          console.error('Error inserting video URLs:', videoError);
+          // Don't fail the whole request if video insertion fails
+        }
+      }
+    }
+
+    // Upload images to Supabase Storage if provided
+    if (images && Array.isArray(images) && images.length > 0) {
+      const imageRecords: any[] = [];
+
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        if (!image.fileData || !image.fileName) continue;
+
+        try {
+          // Generate filename with order prefix
+          const fileExtension = image.fileName.split('.').pop() || 'png';
+          const orderPrefix = String(i + 1).padStart(3, '0');
+          const sanitizedName = image.fileName
+            .toLowerCase()
+            .replace(/[^a-z0-9.-]/g, '-')
+            .replace(/^\.+/, '')
+            .replace(/\.+/g, '.');
+          const fileName = `${orderPrefix}-${sanitizedName}`;
+
+          // Storage path: kb-media/kb/<kb_id>/images/<filename>
+          const storagePath = `kb-media/kb/${article.id}/images/${fileName}`;
+
+          // Convert base64 to buffer
+          const buffer = Buffer.from(image.fileData, 'base64');
+
+          // Upload to Supabase Storage
+          const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+            .from('kb-media')
+            .upload(storagePath.replace('kb-media/', ''), buffer, {
+              contentType: image.fileType || 'image/png',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('Error uploading image:', uploadError);
+            continue;
+          }
+
+          // Get public URL
+          const { data: urlData } = supabaseAdmin.storage
+            .from('kb-media')
+            .getPublicUrl(storagePath.replace('kb-media/', ''));
+
+          imageRecords.push({
+            kb_id: article.id,
+            image_url: urlData.publicUrl,
+            display_order: i,
+          });
+        } catch (error) {
+          console.error('Error processing image:', error);
+        }
+      }
+
+      // Insert image records into database
+      if (imageRecords.length > 0) {
+        const { error: imageError } = await supabaseAdmin
+          .from('kb_images')
+          .insert(imageRecords);
+
+        if (imageError) {
+          console.error('Error inserting image records:', imageError);
+        }
+      }
     }
 
     return res.status(201).json({ article });

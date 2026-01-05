@@ -7,14 +7,17 @@ import LexicalEditor from '@/components/LexicalEditor';
 import {
   ArrowLeft,
   Save,
-  Tag,
   Folder,
   Type,
   ChevronDown,
   CheckCircle,
   AlertCircle,
   Loader2,
-  X
+  X,
+  Video,
+  Plus,
+  Image as ImageIcon,
+  Upload
 } from 'lucide-react';
 
 interface Category {
@@ -33,6 +36,7 @@ interface Article {
   tags: string[];
   description?: string;
   author_id: string;
+  images?: Array<{ id: string; image_url: string; caption?: string; display_order: number }>;
 }
 
 export default function EditArticlePage() {
@@ -50,8 +54,11 @@ export default function EditArticlePage() {
     description: '',
     content: ''
   });
-  const [tags, setTags] = useState<string[]>([]);
-  const [tagInput, setTagInput] = useState('');
+  const [videoUrls, setVideoUrls] = useState<string[]>([]);
+  const [videoUrlInput, setVideoUrlInput] = useState('');
+  const [existingImages, setExistingImages] = useState<Array<{ id: string; image_url: string; caption?: string; display_order: number }>>([]);
+  const [newImages, setNewImages] = useState<File[]>([]);
+  const [newImagePreviews, setNewImagePreviews] = useState<string[]>([]);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -73,7 +80,8 @@ export default function EditArticlePage() {
             description: data.article.description || '',
             content: data.article.content
           });
-          setTags(data.article.tags || []);
+          setVideoUrls(data.article.video_urls || []);
+          setExistingImages(data.article.images || []);
         } else {
           setErrorMessage('Article not found or you do not have permission to edit it');
           setShowErrorModal(true);
@@ -141,6 +149,27 @@ export default function EditArticlePage() {
       const category = categories.find(cat => cat.name === formData.category);
       const categoryId = category?.id || article.category_id;
 
+      // Convert new images to base64
+      const imageData = await Promise.all(
+        newImages.map(async (file, index) => {
+          return new Promise<{ fileName: string; fileData: string; fileType: string }>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              const base64 = (reader.result as string).split(',')[1];
+              resolve({
+                fileName: file.name,
+                fileData: base64,
+                fileType: file.type
+              });
+            };
+            reader.readAsDataURL(file);
+          });
+        })
+      );
+
+      // Get IDs of existing images to keep
+      const keepImageIds = existingImages.map(img => img.id);
+
       const response = await fetch('/api/knowledge-base/update', {
         method: 'PUT',
         headers: {
@@ -152,7 +181,9 @@ export default function EditArticlePage() {
           content: formData.content,
           category_id: categoryId,
           published: article.published,
-          tags: tags,
+          video_urls: videoUrls,
+          keep_image_ids: keepImageIds,
+          new_images: imageData,
         }),
       });
 
@@ -161,7 +192,7 @@ export default function EditArticlePage() {
       if (response.ok) {
         setShowSuccessModal(true);
         setTimeout(() => {
-          router.push(`/dashboard/knowledge-base/${data.article.slug}`);
+          router.push(`/dashboard/knowledge-base/${id}`);
         }, 1500);
       } else {
         setErrorMessage(data.error || 'Failed to update article');
@@ -176,23 +207,68 @@ export default function EditArticlePage() {
     }
   };
 
-  const handleAddTag = () => {
-    const trimmedTag = tagInput.trim();
-    if (trimmedTag && !tags.includes(trimmedTag)) {
-      setTags([...tags, trimmedTag]);
-      setTagInput('');
+  const handleAddVideoUrl = () => {
+    const trimmedUrl = videoUrlInput.trim();
+    if (trimmedUrl && !videoUrls.includes(trimmedUrl)) {
+      setVideoUrls([...videoUrls, trimmedUrl]);
+      setVideoUrlInput('');
     }
   };
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+  const handleRemoveVideoUrl = (urlToRemove: string) => {
+    setVideoUrls(videoUrls.filter(url => url !== urlToRemove));
   };
 
-  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleVideoUrlInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      handleAddTag();
+      handleAddVideoUrl();
     }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const newFiles = Array.from(files);
+    const totalImages = existingImages.length + newImages.length + newFiles.length;
+
+    // Check if adding new files would exceed limit
+    if (totalImages > 5) {
+      const currentTotal = existingImages.length + newImages.length;
+      setErrorMessage(`You can only upload a maximum of 5 images. Currently you have ${currentTotal} image(s). You can add ${5 - currentTotal} more.`);
+      setShowErrorModal(true);
+      e.target.value = '';
+      return;
+    }
+
+    const newPreviews: string[] = [];
+
+    newFiles.forEach(file => {
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          newPreviews.push(reader.result as string);
+          if (newPreviews.length === newFiles.length) {
+            setNewImages([...newImages, ...newFiles]);
+            setNewImagePreviews([...newImagePreviews, ...newPreviews]);
+          }
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleRemoveExistingImage = (imageId: string) => {
+    setExistingImages(existingImages.filter(img => img.id !== imageId));
+  };
+
+  const handleRemoveNewImage = (index: number) => {
+    setNewImages(newImages.filter((_, i) => i !== index));
+    setNewImagePreviews(newImagePreviews.filter((_, i) => i !== index));
   };
 
   if (isFetching) {
@@ -360,55 +436,161 @@ export default function EditArticlePage() {
               </div>
             </div>
 
-            {/* Tags */}
+            {/* Images */}
+            <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <ImageIcon className="w-5 h-5 text-green-500" />
+                  Images
+                </h3>
+                <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                  existingImages.length + newImages.length >= 5
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'bg-slate-800 text-slate-400'
+                }`}>
+                  {existingImages.length + newImages.length}/5
+                </span>
+              </div>
+              <div className="space-y-3">
+                {/* Image Upload */}
+                <label className="block">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageSelect}
+                    className="hidden"
+                    id="image-upload"
+                    disabled={existingImages.length + newImages.length >= 5}
+                  />
+                  <div className={`flex items-center justify-center gap-2 px-4 py-3 text-white text-sm rounded-lg font-medium transition-all ${
+                    existingImages.length + newImages.length >= 5
+                      ? 'bg-slate-700 cursor-not-allowed opacity-50'
+                      : 'bg-green-600 hover:bg-green-500 cursor-pointer'
+                  }`}>
+                    <Upload className="w-4 h-4" />
+                    {existingImages.length + newImages.length >= 5 ? 'Maximum Reached' : 'Upload Images'}
+                  </div>
+                </label>
+
+                {/* Display Existing Images */}
+                {existingImages.length > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">Current Images</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {existingImages.map((image) => (
+                        <div
+                          key={image.id}
+                          className="relative group bg-slate-950/50 border border-slate-800 rounded-lg overflow-hidden aspect-square"
+                        >
+                          <img
+                            src={image.image_url}
+                            alt={image.caption || 'Existing image'}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveExistingImage(image.id)}
+                            className="absolute top-1 right-1 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Display New Images */}
+                {newImagePreviews.length > 0 && (
+                  <div>
+                    <p className="text-xs text-slate-500 mb-2">New Images (will be uploaded on save)</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {newImagePreviews.map((preview, index) => (
+                        <div
+                          key={index}
+                          className="relative group bg-slate-950/50 border border-green-500/30 rounded-lg overflow-hidden aspect-square"
+                        >
+                          <img
+                            src={preview}
+                            alt={`New image ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveNewImage(index)}
+                            className="absolute top-1 right-1 p-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-2">
+                            <p className="text-xs text-white truncate font-medium">{newImages[index]?.name}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {existingImages.length === 0 && newImagePreviews.length === 0 && (
+                  <div className="border-2 border-dashed border-slate-800 rounded-lg p-4 text-center">
+                    <p className="text-slate-500 text-xs">No images uploaded yet</p>
+                    <p className="text-slate-600 text-xs mt-1">JPG, PNG, WebP, GIF (Max 5)</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Video URLs */}
             <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <Tag className="w-5 h-5 text-purple-500" />
-                Tags
+                <Video className="w-5 h-5 text-blue-500" />
+                Video Links
               </h3>
               <div className="space-y-3">
-                {/* Tag Input */}
+                {/* Video URL Input */}
                 <div className="flex gap-2">
                   <input
-                    type="text"
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={handleTagInputKeyDown}
-                    placeholder="Add a tag..."
-                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-transparent transition-all"
+                    type="url"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    onKeyDown={handleVideoUrlInputKeyDown}
+                    placeholder="Paste video URL..."
+                    className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition-all"
                   />
                   <button
                     type="button"
-                    onClick={handleAddTag}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm rounded-lg font-medium transition-all"
+                    onClick={handleAddVideoUrl}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-sm rounded-lg font-medium transition-all flex items-center gap-1"
                   >
+                    <Plus className="w-4 h-4" />
                     Add
                   </button>
                 </div>
 
-                {/* Display Tags */}
-                {tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {tags.map((tag, index) => (
-                      <span
+                {/* Display Video URLs */}
+                {videoUrls.length > 0 && (
+                  <div className="space-y-2">
+                    {videoUrls.map((url, index) => (
+                      <div
                         key={index}
-                        className="group px-3 py-1 bg-purple-500/10 text-purple-300 text-xs rounded-full border border-purple-500/20 flex items-center gap-2"
+                        className="group px-3 py-2 bg-blue-500/10 text-blue-300 text-xs rounded-lg border border-blue-500/20 flex items-center justify-between gap-2"
                       >
-                        {tag}
+                        <span className="truncate flex-1">{url}</span>
                         <button
                           type="button"
-                          onClick={() => handleRemoveTag(tag)}
-                          className="hover:text-purple-100 transition-colors"
+                          onClick={() => handleRemoveVideoUrl(url)}
+                          className="hover:text-blue-100 transition-colors shrink-0"
                         >
                           <X className="w-3 h-3" />
                         </button>
-                      </span>
+                      </div>
                     ))}
                   </div>
                 )}
 
-                {tags.length === 0 && (
-                  <p className="text-slate-500 text-xs">No tags added yet. Tags help users find your article.</p>
+                {videoUrls.length === 0 && (
+                  <p className="text-slate-500 text-xs">No video links added yet. Supports YouTube, Vimeo, and other video platforms.</p>
                 )}
               </div>
             </div>
