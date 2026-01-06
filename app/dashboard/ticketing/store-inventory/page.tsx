@@ -7,8 +7,7 @@ import StoreInventoryDetailModal from '@/components/ticketing/StoreInventoryDeta
 import ImportStoreInventoryLogsModal from '@/components/ticketing/ImportStoreInventoryLogsModal';
 import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
@@ -481,11 +480,8 @@ export default function StoreInventoryPage() {
     }
   };
 
-  const handlePrint = async () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Fetch ALL inventory items including deleted ones for the PDF
+  const handleExport = async () => {
+    // Fetch ALL inventory items including deleted ones for the export
     let allItems: InventoryItem[] = [];
     try {
       const response = await fetch('/api/inventory/get-all');
@@ -508,112 +504,62 @@ export default function StoreInventoryPage() {
         return nameA.localeCompare(nameB);
       });
 
-    try {
-      // Add logo
-      const logoImg = new Image();
-      logoImg.src = '/logo.png';
-      await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = reject;
-      });
-      const logoWidth = 80;
-      const logoHeight = 20;
-      const logoX = (pageWidth - logoWidth) / 2;
-      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error loading logo:', error);
-      // Continue without logo if it fails
-    }
+    // Prepare data for Excel
+    const excelData = sortedItems.map((item) => ({
+      'Category': item.categories?.name || 'N/A',
+      'Brand': item.brands?.name || 'N/A',
+      'Model': item.models?.name || 'N/A',
+      'Serial Number': item.serial_number || 'N/A',
+      'Status': item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'N/A',
+      'Store Name': item.stores?.store_name || 'N/A',
+      'Store Code': item.stores?.store_code || 'N/A',
+      'Station': item.stations?.name || 'N/A',
+      'Under Warranty': item.under_warranty ? 'Yes' : 'No',
+      'Warranty Date': item.warranty_date ? new Date(item.warranty_date).toLocaleDateString() : 'N/A',
+      'Created By': item.created_by_user ? `${item.created_by_user.first_name} ${item.created_by_user.last_name}` : 'N/A',
+      'Created At': new Date(item.created_at).toLocaleDateString(),
+    }));
 
-    // Add header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Store Inventory Report', pageWidth / 2, 38, { align: 'center' });
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    // Add date and count
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // Category
+      { wch: 20 }, // Brand
+      { wch: 25 }, // Model
+      { wch: 25 }, // Serial Number
+      { wch: 15 }, // Status
+      { wch: 30 }, // Store Name
+      { wch: 15 }, // Store Code
+      { wch: 20 }, // Station
+      { wch: 15 }, // Under Warranty
+      { wch: 15 }, // Warranty Date
+      { wch: 25 }, // Created By
+      { wch: 15 }, // Created At
+    ];
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Store Inventory');
+
+    // Add metadata sheet
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-    doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Items: ${sortedItems.length}`, pageWidth - 14, 46, { align: 'right' });
-
-    // Prepare table data
-    const tableColumn = [
-      'Item Details',
-      'Serial Number',
-      'Status',
-      'Category',
-      'Brand',
-      'Model',
-      'Store',
-      'Station',
-      'Warranty',
-      'Warranty Date',
+    const metaData = [
+      { Field: 'Report Title', Value: 'Store Inventory Report' },
+      { Field: 'Generated Date', Value: today },
+      { Field: 'Total Items', Value: sortedItems.length },
     ];
+    const metaSheet = XLSX.utils.json_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
 
-    const tableRows = sortedItems.map((item) => [
-      `${item.brands?.name || 'N/A'}\n${item.categories?.name || 'N/A'}`,
-      item.serial_number || 'N/A',
-      item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'N/A',
-      item.categories?.name || 'N/A',
-      item.brands?.name || 'N/A',
-      item.models?.name || 'N/A',
-      `${item.stores?.store_name || 'N/A'}\n${item.stores?.store_code || ''}`,
-      item.stations?.name || 'N/A',
-      item.under_warranty ? 'Yes' : 'No',
-      item.warranty_date ? new Date(item.warranty_date).toLocaleDateString() : 'N/A',
-    ]);
-
-    // Add table
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 54,
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42], // Slate 900
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252], // Light gray
-      },
-      columnStyles: {
-        0: { cellWidth: 35 },  // Item Details
-        1: { cellWidth: 30 },  // Serial Number
-        2: { cellWidth: 20 },  // Status
-        3: { cellWidth: 30 },  // Category
-        4: { cellWidth: 30 },  // Brand
-        5: { cellWidth: 30 },  // Model
-        6: { cellWidth: 35 },  // Store
-        7: { cellWidth: 25 },  // Station
-        8: { cellWidth: 20 },  // Warranty
-        9: { cellWidth: 25 },  // Warranty Date
-      },
-    });
-
-    // Add page numbers
-    const pageCount = doc.internal.pages.length - 1;
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(9);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      );
-    }
-
-    // Open PDF in new tab (without print dialog)
-    window.open(doc.output('bloburl'), '_blank');
+    // Save file
+    const filename = `Store_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
   };
 
   // Clear all filters
@@ -710,13 +656,13 @@ export default function StoreInventoryPage() {
                       </button>
                       <button
                         onClick={() => {
-                          handlePrint();
+                          handleExport();
                           setIsActionsDropdownOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                       >
-                        <Printer size={16} />
-                        <span>Print Report</span>
+                        <FileSpreadsheet size={16} />
+                        <span>Export Excel</span>
                       </button>
                     </div>
                   </div>

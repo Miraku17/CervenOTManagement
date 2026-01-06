@@ -8,8 +8,7 @@ import { LeaveRequestDetailModal } from '@/components/LeaveRequestDetailModal';
 import { UploadLeaveCreditsModal } from '@/components/admin_dashboard/UploadLeaveCreditsModal';
 import { QuickUpdateLeaveCreditsModal } from '@/components/admin_dashboard/QuickUpdateLeaveCreditsModal';
 import { ViewLeaveCreditsModal } from '@/components/admin_dashboard/ViewLeaveCreditsModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface LeaveRequest {
   id: string;
@@ -159,7 +158,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
   const handleApprove = (id: string) => openConfirmation(id, 'approve');
   const handleReject = (id: string) => openConfirmation(id, 'reject');
 
-  const handleExportPDF = async () => {
+  const handleExportExcel = async () => {
     if (!startDate || !endDate) {
       setError('Please select both start and end dates for export');
       setTimeout(() => setError(null), 3000);
@@ -168,9 +167,6 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
 
     setIsExporting(true);
     try {
-      const doc = new jsPDF({ orientation: 'landscape' });
-      const pageWidth = doc.internal.pageSize.getWidth();
-
       // Filter requests by date range
       const filteredByDate = requests.filter(req => {
         const reqDate = new Date(req.created_at);
@@ -187,119 +183,62 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         return nameA.localeCompare(nameB);
       });
 
-      // Add logo
-      try {
-        const logoImg = new Image();
-        logoImg.src = '/logo.png';
-        await new Promise((resolve, reject) => {
-          logoImg.onload = resolve;
-          logoImg.onerror = reject;
-        });
-
-        const logoWidth = 80;
-        const logoHeight = 20;
-        const logoX = (pageWidth - logoWidth) / 2;
-        doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
-      } catch (error) {
-        console.error('Failed to load logo:', error);
-      }
-
-      // Add document title
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text("Leave Requests Report", pageWidth / 2, 38, { align: 'center' });
-
-      // Add date range and count
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 100, 100);
-      const dateRange = `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}`;
-      doc.text(`Period: ${dateRange}`, 14, 46);
-      doc.text(`Total Requests: ${sortedRequests.length}`, pageWidth - 14, 46, { align: 'right' });
-
-      // Add separator line
-      doc.setDrawColor(200, 200, 200);
-      doc.line(14, 52, pageWidth - 14, 52);
-
-      // Prepare table data
-      const tableColumn = [
-        "Employee",
-        "Leave Type",
-        "Start Date",
-        "End Date",
-        "Days",
-        "Status",
-        "Reviewer"
-      ];
-
-      const tableRows = sortedRequests.map((req) => {
+      // Prepare data for Excel
+      const excelData = sortedRequests.map((req) => {
         const employeeName = `${req.employee.first_name} ${req.employee.last_name}`;
         const duration = calculateDuration(req.start_date, req.end_date);
         const reviewer = req.reviewer
           ? `${req.reviewer.first_name} ${req.reviewer.last_name}`
           : 'N/A';
 
-        return [
-          employeeName,
-          req.leave_type,
-          new Date(req.start_date).toLocaleDateString(),
-          new Date(req.end_date).toLocaleDateString(),
-          `${duration} day${duration !== 1 ? 's' : ''}`,
-          req.status.charAt(0).toUpperCase() + req.status.slice(1),
-          reviewer
-        ];
+        return {
+          'Employee': employeeName,
+          'Leave Type': req.leave_type,
+          'Start Date': new Date(req.start_date).toLocaleDateString(),
+          'End Date': new Date(req.end_date).toLocaleDateString(),
+          'Days': `${duration} day${duration !== 1 ? 's' : ''}`,
+          'Status': req.status.charAt(0).toUpperCase() + req.status.slice(1),
+          'Reviewer': reviewer,
+          'Reason': req.reason
+        };
       });
 
-      autoTable(doc, {
-        head: [tableColumn],
-        body: tableRows,
-        startY: 58,
-        styles: {
-          fontSize: 8,
-          cellPadding: 3,
-        },
-        headStyles: {
-          fillColor: [15, 23, 42],
-          textColor: [255, 255, 255],
-          fontStyle: 'bold',
-          halign: 'left',
-        },
-        alternateRowStyles: {
-          fillColor: [248, 250, 252],
-        },
-        columnStyles: {
-          0: { cellWidth: 50 }, // Employee
-          1: { cellWidth: 35 }, // Leave Type
-          2: { cellWidth: 35 }, // Start Date
-          3: { cellWidth: 35 }, // End Date
-          4: { cellWidth: 25 }, // Days
-          5: { cellWidth: 30 }, // Status
-          6: { cellWidth: 'auto' }, // Reviewer
-        },
-        margin: { left: 14, right: 14 },
-      });
+      // Create worksheet
+      const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-      // Add footer with page numbers
-      const pageCount = doc.internal.pages.length - 1;
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(
-          `Page ${i} of ${pageCount}`,
-          pageWidth / 2,
-          doc.internal.pageSize.getHeight() - 10,
-          { align: 'center' }
-        );
-      }
+      // Set column widths
+      worksheet['!cols'] = [
+        { wch: 25 }, // Employee
+        { wch: 20 }, // Leave Type
+        { wch: 15 }, // Start Date
+        { wch: 15 }, // End Date
+        { wch: 10 }, // Days
+        { wch: 12 }, // Status
+        { wch: 25 }, // Reviewer
+        { wch: 40 }, // Reason
+      ];
 
-      const filename = `Leave_Requests_${startDate}_to_${endDate}.pdf`;
-      doc.save(filename);
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Leave Requests');
+
+      // Add metadata sheet
+      const metaData = [
+        { Field: 'Report Title', Value: 'Leave Requests Report' },
+        { Field: 'Period', Value: `${new Date(startDate).toLocaleDateString()} - ${new Date(endDate).toLocaleDateString()}` },
+        { Field: 'Total Requests', Value: sortedRequests.length },
+        { Field: 'Generated Date', Value: new Date().toLocaleDateString() },
+      ];
+      const metaSheet = XLSX.utils.json_to_sheet(metaData);
+      XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
+
+      // Save file
+      const filename = `Leave_Requests_${startDate}_to_${endDate}.xlsx`;
+      XLSX.writeFile(workbook, filename);
 
     } catch (error: any) {
       console.error('Export failed:', error);
-      setError('Failed to export PDF. Please try again.');
+      setError('Failed to export Excel. Please try again.');
       setTimeout(() => setError(null), 3000);
     } finally {
       setIsExporting(false);
@@ -539,7 +478,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
           </div>
           <div className="sm:self-end">
             <button
-              onClick={handleExportPDF}
+              onClick={handleExportExcel}
               disabled={isExporting}
               className={`w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2 shadow-lg ${
                 isExporting ? 'opacity-50 cursor-not-allowed' : ''
@@ -553,7 +492,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
               ) : (
                 <>
                   <FileDown size={18} />
-                  <span className="whitespace-nowrap">Export PDF</span>
+                  <span className="whitespace-nowrap">Export Excel</span>
                 </>
               )}
             </button>

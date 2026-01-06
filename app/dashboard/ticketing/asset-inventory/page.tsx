@@ -5,8 +5,7 @@ import { Plus, Search, Filter, Monitor, Laptop, Server, AlertTriangle, Tag, Edit
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
 import ImportLogsModal from '@/components/ticketing/ImportLogsModal';
 import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
@@ -260,11 +259,8 @@ export default function AssetInventoryPage() {
     setEditItem(null);
   };
 
-  const handlePrint = async () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-
-    // Fetch ALL assets including deleted ones for the PDF
+  const handleExport = async () => {
+    // Fetch ALL assets including deleted ones for the export
     let allAssets: Asset[] = [];
     try {
       const response = await fetch('/api/assets/get-all');
@@ -287,103 +283,54 @@ export default function AssetInventoryPage() {
         return nameA.localeCompare(nameB);
       });
 
-    try {
-      // Add logo
-      const logoImg = new Image();
-      logoImg.src = '/logo.png';
-      await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = reject;
-      });
-      const logoWidth = 80;
-      const logoHeight = 20;
-      const logoX = (pageWidth - logoWidth) / 2;
-      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error loading logo:', error);
-      // Continue without logo if it fails
-    }
+    // Prepare data for Excel
+    const excelData = sortedAssets.map((asset) => ({
+      'Category': asset.categories?.name || 'N/A',
+      'Brand': asset.brands?.name || 'N/A',
+      'Model': asset.models?.name || 'N/A',
+      'Serial Number': asset.serial_number || 'N/A',
+      'Status': asset.status || 'Available',
+      'Under Warranty': asset.under_warranty ? 'Yes' : 'No',
+      'Warranty Date': asset.warranty_date ? new Date(asset.warranty_date).toLocaleDateString() : 'N/A',
+      'Created At': new Date(asset.created_at).toLocaleDateString(),
+    }));
 
-    // Add header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Asset Inventory Report', pageWidth / 2, 38, { align: 'center' });
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    // Add date and count
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 25 }, // Category
+      { wch: 25 }, // Brand
+      { wch: 30 }, // Model
+      { wch: 30 }, // Serial Number
+      { wch: 15 }, // Status
+      { wch: 15 }, // Under Warranty
+      { wch: 15 }, // Warranty Date
+      { wch: 15 }, // Created At
+    ];
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Asset Inventory');
+
+    // Add metadata sheet
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-    doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Assets: ${sortedAssets.length}`, pageWidth - 14, 46, { align: 'right' });
-
-    // Prepare table data
-    const tableColumn = [
-      'Category',
-      'Brand',
-      'Model',
-      'Serial Number',
-      'Status',
-      'Warranty',
-      'Warranty Date',
+    const metaData = [
+      { Field: 'Report Title', Value: 'Asset Inventory Report' },
+      { Field: 'Generated Date', Value: today },
+      { Field: 'Total Assets', Value: sortedAssets.length },
     ];
+    const metaSheet = XLSX.utils.json_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
 
-    const tableRows = sortedAssets.map((asset) => [
-      asset.categories?.name || 'N/A',
-      asset.brands?.name || 'N/A',
-      asset.models?.name || 'N/A',
-      asset.serial_number || 'N/A',
-      asset.status || 'Available',
-      asset.under_warranty ? 'Yes' : 'No',
-      asset.warranty_date ? new Date(asset.warranty_date).toLocaleDateString() : 'N/A',
-    ]);
-
-    // Add table
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 54,
-      styles: {
-        fontSize: 9,
-        cellPadding: 4,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42], // Slate 900
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252], // Light gray
-      },
-      columnStyles: {
-        0: { cellWidth: 45 },  // Category
-        1: { cellWidth: 45 },  // Brand
-        2: { cellWidth: 45 },  // Model
-        3: { cellWidth: 45 },  // Serial Number
-        4: { cellWidth: 35 },  // Status
-        5: { cellWidth: 30 },  // Warranty
-        6: { cellWidth: 35 },  // Warranty Date
-      },
-    });
-
-    // Add page numbers
-    const pageCount = doc.internal.pages.length - 1;
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(9);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      );
-    }
-
-    // Open PDF in new tab (without print dialog)
-    window.open(doc.output('bloburl'), '_blank');
+    // Save file
+    const filename = `Asset_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
   };
 
   const handleDownloadTemplate = async () => {
@@ -659,13 +606,13 @@ export default function AssetInventoryPage() {
                     {!isReadOnly && (
                       <button
                         onClick={() => {
-                          handlePrint();
+                          handleExport();
                           setIsActionsDropdownOpen(false);
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
                       >
-                        <Printer size={16} />
-                        <span>Print Report</span>
+                        <FileSpreadsheet size={16} />
+                        <span>Export Excel</span>
                       </button>
                     )}
                   </div>

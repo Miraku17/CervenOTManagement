@@ -6,8 +6,7 @@ import { Store } from '@/types';
 import StoreModal from '@/components/ticketing/StoreModal';
 import StoreDetailModal from '@/components/ticketing/StoreDetailModal';
 import ImportStoresModal from '@/components/ticketing/ImportStoresModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
@@ -63,78 +62,59 @@ export default function StoresPage() {
     }
   };
 
-  const handlePrintAllStoresPDF = async () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
+  const handleExportAllStoresExcel = () => {
+    // Prepare data for Excel
+    const excelData = stores.map((store) => ({
+      'Store Name': store.store_name,
+      'Store Code': store.store_code,
+      'Store Type': store.store_type || 'N/A',
+      'Contact No': store.contact_no || 'N/A',
+      'City': store.city || 'N/A',
+      'Location': store.location || 'N/A',
+      'Group': store.group || 'N/A',
+      'Managers': Array.isArray(store.managers) && store.managers.length > 0
+        ? store.managers.join(', ')
+        : 'N/A',
+      'Created At': new Date(store.created_at).toLocaleDateString(),
+    }));
 
-    try {
-      // Add logo
-      const logoImg = new Image();
-      logoImg.src = '/logo.png';
-      await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = reject;
-      });
-      const logoWidth = 80;
-      const logoHeight = 20;
-      const logoX = (pageWidth - logoWidth) / 2;
-      doc.addImage(logoImg, 'PNG', logoX, 10, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Error loading logo:', error);
-      // Continue without logo if it fails
-    }
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    // Add header
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('All Stores Data', pageWidth / 2, 38, { align: 'center' });
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 30 }, // Store Name
+      { wch: 15 }, // Store Code
+      { wch: 15 }, // Store Type
+      { wch: 15 }, // Contact No
+      { wch: 20 }, // City
+      { wch: 40 }, // Location
+      { wch: 15 }, // Group
+      { wch: 40 }, // Managers
+      { wch: 15 }, // Created At
+    ];
 
-    // Add date and count
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Stores');
+
+    // Add metadata sheet
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
-    doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Stores: ${stores.length}`, pageWidth - 14, 46, { align: 'right' });
-
-    const tableColumn = [
-      "Store Name",
-      "Store Code",
-      "Store Type",
-      "Contact No",
-      "City",
-      "Location",
-      "Group",
-      "Managers",
-      "Created At",
+    const metaData = [
+      { Field: 'Report Title', Value: 'All Stores Data' },
+      { Field: 'Generated Date', Value: today },
+      { Field: 'Total Stores', Value: stores.length },
     ];
+    const metaSheet = XLSX.utils.json_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
 
-    const tableRows = stores.map((store) => [
-      store.store_name,
-      store.store_code,
-      store.store_type || 'N/A',
-      store.contact_no || 'N/A',
-      store.city || 'N/A',
-      store.location || 'N/A',
-      store.group || 'N/A',
-      Array.isArray(store.managers) && store.managers.length > 0
-        ? store.managers.join(', ')
-        : 'N/A',
-      new Date(store.created_at).toLocaleDateString(),
-    ]);
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 54,
-      styles: { fontSize: 8 },
-      headStyles: { fillColor: [15, 23, 42] }, // Slate 900
-    });
-
-    doc.save("all_stores_data.pdf");
+    // Save file
+    const filename = `All_Stores_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
   };
 
   useEffect(() => {
@@ -182,11 +162,11 @@ export default function StoresPage() {
               </>
             )}
             <button
-                onClick={handlePrintAllStoresPDF}
+                onClick={handleExportAllStoresExcel}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-xl transition-colors shadow-lg shadow-slate-900/20"
               >
                 <FileDown size={20} />
-                <span>Print All Stores</span>
+                <span>Export All Stores</span>
               </button>
         </div>
       </div>
