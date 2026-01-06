@@ -10,8 +10,7 @@ import {
   Trash2,
   AlertTriangle,
 } from "lucide-react";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as XLSX from 'xlsx';
 import { Employee, Position } from "@/types";
 import EmployeeForm from "@/components/admin_dashboard/EmployeeForm";
 import { useUser } from "@/hooks/useUser";
@@ -53,120 +52,58 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     );
   }, [employees, searchTerm]);
 
-  const handleExportPDF = async () => {
-    const doc = new jsPDF({ orientation: 'landscape' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-
+  const handleExportExcel = () => {
     // Sort employees alphabetically by fullName
     const sortedEmployees = [...employees].sort((a, b) =>
       a.fullName.localeCompare(b.fullName)
     );
 
-    // Add logo (centered at top)
-    try {
-      const logoImg = new Image();
-      logoImg.src = '/logo.png';
-      await new Promise((resolve, reject) => {
-        logoImg.onload = resolve;
-        logoImg.onerror = reject;
-      });
+    // Prepare data for Excel
+    const excelData = sortedEmployees.map((emp) => ({
+      'Employee ID': emp.employee_id || 'N/A',
+      'Full Name': emp.fullName,
+      'Email': emp.email,
+      'Position': emp.position,
+      'Status': emp.status,
+      'Contact': emp.contact_number || 'N/A',
+      'Address': emp.address || 'N/A',
+    }));
 
-      // Center the logo - using wider dimensions to match the logo aspect ratio
-      const logoWidth = 80;
-      const logoHeight = 20;
-      const logoX = (pageWidth - logoWidth) / 2;
-      doc.addImage(logoImg, 'WEBP', logoX, 10, logoWidth, logoHeight);
-    } catch (error) {
-      console.error('Failed to load logo:', error);
-    }
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-    // Add document title below logo
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text("Employee Directory", pageWidth / 2, 38, { align: 'center' });
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 15 }, // Employee ID
+      { wch: 25 }, // Full Name
+      { wch: 30 }, // Email
+      { wch: 25 }, // Position
+      { wch: 12 }, // Status
+      { wch: 15 }, // Contact
+      { wch: 40 }, // Address
+    ];
 
-    // Add date and count
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(100, 100, 100);
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Employees');
+
+    // Add metadata sheet
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
     });
-    doc.text(`Generated: ${today}`, 14, 46);
-    doc.text(`Total Employees: ${sortedEmployees.length}`, pageWidth - 14, 46, { align: 'right' });
-
-    // Add separator line
-    doc.setDrawColor(200, 200, 200);
-    doc.line(14, 52, pageWidth - 14, 52);
-
-    const tableColumn = [
-      "Employee ID",
-      "Full Name",
-      "Email",
-      "Position",
-      "Status",
-      "Contact",
-      "Address",
+    const metaData = [
+      { Field: 'Report Title', Value: 'Employee Directory' },
+      { Field: 'Generated Date', Value: today },
+      { Field: 'Total Employees', Value: sortedEmployees.length },
     ];
+    const metaSheet = XLSX.utils.json_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
 
-    const tableRows = sortedEmployees.map((emp) => [
-      emp.employee_id || 'N/A',
-      emp.fullName,
-      emp.email,
-      emp.position,
-      emp.status,
-      emp.contact_number || 'N/A',
-      emp.address || 'N/A',
-    ]);
-
-    autoTable(doc, {
-      head: [tableColumn],
-      body: tableRows,
-      startY: 58,
-      styles: {
-        fontSize: 8,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [15, 23, 42], // Slate 900
-        textColor: [255, 255, 255],
-        fontStyle: 'bold',
-        halign: 'left',
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252], // Slate 50
-      },
-      columnStyles: {
-        0: { cellWidth: 25 }, // Employee ID
-        1: { cellWidth: 45 }, // Full Name
-        2: { cellWidth: 55 }, // Email
-        3: { cellWidth: 40 }, // Position
-        4: { cellWidth: 20 }, // Status
-        5: { cellWidth: 32 }, // Contact
-        6: { cellWidth: 'auto' }, // Address
-      },
-      margin: { left: 14, right: 14 },
-    });
-
-    // Add footer with page numbers
-    const pageCount = doc.internal.pages.length - 1;
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(
-        `Page ${i} of ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      );
-    }
-
-    const filename = `CervenTech_Employees_${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
+    // Save file
+    const filename = `CervenTech_Employees_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, employee: Employee) => {
@@ -244,7 +181,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
 
         <div className="flex gap-3">
           <button
-            onClick={handleExportPDF}
+            onClick={handleExportExcel}
             className="px-4 py-2.5 bg-slate-800 text-slate-300 rounded-xl border border-slate-700 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2"
           >
             <FileDown size={18} />
