@@ -57,7 +57,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const employeeMap = new Map<string, string>();
     profiles?.forEach((p) => {
       if (p.employee_id) {
-        employeeMap.set(p.employee_id, p.id);
+        employeeMap.set(String(p.employee_id), p.id);
       }
     });
 
@@ -95,7 +95,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
 
       // 3. Employee Lookup
-      const employeeUUID = employeeMap.get(employee_id);
+      const employeeUUID = employeeMap.get(String(employee_id));
       if (!employeeUUID) {
         errors.push(`Row ${rowNum}: Employee ID '${employee_id}' not found in system`);
         continue;
