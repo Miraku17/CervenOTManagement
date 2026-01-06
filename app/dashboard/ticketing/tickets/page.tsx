@@ -66,6 +66,8 @@ export default function TicketsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -191,17 +193,22 @@ export default function TicketsPage() {
 
   const filteredTickets = tickets
     .filter(ticket => {
-      const matchesSearch = 
+      const matchesSearch =
         ticket.rcc_reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ticket.stores?.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
       // Normalize DB status (snake_case) to match Filter (space separated)
       const normalizedTicketStatus = ticket.status.toLowerCase().replace(/_/g, ' ');
       const matchesStatus = statusFilter === 'all' || normalizedTicketStatus === statusFilter.toLowerCase();
 
-      return matchesSearch && matchesStatus;
+      // Date filtering
+      const ticketDate = new Date(ticket.date_reported);
+      const matchesStartDate = !startDate || ticketDate >= new Date(startDate);
+      const matchesEndDate = !endDate || ticketDate <= new Date(endDate);
+
+      return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
     })
     .sort((a, b) => {
       const dateA = new Date(`${a.date_reported}T${a.time_reported}`);
@@ -289,38 +296,81 @@ export default function TicketsPage() {
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input
-            type="text"
-            placeholder="Search tickets..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-          />
-        </div>
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-          <button
-            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors mr-2"
-          >
-            <ArrowUpDown size={16} />
-            <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
-          </button>
-          {['all', 'open', 'in progress', 'on hold', 'closed'].map((status) => (
+      <div className="space-y-4">
+        <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input
+              type="text"
+              placeholder="Search tickets..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+            />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-colors border ${
-                statusFilter === status
-                  ? 'bg-blue-600 text-white border-blue-500'
-                  : 'bg-slate-950 text-slate-400 border-slate-700 hover:bg-slate-900 hover:text-white'
-              }`}
+              onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors mr-2"
             >
-              {status}
+              <ArrowUpDown size={16} />
+              <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
             </button>
-          ))}
+            {['all', 'open', 'in progress', 'on hold', 'closed'].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-colors border ${
+                  statusFilter === status
+                    ? 'bg-blue-600 text-white border-blue-500'
+                    : 'bg-slate-950 text-slate-400 border-slate-700 hover:bg-slate-900 hover:text-white'
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Date Range Filter */}
+        <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Calendar size={18} className="flex-shrink-0 text-white" />
+            <span className="text-sm font-medium whitespace-nowrap">Date Range:</span>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 flex-1">
+            <div className="flex items-center gap-2 flex-1">
+              <label htmlFor="start-date" className="text-sm text-slate-400 whitespace-nowrap">From:</label>
+              <input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+              />
+            </div>
+            <div className="flex items-center gap-2 flex-1">
+              <label htmlFor="end-date" className="text-sm text-slate-400 whitespace-nowrap">To:</label>
+              <input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setStartDate('');
+                  setEndDate('');
+                }}
+                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+              >
+                Clear Dates
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
