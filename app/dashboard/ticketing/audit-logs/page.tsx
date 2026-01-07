@@ -36,10 +36,14 @@ export default function AuditLogsPage() {
   const hasAccess = hasPermission('view_audit_logs');
 
   useEffect(() => {
-    if (hasAccess) {
-      fetchAuditLogs();
+    if (!permissionsLoading) {
+      if (hasAccess) {
+        fetchAuditLogs();
+      } else {
+        setLoading(false);
+      }
     }
-  }, [hasAccess]);
+  }, [hasAccess, permissionsLoading]);
 
   const fetchAuditLogs = async () => {
     setLoading(true);
