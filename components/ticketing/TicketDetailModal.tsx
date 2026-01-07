@@ -448,6 +448,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         work_start: ticket.work_start || '',
         work_end: ticket.work_end || '',
         date_resolved: ticket.date_resolved || '',
+        time_resolved: ticket.time_resolved || '',
         sla_status: ticket.sla_status || '',
         downtime: ticket.downtime || '',
         date_responded: ticket.date_responded || '',
@@ -545,12 +546,36 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     setPendingPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleSave = async () => {
-    if (!ticket || !user?.id) return;
-
-    setIsSaving(true);
-    try {
-      // 1. Sanitize date fields - convert empty strings to null
+      const handleSave = async () => {
+      if (!ticket || !user?.id) return;
+  
+      setIsSaving(true);
+  
+      // Validate that Date Resolved is not before Date Reported
+      if (editData.date_resolved) {
+        const dateReported = ticket.date_reported;
+        const timeReported = ticket.time_reported;
+        const dateResolved = editData.date_resolved;
+        const timeResolved = editData.time_resolved;
+  
+        if (dateReported && timeReported && dateResolved && timeResolved) {
+          const reportedDate = new Date(dateReported);
+          const [reportedHours, reportedMinutes] = timeReported.split(':');
+          reportedDate.setHours(parseInt(reportedHours), parseInt(reportedMinutes), 0, 0);
+  
+          const resolvedDate = new Date(dateResolved);
+          const [resolvedHours, resolvedMinutes] = timeResolved.split(':');
+          resolvedDate.setHours(parseInt(resolvedHours), parseInt(resolvedMinutes), 0, 0);
+  
+          if (resolvedDate < reportedDate) {
+            alert('Date Resolved cannot be earlier than Date Reported.');
+            setIsSaving(false);
+            return;
+          }
+        }
+      }
+  
+      try {      // 1. Sanitize date fields - convert empty strings to null
       const sanitizedData = Object.entries(editData).reduce((acc, [key, value]) => {
         // Convert empty strings to null for all fields
         acc[key] = value === '' ? null : value;
@@ -679,6 +704,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         work_start: ticket.work_start || '',
         work_end: ticket.work_end || '',
         date_resolved: ticket.date_resolved || '',
+        time_resolved: ticket.time_resolved || '',
         sla_status: ticket.sla_status || '',
         downtime: ticket.downtime || '',
         date_responded: ticket.date_responded || '',
@@ -912,6 +938,14 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               editable
               editKey="date_resolved"
               type="date"
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Time Resolved"
+              value={ticket.time_resolved}
+              editable
+              editKey="time_resolved"
+              type="time"
               isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
             />
             <LabelValue label="SLA Status" value={ticket.sla_status} editable editKey="sla_status" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />

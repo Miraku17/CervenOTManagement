@@ -24,6 +24,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   const userId = req.user?.id || '';
   const userPosition = req.user?.position;
 
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
   // Check if user has edit-only access from store_inventory_edit_access table
   const { data: editAccess, error: editAccessError } = await supabaseAdmin
     .from('store_inventory_edit_access')
@@ -73,12 +77,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-
-    if (!supabaseAdmin) {
-      throw new Error('Database connection not available');
-    }
-
-
     const updateData: any = {
       store_id,
       station_id,

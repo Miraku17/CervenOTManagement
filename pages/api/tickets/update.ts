@@ -23,15 +23,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Ticket ID is required' });
     }
 
-    // Fetch the ticket to check authorization
+    // Fetch the existing ticket to check authorization and get current data
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by')
+      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved')
       .eq('id', id)
       .single();
 
     if (fetchError || !existingTicket) {
-      return res.status(404).json({ error: 'Ticket not found' });
+      console.error('Error fetching ticket for update:', fetchError);
+      return res.status(404).json({ 
+        error: 'Ticket not found', 
+        details: fetchError 
+      });
     }
 
     // Authorization check: Only admin or assigned employee can update
@@ -53,6 +57,44 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       delete updateData.station_id;
       delete updateData.mod_id;
       delete updateData.sev;
+    }
+
+    // Calculate SLA Count Hours if date_resolved and time_resolved are available
+    const dateReported = updateData.date_reported || existingTicket.date_reported;
+    const timeReported = updateData.time_reported || existingTicket.time_reported;
+    const dateResolved = updateData.date_resolved || existingTicket.date_resolved;
+    const timeResolved = updateData.time_resolved || existingTicket.time_resolved;
+
+    if (dateReported && timeReported && dateResolved && timeResolved) {
+      try {
+        // Parse reported date and time
+        const reportedDate = new Date(dateReported);
+        const [reportedHours, reportedMinutes] = timeReported.split(':');
+        reportedDate.setHours(parseInt(reportedHours), parseInt(reportedMinutes), 0, 0);
+
+        // Parse resolved date and time
+        const resolvedDate = new Date(dateResolved);
+        const [resolvedHours, resolvedMinutes] = timeResolved.split(':');
+        resolvedDate.setHours(parseInt(resolvedHours), parseInt(resolvedMinutes), 0, 0);
+
+        // Calculate difference in hours
+        const diffInMs = resolvedDate.getTime() - reportedDate.getTime();
+
+        if (diffInMs < 0) {
+          return res.status(400).json({ error: 'Date Resolved cannot be earlier than Date Reported' });
+        }
+
+        const diffInHours = diffInMs / (1000 * 60 * 60);
+
+        // Round to 2 decimal places and ensure it's not negative
+        updateData.sla_count_hrs = Math.max(0, Math.round(diffInHours * 100) / 100);
+      } catch (error) {
+        console.error('Error calculating SLA count hours:', error);
+        // Continue without setting sla_count_hrs if calculation fails
+      }
+    } else if (updateData.date_resolved === null || updateData.time_resolved === null) {
+      // If date_resolved or time_resolved is being cleared, also clear sla_count_hrs
+      updateData.sla_count_hrs = null;
     }
 
     // Update the ticket
