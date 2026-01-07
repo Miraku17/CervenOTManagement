@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -19,12 +20,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     warranty_date,
     status
   } = req.body;
-  const userId = req.user?.id;
+  const userId = req.user?.id || '';
   const userPosition = req.user?.position;
 
-  // Check for restricted positions
+  // Check if user has edit-only access from store_inventory_edit_access table
+  const { data: editAccess } = await supabaseAdmin
+    .from('store_inventory_edit_access')
+    .select('can_edit')
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  const hasEditAccess = editAccess?.can_edit === true;
+
+  // Check if user has manage_store_inventory permission
+  const hasManagePermission = await userHasPermission(userId, 'manage_store_inventory');
+
+  // Field Engineers CANNOT create items (only view and update)
   if (userPosition === 'Field Engineer') {
-    return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers' });
+    return res.status(403).json({
+      error: 'Forbidden: Field Engineers can only view and update inventory items, not create new ones'
+    });
+  }
+
+  // User must have either manage permission or edit access
+  if (!hasManagePermission && !hasEditAccess) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to create store inventory items'
+    });
   }
 
   if (!store_id) {
@@ -98,4 +120,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: ['admin', 'employee'] });
+export default withAuth(handler);

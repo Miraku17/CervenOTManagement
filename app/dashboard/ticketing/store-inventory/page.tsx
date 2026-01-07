@@ -75,6 +75,8 @@ export default function StoreInventoryPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   const isLoadingAccess = authLoading || permissionsLoading;
 
@@ -214,6 +216,10 @@ export default function StoreInventoryPage() {
         setInventoryItems(data.items || []);
         setTotalCount(data.pagination.totalCount);
         setTotalPages(data.pagination.totalPages);
+        // Set edit-only user flag
+        if (data.isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
       } else {
         console.error('Failed to fetch inventory:', data.error);
         showToast('error', 'Failed to fetch inventory');
@@ -272,6 +278,57 @@ export default function StoreInventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Check access permissions - MUST be before any early returns to comply with Rules of Hooks
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isLoadingAccess || !user?.id) return;
+
+      try {
+        // Fetch user position
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const position = (profile?.positions as any)?.name || null;
+        setUserPosition(position);
+
+        // Check if user has edit-only access from store_inventory_edit_access table
+        const { data: editAccess } = await supabase
+          .from('store_inventory_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
+
+      } catch (error) {
+        console.error('Error checking access:', error);
+        // Check if user has edit-only access even if other checks fail
+        const { data: editAccess } = await supabase
+          .from('store_inventory_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (!isEditOnly && !hasPermission('manage_store_inventory')) {
+          router.push('/dashboard/ticketing/tickets');
+        } else if (isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, isLoadingAccess, hasPermission, router]);
+
   // Show loading state while checking permissions
   if (isLoadingAccess) {
     return (
@@ -285,10 +342,10 @@ export default function StoreInventoryPage() {
   }
 
   // Only check permission AFTER loading is complete
-  const hasAccess = hasPermission('manage_store_inventory');
+  const hasAccess = hasPermission('manage_store_inventory') || isEditOnlyUser;
 
   // Show access denied if no permission
-  if (!hasAccess) {
+  if (!isLoadingAccess && !hasAccess) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-4">
@@ -596,7 +653,8 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-            {hasPermission('manage_store_inventory') && (
+            {/* Field Engineers cannot create items, only view and update */}
+            {(hasPermission('manage_store_inventory') || (isEditOnlyUser && userPosition !== 'Field Engineer')) && (
               <button
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
                 onClick={() => setIsModalOpen(true)}
@@ -606,7 +664,7 @@ export default function StoreInventoryPage() {
               </button>
             )}
 
-            {hasPermission('manage_store_inventory') && (
+            {(hasPermission('manage_store_inventory') && !isEditOnlyUser) && (
               <div className="relative" ref={actionsDropdownRef}>
                 <button
                   onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
@@ -976,16 +1034,18 @@ export default function StoreInventoryPage() {
                                   >
                                     <Edit2 size={16} />
                                   </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDelete(item);
-                                    }}
-                                    className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                                    title="Delete item"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
+                                  {!isEditOnlyUser && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(item);
+                                      }}
+                                      className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                      title="Delete item"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
                               </div>
                             </td>
                         </tr>

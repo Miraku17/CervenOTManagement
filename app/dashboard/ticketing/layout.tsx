@@ -21,6 +21,7 @@ export default function TicketingLayout({
   const [userPosition, setUserPosition] = useState<string | null>(null);
   const [isLoadingRole, setIsLoadingRole] = useState(true);
   const [hasAssetEditAccess, setHasAssetEditAccess] = useState(false);
+  const [hasStoreInventoryEditAccess, setHasStoreInventoryEditAccess] = useState(false);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -72,6 +73,28 @@ export default function TicketingLayout({
     checkAssetEditAccess();
   }, [user?.id]);
 
+  // Check if user has edit-only access to store inventory
+  useEffect(() => {
+    const checkStoreInventoryEditAccess = async () => {
+      if (!user?.id) return;
+
+      try {
+        const { data: editAccess } = await supabase
+          .from('store_inventory_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .single();
+
+        setHasStoreInventoryEditAccess(editAccess?.can_edit === true);
+      } catch (error) {
+        // User not in store_inventory_edit_access table, which is fine
+        setHasStoreInventoryEditAccess(false);
+      }
+    };
+
+    checkStoreInventoryEditAccess();
+  }, [user?.id]);
+
   const handleNavigate = (path: string) => {
     router.push(path);
     setIsMobileMenuOpen(false);
@@ -82,7 +105,8 @@ export default function TicketingLayout({
   const hasStoresAccess = hasPermission('view_stores');
 
   // Check if user has access to store inventory
-  const hasStoreInventoryAccess = hasPermission('manage_store_inventory');
+  // Store Inventory: Permission-based access OR edit-only access from store_inventory_edit_access table
+  const hasStoreInventoryAccess = hasPermission('manage_store_inventory') || hasStoreInventoryEditAccess;
 
   // Check if user has access to asset inventory
   // Asset Inventory: Permission-based access OR edit-only access from assets_edit_access table

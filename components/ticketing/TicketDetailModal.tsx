@@ -310,7 +310,7 @@ const LabelValue = ({
           />
         )
       ) : (
-        <div className="text-sm text-slate-300 font-medium break-words">{value || <span className="text-slate-600 italic">N/A</span>}</div>
+        <div className="text-sm text-slate-300 font-medium break-words whitespace-pre-wrap">{value || <span className="text-slate-600 italic">N/A</span>}</div>
       )}
     </div>
   );
