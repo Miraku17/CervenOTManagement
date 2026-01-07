@@ -43,6 +43,7 @@ interface Ticket {
   pause_time_end: string | null;
   work_end: string | null;
   date_resolved: string | null;
+  time_resolved: string | null;
   sla_count_hrs: number | null;
   downtime: string | null;
   sla_status: string | null;

@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -8,15 +9,38 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Check for restricted positions
-  const userPosition = req.user?.position;
-  if (userPosition === 'Field Engineer') {
-    return res.status(403).json({ error: 'Forbidden: Access denied for Field Engineers' });
-  }
-
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
+    }
+
+    const userId = req.user?.id || '';
+    const userPosition = req.user?.position;
+
+    // Check if user has manage_store_inventory permission
+    const hasManageStoreInventory = await userHasPermission(userId, 'manage_store_inventory');
+    let hasEditAccess = false;
+
+    // If no manage permission, check for edit-only access
+    if (!hasManageStoreInventory) {
+      const { data: editAccess } = await supabaseAdmin
+        .from('store_inventory_edit_access')
+        .select('can_edit')
+        .eq('profile_id', userId)
+        .maybeSingle();
+      hasEditAccess = editAccess?.can_edit === true;
+    }
+
+    // Field Engineers need explicit edit access
+    if (userPosition === 'Field Engineer' && !hasEditAccess && !hasManageStoreInventory) {
+      return res.status(403).json({ error: 'Forbidden: Access denied for Field Engineers without edit permission' });
+    }
+
+    // If user has neither manage nor edit access, deny
+    if (!hasManageStoreInventory && !hasEditAccess) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access store inventory'
+      });
     }
 
     // Fetch ALL store inventory items (including soft-deleted)
@@ -113,4 +137,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: ['admin', 'employee'] });
+export default withAuth(handler);

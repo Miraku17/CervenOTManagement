@@ -78,6 +78,7 @@ export default function AssetInventoryPage() {
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [showAll, setShowAll] = useState(false);
 
   // Stats state (for all assets, not just current page)
   const [stats, setStats] = useState({
@@ -168,21 +169,24 @@ export default function AssetInventoryPage() {
 
   useEffect(() => {
     fetchAssets();
-  }, [currentPage, pageSize, searchTerm, statusFilter]);
+  }, [currentPage, pageSize, searchTerm, statusFilter, showAll]);
 
-  // Reset to page 1 when search term changes
+  // Reset to page 1 when search term or status filter changes
   useEffect(() => {
-    if (searchTerm !== '') {
-      setCurrentPage(1);
-    }
-  }, [searchTerm]);
+    setCurrentPage(1);
+    setShowAll(false);
+  }, [searchTerm, statusFilter]);
 
   const fetchAssets = async () => {
     try {
       setLoading(true);
+      // Use a very large number for "All" option - larger than any realistic inventory size
+      const effectiveLimit = showAll ? 9999999 : pageSize;
+      const effectivePage = showAll ? 1 : currentPage;
+
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
       const statusParam = statusFilter && statusFilter !== 'All' ? `&status=${encodeURIComponent(statusFilter)}` : '';
-      const response = await fetch(`/api/assets/get?page=${currentPage}&limit=${pageSize}${searchParam}${statusParam}`);
+      const response = await fetch(`/api/assets/get?page=${effectivePage}&limit=${effectiveLimit}${searchParam}${statusParam}`);
       const data = await response.json();
 
       if (response.ok) {
@@ -815,7 +819,7 @@ export default function AssetInventoryPage() {
             {/* Page Info */}
             <div className="flex items-center gap-4">
               <p className="text-sm text-slate-400">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} assets
+                Showing {showAll ? 1 : ((currentPage - 1) * pageSize) + 1} to {showAll ? totalCount : Math.min(currentPage * pageSize, totalCount)} of {totalCount} assets
               </p>
 
               {/* Page Size Selector */}
@@ -825,10 +829,17 @@ export default function AssetInventoryPage() {
                 </label>
                 <select
                   id="pageSize"
-                  value={pageSize}
+                  value={showAll ? 'all' : pageSize}
                   onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1); // Reset to first page when changing page size
+                    const value = e.target.value;
+                    if (value === 'all') {
+                      setShowAll(true);
+                      setCurrentPage(1);
+                    } else {
+                      setShowAll(false);
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }
                   }}
                   className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
@@ -836,12 +847,14 @@ export default function AssetInventoryPage() {
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
+                  <option value="all">All</option>
                 </select>
               </div>
             </div>
 
             {/* Page Navigation */}
-            <div className="flex items-center gap-2">
+            {!showAll && (
+              <div className="flex items-center gap-2">
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
@@ -902,6 +915,7 @@ export default function AssetInventoryPage() {
                 Last
               </button>
             </div>
+            )}
           </div>
         )}
       </div>

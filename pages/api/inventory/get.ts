@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -12,6 +13,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
+    }
+
+    const userId = req.user?.id || '';
+
+    // Check if user has manage_store_inventory permission
+    let hasManageStoreInventory = await userHasPermission(userId, 'manage_store_inventory');
+    let hasEditAccess = false;
+
+    // If no manage permission, check for edit-only access
+    if (!hasManageStoreInventory) {
+      const { data: editAccess } = await supabaseAdmin
+        .from('store_inventory_edit_access')
+        .select('can_edit')
+        .eq('profile_id', userId)
+        .maybeSingle();
+      hasEditAccess = editAccess?.can_edit === true;
+    }
+
+    // If user has neither manage nor edit access, deny
+    if (!hasManageStoreInventory && !hasEditAccess) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access store inventory'
+      });
     }
 
     // Get pagination and search parameters from query
@@ -91,7 +115,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `, { count: 'exact' })
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, 99999); // Override Supabase's default 1000 row limit
 
     // Apply filters at database level where possible
     // Note: Supabase doesn't support filtering on nested relations directly,
@@ -199,6 +224,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         totalCount: totalCount || 0,
         totalPages: Math.ceil((totalCount || 0) / limit),
       },
+      hasEditAccess: hasEditAccess || hasManageStoreInventory,
+      isEditOnly: hasEditAccess && !hasManageStoreInventory,
     });
   } catch (error: any) {
     console.error('Error fetching inventory:', error);
@@ -206,4 +233,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: ['admin', 'employee'] });
+export default withAuth(handler);

@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -11,6 +12,29 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
+    }
+
+    const userId = req.user?.id || '';
+
+    // Check if user has manage_store_inventory permission
+    const hasManageStoreInventory = await userHasPermission(userId, 'manage_store_inventory');
+    let hasEditAccess = false;
+
+    // If no manage permission, check for edit-only access
+    if (!hasManageStoreInventory) {
+      const { data: editAccess } = await supabaseAdmin
+        .from('store_inventory_edit_access')
+        .select('can_edit')
+        .eq('profile_id', userId)
+        .maybeSingle();
+      hasEditAccess = editAccess?.can_edit === true;
+    }
+
+    // If user has neither manage nor edit access, deny
+    if (!hasManageStoreInventory && !hasEditAccess) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to access autocomplete data'
+      });
     }
 
     // Fetch all autocomplete data in parallel - now with IDs
@@ -38,4 +62,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: ['admin', 'employee'] });
+export default withAuth(handler);

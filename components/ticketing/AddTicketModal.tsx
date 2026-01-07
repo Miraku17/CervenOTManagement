@@ -118,11 +118,9 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     sev: '',
     serviced_by: '',
     kb_id: '',
+    date_reported: formatInTimeZone(new Date(), 'Asia/Manila', 'yyyy-MM-dd'),
+    time_reported: formatInTimeZone(new Date(), 'Asia/Manila', 'HH:mm'),
   });
-
-  // Get current date and time in Philippine timezone
-  const currentDate = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'MMMM dd, yyyy');
-  const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'hh:mm a');
 
   // Fetch stores, employees and stations
   useEffect(() => {
@@ -488,8 +486,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         },
         body: JSON.stringify({
           ...formData,
-          date_reported: new Date().toISOString(),
-          time_reported: currentTime,
           status: 'open',
           reported_by: currentUserId,
         }),
@@ -572,6 +568,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         sev: '',
         serviced_by: '',
         kb_id: '',
+        date_reported: formatInTimeZone(new Date(), 'Asia/Manila', 'yyyy-MM-dd'),
+        time_reported: formatInTimeZone(new Date(), 'Asia/Manila', 'HH:mm'),
       });
       setSelectedStore(null);
       setStoreName('');
@@ -626,21 +624,29 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
-                    <Calendar size={14} />
-                    Date Reported
+                    <Calendar size={14} className="text-white" />
+                    Date Reported <span className="text-red-400">*</span>
                   </label>
-                  <div className="bg-slate-900 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg">
-                    {currentDate}
-                  </div>
+                  <input
+                    type="date"
+                    value={formData.date_reported}
+                    onChange={(e) => setFormData({ ...formData, date_reported: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-200 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">
-                    <Clock size={14} />
-                    Time Reported
+                    <Clock size={14} className="text-white" />
+                    Time Reported <span className="text-red-400">*</span>
                   </label>
-                  <div className="bg-slate-900 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg">
-                    {currentTime}
-                  </div>
+                  <input
+                    type="time"
+                    value={formData.time_reported}
+                    onChange={(e) => setFormData({ ...formData, time_reported: e.target.value })}
+                    className="w-full bg-slate-900 border border-slate-700 text-slate-300 px-4 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert [&::-webkit-calendar-picker-indicator]:brightness-200 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-500 mb-1 flex items-center gap-2">

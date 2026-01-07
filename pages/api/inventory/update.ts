@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'PUT') {
@@ -20,12 +21,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     warranty_date,
     status
   } = req.body;
-  const userId = req.user?.id;
+  const userId = req.user?.id || '';
   const userPosition = req.user?.position;
 
-  // Check for restricted positions
-  if (userPosition === 'Field Engineer') {
-    return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers' });
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
+  // Check if user has edit-only access from store_inventory_edit_access table
+  const { data: editAccess, error: editAccessError } = await supabaseAdmin
+    .from('store_inventory_edit_access')
+    .select('can_edit')
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  const hasEditAccess = editAccess?.can_edit === true;
+
+  // Check if user has manage_store_inventory permission
+  const hasManagePermission = await userHasPermission(userId, 'manage_store_inventory');
+
+  // Field Engineers need explicit edit access
+  if (userPosition === 'Field Engineer' && !hasEditAccess && !hasManagePermission) {
+    return res.status(403).json({ error: 'Forbidden: Read-only access for Field Engineers without edit permission' });
+  }
+
+  // User must have either manage permission or edit access
+  if (!hasManagePermission && !hasEditAccess) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to update store inventory items'
+    });
   }
 
   if (!id || !store_id) {
@@ -53,12 +77,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-
-    if (!supabaseAdmin) {
-      throw new Error('Database connection not available');
-    }
-
-
     const updateData: any = {
       store_id,
       station_id,
@@ -103,4 +121,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: ['admin', 'employee'] });
+export default withAuth(handler);

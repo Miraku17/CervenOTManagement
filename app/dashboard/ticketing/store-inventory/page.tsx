@@ -75,6 +75,8 @@ export default function StoreInventoryPage() {
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
 
   const isLoadingAccess = authLoading || permissionsLoading;
 
@@ -89,6 +91,7 @@ export default function StoreInventoryPage() {
   const [pageSize, setPageSize] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
+  const [showAll, setShowAll] = useState(false);
 
   // Stats state
   const [stats, setStats] = useState({
@@ -197,9 +200,12 @@ export default function StoreInventoryPage() {
   const fetchInventory = async () => {
     setLoading(true);
     try {
+      // Use a very large number for "All" option - larger than any realistic inventory size
+      const effectiveLimit = showAll ? 9999999 : pageSize;
+
       const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: pageSize.toString(),
+        page: showAll ? '1' : currentPage.toString(),
+        limit: effectiveLimit.toString(),
         search: searchTerm,
         category: selectedCategory || '',
         store: selectedStore || '',
@@ -214,6 +220,10 @@ export default function StoreInventoryPage() {
         setInventoryItems(data.items || []);
         setTotalCount(data.pagination.totalCount);
         setTotalPages(data.pagination.totalPages);
+        // Set edit-only user flag
+        if (data.isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
       } else {
         console.error('Failed to fetch inventory:', data.error);
         showToast('error', 'Failed to fetch inventory');
@@ -242,6 +252,7 @@ export default function StoreInventoryPage() {
   // Reset to page 1 when search or filters change
   useEffect(() => {
     setCurrentPage(1);
+    setShowAll(false);
   }, [searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter]);
 
   // Fetch when page, size, search, or filters change
@@ -252,7 +263,7 @@ export default function StoreInventoryPage() {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter]);
+  }, [currentPage, pageSize, searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter, showAll]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -272,6 +283,57 @@ export default function StoreInventoryPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  // Check access permissions - MUST be before any early returns to comply with Rules of Hooks
+  useEffect(() => {
+    const checkAccess = async () => {
+      if (isLoadingAccess || !user?.id) return;
+
+      try {
+        // Fetch user position
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('positions(name)')
+          .eq('id', user.id)
+          .single();
+
+        const position = (profile?.positions as any)?.name || null;
+        setUserPosition(position);
+
+        // Check if user has edit-only access from store_inventory_edit_access table
+        const { data: editAccess } = await supabase
+          .from('store_inventory_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
+
+      } catch (error) {
+        console.error('Error checking access:', error);
+        // Check if user has edit-only access even if other checks fail
+        const { data: editAccess } = await supabase
+          .from('store_inventory_edit_access')
+          .select('can_edit')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        const isEditOnly = editAccess?.can_edit === true;
+
+        if (!isEditOnly && !hasPermission('manage_store_inventory')) {
+          router.push('/dashboard/ticketing/tickets');
+        } else if (isEditOnly) {
+          setIsEditOnlyUser(true);
+        }
+      }
+    };
+
+    checkAccess();
+  }, [user?.id, isLoadingAccess, hasPermission, router]);
+
   // Show loading state while checking permissions
   if (isLoadingAccess) {
     return (
@@ -285,10 +347,10 @@ export default function StoreInventoryPage() {
   }
 
   // Only check permission AFTER loading is complete
-  const hasAccess = hasPermission('manage_store_inventory');
+  const hasAccess = hasPermission('manage_store_inventory') || isEditOnlyUser;
 
   // Show access denied if no permission
-  if (!hasAccess) {
+  if (!isLoadingAccess && !hasAccess) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-4">
@@ -596,7 +658,8 @@ export default function StoreInventoryPage() {
           <p className="text-slate-400">Track and manage stock levels across all stores.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-            {hasPermission('manage_store_inventory') && (
+            {/* Field Engineers cannot create items, only view and update */}
+            {(hasPermission('manage_store_inventory') || (isEditOnlyUser && userPosition !== 'Field Engineer')) && (
               <button
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20 active:scale-95 whitespace-nowrap"
                 onClick={() => setIsModalOpen(true)}
@@ -606,7 +669,7 @@ export default function StoreInventoryPage() {
               </button>
             )}
 
-            {hasPermission('manage_store_inventory') && (
+            {(hasPermission('manage_store_inventory') && !isEditOnlyUser) && (
               <div className="relative" ref={actionsDropdownRef}>
                 <button
                   onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
@@ -976,16 +1039,18 @@ export default function StoreInventoryPage() {
                                   >
                                     <Edit2 size={16} />
                                   </button>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleDelete(item);
-                                    }}
-                                    className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
-                                    title="Delete item"
-                                  >
-                                    <Trash2 size={16} />
-                                  </button>
+                                  {!isEditOnlyUser && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDelete(item);
+                                      }}
+                                      className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                      title="Delete item"
+                                    >
+                                      <Trash2 size={16} />
+                                    </button>
+                                  )}
                               </div>
                             </td>
                         </tr>
@@ -1000,7 +1065,7 @@ export default function StoreInventoryPage() {
             {/* Page Info */}
             <div className="flex items-center gap-4">
               <p className="text-sm text-slate-400">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalCount)} of {totalCount} items
+                Showing {showAll ? 1 : ((currentPage - 1) * pageSize) + 1} to {showAll ? totalCount : Math.min(currentPage * pageSize, totalCount)} of {totalCount} items
               </p>
 
               {/* Page Size Selector */}
@@ -1010,10 +1075,17 @@ export default function StoreInventoryPage() {
                 </label>
                 <select
                   id="pageSize"
-                  value={pageSize}
+                  value={showAll ? 'all' : pageSize}
                   onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1); // Reset to first page when changing page size
+                    const value = e.target.value;
+                    if (value === 'all') {
+                      setShowAll(true);
+                      setCurrentPage(1);
+                    } else {
+                      setShowAll(false);
+                      setPageSize(Number(value));
+                      setCurrentPage(1);
+                    }
                   }}
                   className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
@@ -1021,71 +1093,74 @@ export default function StoreInventoryPage() {
                   <option value={20}>20</option>
                   <option value={50}>50</option>
                   <option value={100}>100</option>
+                  <option value="all">All</option>
                 </select>
               </div>
             </div>
 
             {/* Page Navigation */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                First
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Previous
-              </button>
+            {!showAll && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                >
+                  First
+                </button>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                >
+                  Previous
+                </button>
 
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
+                {/* Page Numbers */}
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = i + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + i;
+                    } else {
+                      pageNum = currentPage - 2 + i;
+                    }
 
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${ currentPage === pageNum
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${ currentPage === pageNum
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                >
+                  Next
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
+                >
+                  Last
+                </button>
               </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Next
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Last
-              </button>
-            </div>
+            )}
           </div>
         )}
       </div>

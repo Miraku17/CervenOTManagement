@@ -42,24 +42,48 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const auditLogs: AuditLog[] = [];
 
-    // Fetch store inventory logs (created, updated, deleted)
+    // Fetch store inventory logs (created, updated, deleted) - limit to most recent 1000 records
     const { data: storeInventory, error: storeError } = await supabaseAdmin
       .from('store_inventory')
       .select('id, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by, serial_number')
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(1000);
 
     if (storeError) throw storeError;
+
+    // Fetch asset inventory logs (created, updated, deleted) - limit to most recent 1000 records
+    const { data: assetInventory, error: assetError } = await supabaseAdmin
+      .from('asset_inventory')
+      .select('id, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by, serial_number')
+      .order('created_at', { ascending: false })
+      .limit(1000);
+
+    if (assetError) throw assetError;
+
+    // Collect all unique user IDs
+    const userIds = new Set<string>();
+    for (const item of [...(storeInventory || []), ...(assetInventory || [])]) {
+      if (item.created_by) userIds.add(item.created_by);
+      if (item.updated_by) userIds.add(item.updated_by);
+      if (item.deleted_by) userIds.add(item.deleted_by);
+    }
+
+    // Fetch all users at once
+    const { data: users } = await supabaseAdmin
+      .from('profiles')
+      .select('id, first_name, last_name, email')
+      .in('id', Array.from(userIds));
+
+    // Create a map for quick user lookup
+    const userMap = new Map(
+      (users || []).map(user => [user.id, user])
+    );
 
     // Process store inventory logs
     for (const item of storeInventory || []) {
       // Created log
       if (item.created_by) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.created_by)
-          .single();
-
+        const user = userMap.get(item.created_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-created`,
@@ -78,12 +102,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Updated log
       if (item.updated_by && item.updated_at && item.updated_at !== item.created_at) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.updated_by)
-          .single();
-
+        const user = userMap.get(item.updated_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-updated-${item.updated_at}`,
@@ -102,12 +121,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Deleted log
       if (item.deleted_by && item.deleted_at) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.deleted_by)
-          .single();
-
+        const user = userMap.get(item.deleted_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-deleted`,
@@ -125,24 +139,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
-    // Fetch asset inventory logs (created, updated, deleted)
-    const { data: assetInventory, error: assetError } = await supabaseAdmin
-      .from('asset_inventory')
-      .select('id, created_at, updated_at, deleted_at, created_by, updated_by, deleted_by, serial_number')
-      .order('created_at', { ascending: false });
-
-    if (assetError) throw assetError;
-
     // Process asset inventory logs
     for (const item of assetInventory || []) {
       // Created log
       if (item.created_by) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.created_by)
-          .single();
-
+        const user = userMap.get(item.created_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-created`,
@@ -161,12 +162,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Updated log
       if (item.updated_by && item.updated_at && item.updated_at !== item.created_at) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.updated_by)
-          .single();
-
+        const user = userMap.get(item.updated_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-updated-${item.updated_at}`,
@@ -185,12 +181,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Deleted log
       if (item.deleted_by && item.deleted_at) {
-        const { data: user } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, email')
-          .eq('id', item.deleted_by)
-          .single();
-
+        const user = userMap.get(item.deleted_by);
         if (user) {
           auditLogs.push({
             id: `${item.id}-deleted`,
