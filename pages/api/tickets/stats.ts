@@ -23,60 +23,99 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    // Fetch minimal data for aggregation
-    const { data, error } = await supabaseAdmin
+    // Get date range from query params
+    const { startDate, endDate } = req.query;
+
+    // Build query with date filtering
+    let query = supabaseAdmin
       .from('tickets')
-      .select('id, status, sev, created_at, request_type, store_id, stores(store_name)');
+      .select(`
+        id,
+        sev,
+        problem_category,
+        date_reported,
+        stores(store_name),
+        serviced_by_user:serviced_by(first_name, last_name)
+      `);
+
+    // Apply date filters if provided
+    if (startDate && typeof startDate === 'string') {
+      query = query.gte('date_reported', startDate);
+    }
+    if (endDate && typeof endDate === 'string') {
+      query = query.lte('date_reported', endDate);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw error;
     }
 
     if (!data) {
-      return res.status(200).json({ 
-        total: 0, 
-        byStatus: {}, 
-        bySeverity: {}, 
-        recentActivity: [] 
+      return res.status(200).json({
+        total: 0,
+        byStore: [],
+        byFieldEngineer: [],
+        bySeverity: [],
+        byProblemCategory: []
       });
     }
 
     // Process data
     const total = data.length;
-    
-    const byStatus = data.reduce((acc: any, ticket) => {
-      const status = ticket.status || 'Unknown';
-      acc[status] = (acc[status] || 0) + 1;
-      return acc;
-    }, {});
 
-    const bySeverity = data.reduce((acc: any, ticket) => {
-      const sev = ticket.sev || 'Unknown';
-      acc[sev] = (acc[sev] || 0) + 1;
-      return acc;
-    }, {});
+    // 1. Tickets by Store
+    const storeMap = new Map<string, number>();
+    data.forEach(ticket => {
+      const storeName = (ticket.stores as any)?.store_name || 'Unknown';
+      storeMap.set(storeName, (storeMap.get(storeName) || 0) + 1);
+    });
+    const byStore = Array.from(storeMap.entries())
+      .map(([store_name, count]) => ({ store_name, count }))
+      .sort((a, b) => b.count - a.count);
 
-    // Last 30 days activity
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const recentActivity = data
-      .filter(t => new Date(t.created_at) >= thirtyDaysAgo)
-      .reduce((acc: any, ticket) => {
-        const date = new Date(ticket.created_at).toISOString().split('T')[0];
-        acc[date] = (acc[date] || 0) + 1;
-        return acc;
-      }, {});
+    // 2. Tickets by Field Engineer
+    const feMap = new Map<string, number>();
+    data.forEach(ticket => {
+      const fe = ticket.serviced_by_user as any;
+      const engineerName = fe ? `${fe.first_name} ${fe.last_name}` : 'Unassigned';
+      feMap.set(engineerName, (feMap.get(engineerName) || 0) + 1);
+    });
+    const byFieldEngineer = Array.from(feMap.entries())
+      .map(([engineer_name, count]) => ({ engineer_name, count }))
+      .sort((a, b) => b.count - a.count);
 
-    const activityArray = Object.entries(recentActivity)
-      .map(([date, count]) => ({ date, count }))
-      .sort((a: any, b: any) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // 3. Tickets by Severity
+    const sevMap = new Map<string, number>();
+    data.forEach(ticket => {
+      const severity = ticket.sev || 'Unknown';
+      sevMap.set(severity, (sevMap.get(severity) || 0) + 1);
+    });
+    const bySeverity = Array.from(sevMap.entries())
+      .map(([severity, count]) => ({ severity, count }))
+      .sort((a, b) => {
+        // Sort by severity priority: SEV3, SEV2, SEV1
+        const order: Record<string, number> = { 'SEV3': 1, 'SEV2': 2, 'SEV1': 3 };
+        return (order[a.severity] || 999) - (order[b.severity] || 999);
+      });
+
+    // 4. Top Problem Categories
+    const categoryMap = new Map<string, number>();
+    data.forEach(ticket => {
+      const category = ticket.problem_category || 'Unknown';
+      categoryMap.set(category, (categoryMap.get(category) || 0) + 1);
+    });
+    const byProblemCategory = Array.from(categoryMap.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
 
     return res.status(200).json({
       total,
-      byStatus,
+      byStore,
+      byFieldEngineer,
       bySeverity,
-      recentActivity: activityArray
+      byProblemCategory
     });
 
   } catch (error: any) {
