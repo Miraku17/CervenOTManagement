@@ -49,7 +49,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const { data: allAssets, error: statsError } = await supabaseAdmin
       .from('asset_inventory')
       .select('serial_number, category_id')
-      .is('deleted_at', null);
+      .is('deleted_at', null)
+      .range(0, 99999); // Override Supabase's default 1000 row limit
 
     if (statsError) throw statsError;
 
@@ -86,7 +87,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, 99999); // Override Supabase's default 1000 row limit
 
     if (fetchError) throw fetchError;
 

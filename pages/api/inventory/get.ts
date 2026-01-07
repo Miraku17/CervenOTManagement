@@ -115,7 +115,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `, { count: 'exact' })
       .is('deleted_at', null)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(0, 99999); // Override Supabase's default 1000 row limit
 
     // Apply filters at database level where possible
     // Note: Supabase doesn't support filtering on nested relations directly,
