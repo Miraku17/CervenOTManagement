@@ -13,6 +13,17 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
 import { ShieldAlert } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
+import { useInventory, useInventoryStats, useFilterOptions } from '@/hooks/useInventoryQueries';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface InventoryItem {
   id: string;
@@ -68,13 +79,12 @@ export default function StoreInventoryPage() {
   const { user, loading: authLoading } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   // State definitions
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statsLoading, setStatsLoading] = useState(true);
   const [isEditOnlyUser, setIsEditOnlyUser] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
 
@@ -84,21 +94,47 @@ export default function StoreInventoryPage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
-  const [serialNumberFilter, setSerialNumberFilter] = useState<'all' | 'with' | 'without'>('all');
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
-  const [totalCount, setTotalCount] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
   const [showAll, setShowAll] = useState(false);
 
-  // Stats state
-  const [stats, setStats] = useState({
-    totalItems: 0,
-    uniqueCategories: 0,
-    uniqueStores: 0,
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // TanStack Query hooks
+  const { data: inventoryData, isLoading: loading, error: inventoryError } = useInventory({
+    page: currentPage,
+    pageSize,
+    searchTerm: debouncedSearchTerm,
+    selectedCategory: selectedCategory || '',
+    selectedStore: selectedStore || '',
+    selectedBrand: selectedBrand || '',
+    showAll,
   });
+
+  const { data: statsData, isLoading: statsLoading } = useInventoryStats();
+  const { data: filterOptionsData } = useFilterOptions();
+
+  // Extract data from queries
+  const inventoryItems = inventoryData?.items || [];
+  const totalCount = inventoryData?.pagination.totalCount || 0;
+  const totalPages = inventoryData?.pagination.totalPages || 0;
+  const stats = statsData?.stats || { totalItems: 0, uniqueCategories: 0, uniqueStores: 0 };
+  const filterOptions = filterOptionsData || { categories: [], stores: [], brands: [] };
+
+  // Update edit-only user flag when data changes
+  useEffect(() => {
+    if (inventoryData?.isEditOnly) {
+      setIsEditOnlyUser(true);
+    }
+  }, [inventoryData]);
 
   // Dropdown states
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
@@ -138,104 +174,6 @@ export default function StoreInventoryPage() {
   const filterRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
 
-  const [filterOptions, setFilterOptions] = useState({
-    categories: [] as string[],
-    stores: [] as string[],
-    brands: [] as string[],
-  });
-
-
-  const fetchFilterOptions = async () => {
-    try {
-        const { data, error } = await supabase
-            .from('store_inventory')
-            .select(
-                `
-                categories:category_id(name),
-                stores:store_id(store_name),
-                brands:brand_id(name)
-            `)
-            .is('deleted_at', null);
-        
-        if (data) {
-            const categories = Array.from(new Set(data.map((i: any) => i.categories?.name).filter(Boolean)));
-            const stores = Array.from(new Set(data.map((i: any) => i.stores?.store_name).filter(Boolean)));
-            const brands = Array.from(new Set(data.map((i: any) => i.brands?.name).filter(Boolean)));
-            
-            setFilterOptions({
-                categories: categories.sort(),
-                stores: stores.sort(),
-                brands: brands.sort()
-            });
-        }
-    } catch (e) {
-        console.error("Error fetching filter options", e);
-    }
-  };
-
-  useEffect(() => {
-    fetchFilterOptions();
-  }, []);
-
-
-  // Fetch stats only once (doesn't change with filters/search)
-  const fetchStats = async () => {
-    setStatsLoading(true);
-    try {
-      const response = await fetch('/api/inventory/get?page=1&limit=1');
-      const data = await response.json();
-
-      if (response.ok) {
-        setStats(data.stats || { totalItems: 0, uniqueCategories: 0, uniqueStores: 0 });
-      } else {
-        console.error('Failed to fetch stats:', data.error);
-      }
-    } catch (error) {
-      console.error('Error fetching stats:', error);
-    } finally {
-      setStatsLoading(false);
-    }
-  };
-
-  const fetchInventory = async () => {
-    setLoading(true);
-    try {
-      // Use a very large number for "All" option - larger than any realistic inventory size
-      const effectiveLimit = showAll ? 9999999 : pageSize;
-
-      const params = new URLSearchParams({
-        page: showAll ? '1' : currentPage.toString(),
-        limit: effectiveLimit.toString(),
-        search: searchTerm,
-        category: selectedCategory || '',
-        store: selectedStore || '',
-        brand: selectedBrand || '',
-        serial_status: serialNumberFilter,
-      });
-
-      const response = await fetch(`/api/inventory/get?${params.toString()}`);
-      const data = await response.json();
-
-      if (response.ok) {
-        setInventoryItems(data.items || []);
-        setTotalCount(data.pagination.totalCount);
-        setTotalPages(data.pagination.totalPages);
-        // Set edit-only user flag
-        if (data.isEditOnly) {
-          setIsEditOnlyUser(true);
-        }
-      } else {
-        console.error('Failed to fetch inventory:', data.error);
-        showToast('error', 'Failed to fetch inventory');
-      }
-    } catch (error) {
-      console.error('Error fetching inventory:', error);
-      showToast('error', 'Failed to fetch inventory');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
     setToast({ show: true, type, message });
@@ -244,26 +182,11 @@ export default function StoreInventoryPage() {
     }, 3000);
   };
 
-  // Fetch stats only once on mount
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
   // Reset to page 1 when search or filters change
   useEffect(() => {
     setCurrentPage(1);
     setShowAll(false);
-  }, [searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter]);
-
-  // Fetch when page, size, search, or filters change
-  useEffect(() => {
-    // Debounce search
-    const timer = setTimeout(() => {
-      fetchInventory();
-    }, 300);
-
-    return () => clearTimeout(timer);
-  }, [currentPage, pageSize, searchTerm, selectedCategory, selectedStore, selectedBrand, serialNumberFilter, showAll]);
+  }, [debouncedSearchTerm, selectedCategory, selectedStore, selectedBrand]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -376,8 +299,10 @@ export default function StoreInventoryPage() {
   }
 
   const handleSuccess = () => {
-    fetchInventory(); // Only refresh when item is successfully added or updated
-    fetchStats(); // Refresh stats after adding/updating items
+    // Invalidate queries to refetch data
+    queryClient.invalidateQueries({ queryKey: ['inventory'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+    queryClient.invalidateQueries({ queryKey: ['inventory-filter-options'] });
     setEditItem(null); // Clear edit item
   };
 
@@ -412,8 +337,10 @@ export default function StoreInventoryPage() {
 
       setDeleteItem(null);
       showToast('success', 'Inventory item deleted successfully!');
-      await fetchInventory();
-      fetchStats(); // Refresh stats after deleting item
+      // Invalidate queries to refetch data
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-filter-options'] });
       setIsDeleteModalOpen(false); 
     } catch (error: any) {
       console.error('Error deleting item:', error);
@@ -518,9 +445,10 @@ export default function StoreInventoryPage() {
             console.error('Unexpected import errors:', result.errors);
           }
 
-          // Refresh inventory
-          await fetchInventory();
-          fetchStats(); // Refresh stats after importing items
+          // Invalidate queries to refetch data
+          queryClient.invalidateQueries({ queryKey: ['inventory'] });
+          queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+          queryClient.invalidateQueries({ queryKey: ['inventory-filter-options'] });
         } catch (error: any) {
           console.error('Error importing file:', error);
           showToast('error', error.message || 'Failed to import file');
@@ -629,11 +557,10 @@ export default function StoreInventoryPage() {
     setSelectedCategory(null);
     setSelectedStore(null);
     setSelectedBrand(null);
-    setSerialNumberFilter('all');
   };
 
   // Check if any filters are active
-  const hasActiveFilters = selectedCategory || selectedStore || selectedBrand || serialNumberFilter !== 'all';
+  const hasActiveFilters = selectedCategory || selectedStore || selectedBrand;
 
   return (
     <div className="space-y-6">
@@ -767,7 +694,7 @@ export default function StoreInventoryPage() {
                 <span>Filter</span>
                 {hasActiveFilters && (
                   <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                    {[selectedStore, selectedBrand, serialNumberFilter !== 'all' ? 'S/N' : null].filter(Boolean).length}
+                    {[selectedStore, selectedBrand].filter(Boolean).length}
                   </span>
                 )}
                 <ChevronDown size={16} className={`transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
@@ -821,23 +748,6 @@ export default function StoreInventoryPage() {
                           {filterOptions.brands.map((brand) => (
                             <option key={brand} value={brand}>{brand}</option>
                           ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* Serial Number Filter */}
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-2">Serial Number</label>
-                      <div className="relative">
-                        <select
-                          value={serialNumberFilter}
-                          onChange={(e) => setSerialNumberFilter(e.target.value as 'all' | 'with' | 'without')}
-                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                        >
-                          <option value="all">All Items</option>
-                          <option value="with">With Serial Number</option>
-                          <option value="without">Without Serial Number</option>
                         </select>
                         <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
                       </div>
@@ -952,89 +862,89 @@ export default function StoreInventoryPage() {
       {/* Inventory Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-                <thead>
-                    <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-semibold">Item Details</th>
-                        <th className="p-4 font-semibold">Serial Number</th>
-                        <th className="p-4 font-semibold">Category</th>
-                        <th className="p-4 font-semibold">Brand</th>
-                        <th className="p-4 font-semibold">Model</th>
-                        <th className="p-4 font-semibold">Store</th>
-                        <th className="p-4 font-semibold">Station</th>
-                        <th className="p-4 font-semibold text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Item Details</TableHead>
+                        <TableHead>Serial Number</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Brand</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead>Store</TableHead>
+                        <TableHead>Station</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {loading ? (
-                      <tr>
-                        <td colSpan={8} className="p-12 text-center">
+                      <TableRow>
+                        <TableCell colSpan={8} className="p-12 text-center">
                           <div className="flex flex-col items-center gap-3">
                             <Loader2 className="w-8 h-8 text-blue-500 animate-spin" />
-                            <p className="text-slate-400">Loading inventory...</p>
+                            <p className="text-muted-foreground">Loading inventory...</p>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : inventoryItems.length === 0 ? (
-                      <tr>
-                        <td colSpan={8} className="p-12 text-center">
+                      <TableRow>
+                        <TableCell colSpan={8} className="p-12 text-center">
                           <div className="flex flex-col items-center gap-3">
-                            <Package size={48} className="text-slate-600" />
+                            <Package size={48} className="text-muted-foreground" />
                             <div>
-                              <h3 className="text-lg font-medium text-slate-300">No inventory items found</h3>
-                              <p className="text-slate-500 mt-1">
+                              <h3 className="text-lg font-medium">No inventory items found</h3>
+                              <p className="text-muted-foreground mt-1">
                                 {searchTerm ? 'Try adjusting your search' : 'Get started by adding your first item'}
                               </p>
                             </div>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : (
                       inventoryItems.map((item) => (
-                        <tr
+                        <TableRow
                           key={item.id}
                           onClick={() => {
                             setDetailItem(item);
                             setIsDetailModalOpen(true);
                           }}
-                          className="hover:bg-slate-800/50 transition-colors group cursor-pointer"
+                          className="cursor-pointer"
                         >
-                            <td className="p-4 text-slate-300 font-medium">
+                            <TableCell className="font-medium">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-slate-500">
+                                    <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
                                         <Package size={20} />
                                     </div>
                                     <div>
                                         <div className="text-sm">{item.brands?.name || 'N/A'}</div>
-                                        <div className="text-xs text-slate-500">{item.categories?.name || 'Uncategorized'}</div>
+                                        <div className="text-xs text-muted-foreground">{item.categories?.name || 'Uncategorized'}</div>
                                     </div>
                                 </div>
-                            </td>
-                            <td className="p-4 text-slate-400 font-mono text-sm">
-                              {item.serial_number || <span className="text-slate-600 italic">No S/N</span>}
-                            </td>
-                            <td className="p-4 text-slate-400">
-                                <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs whitespace-nowrap">
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">
+                              {item.serial_number || <span className="text-muted-foreground italic">No S/N</span>}
+                            </TableCell>
+                            <TableCell>
+                                <span className="px-2 py-1 rounded-md bg-muted border text-xs whitespace-nowrap">
                                   {item.categories?.name?.replace(/[\n\r]+/g, ' ').trim() || 'N/A'}
                                 </span>
-                            </td>
-                            <td className="p-4 text-slate-400">{item.brands?.name || 'N/A'}</td>
-                            <td className="p-4 text-slate-400">{item.models?.name || <span className="text-slate-600">—</span>}</td>
-                            <td className="p-4 text-slate-400">
+                            </TableCell>
+                            <TableCell>{item.brands?.name || 'N/A'}</TableCell>
+                            <TableCell>{item.models?.name || <span className="text-muted-foreground">—</span>}</TableCell>
+                            <TableCell>
                               <div>
                                 <div className="text-sm">{item.stores?.store_name || 'N/A'}</div>
-                                <div className="text-xs text-slate-600">{item.stores?.store_code || ''}</div>
+                                <div className="text-xs text-muted-foreground">{item.stores?.store_code || ''}</div>
                               </div>
-                            </td>
-                            <td className="p-4 text-slate-400">{item.stations?.name || <span className="text-slate-600">—</span>}</td>
-                            <td className="p-4 text-right">
+                            </TableCell>
+                            <TableCell>{item.stations?.name || <span className="text-muted-foreground">—</span>}</TableCell>
+                            <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       handleEdit(item);
                                     }}
-                                    className="p-2 hover:bg-blue-500/10 rounded-lg text-slate-400 hover:text-blue-400 transition-colors"
+                                    className="p-2 hover:bg-blue-500/10 rounded-lg text-muted-foreground hover:text-blue-400 transition-colors"
                                     title="Edit item"
                                   >
                                     <Edit2 size={16} />
@@ -1045,123 +955,41 @@ export default function StoreInventoryPage() {
                                         e.stopPropagation();
                                         handleDelete(item);
                                       }}
-                                      className="p-2 hover:bg-red-500/10 rounded-lg text-slate-400 hover:text-red-400 transition-colors"
+                                      className="p-2 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-400 transition-colors"
                                       title="Delete item"
                                     >
                                       <Trash2 size={16} />
                                     </button>
                                   )}
                               </div>
-                            </td>
-                        </tr>
+                            </TableCell>
+                        </TableRow>
                       ))
                     )}
-                </tbody>
-            </table>
+                </TableBody>
+            </Table>
         </div>
          {/* Pagination Controls */}
          {!loading && inventoryItems.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800">
-            {/* Page Info */}
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-slate-400">
-                Showing {showAll ? 1 : ((currentPage - 1) * pageSize) + 1} to {showAll ? totalCount : Math.min(currentPage * pageSize, totalCount)} of {totalCount} items
-              </p>
-
-              {/* Page Size Selector */}
-              <div className="flex items-center gap-2">
-                <label htmlFor="pageSize" className="text-sm text-slate-400">
-                  Per page:
-                </label>
-                <select
-                  id="pageSize"
-                  value={showAll ? 'all' : pageSize}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'all') {
-                      setShowAll(true);
-                      setCurrentPage(1);
-                    } else {
-                      setShowAll(false);
-                      setPageSize(Number(value));
-                      setCurrentPage(1);
-                    }
-                  }}
-                  className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Page Navigation */}
-            {!showAll && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(1)}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-                >
-                  First
-                </button>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-                >
-                  Previous
-                </button>
-
-                {/* Page Numbers */}
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (currentPage <= 3) {
-                      pageNum = i + 1;
-                    } else if (currentPage >= totalPages - 2) {
-                      pageNum = totalPages - 4 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${ currentPage === pageNum
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-                >
-                  Next
-                </button>
-                <button
-                  onClick={() => setCurrentPage(totalPages)}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-                >
-                  Last
-                </button>
-              </div>
-            )}
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            showAll={showAll}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              if (size === 'all') {
+                setShowAll(true);
+                setCurrentPage(1);
+              } else {
+                setShowAll(false);
+                setPageSize(size);
+                setCurrentPage(1);
+              }
+            }}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         )}
       </div>
 
