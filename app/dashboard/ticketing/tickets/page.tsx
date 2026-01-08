@@ -1,9 +1,12 @@
 "use client"
-import { useState, useEffect } from 'react';
-import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, ArrowUpDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Ticket as TicketIcon, Search, Filter, MoreHorizontal, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
+import TicketImportLogsModal from '@/components/ticketing/TicketImportLogsModal';
+import ImportLoadingModal from '@/components/ticketing/ImportLoadingModal';
+import { ToastContainer, ToastProps } from '@/components/Toast';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
@@ -75,6 +78,26 @@ export default function TicketsPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importingFileName, setImportingFileName] = useState<string>('');
+  const [isImportLogsModalOpen, setIsImportLogsModalOpen] = useState(false);
+  const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const actionsDropdownRef = useRef<HTMLDivElement>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [showValidationModal, setShowValidationModal] = useState(false);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
+  const [toasts, setToasts] = useState<ToastProps[]>([]);
+
+  // Toast helper function
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, description?: string, details?: string[]) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message, description, details, onClose: removeToast }]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
 
   // Check user role and position
   useEffect(() => {
@@ -111,6 +134,20 @@ export default function TicketsPage() {
 
   const canCreateTicket = userPosition !== 'Field Engineer';
   const canDeleteTicket = userPosition === 'Operations Manager';
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
+        setIsActionsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   const fetchTickets = async () => {
     setLoading(true);
@@ -179,9 +216,10 @@ export default function TicketsPage() {
       await fetchTickets();
       setIsDeleteModalOpen(false);
       setTicketToDelete(null);
+      showToast('success', 'Ticket Deleted', 'The ticket has been successfully deleted.');
     } catch (error: any) {
       console.error('Error deleting ticket:', error);
-      alert(error.message || 'Failed to delete ticket');
+      showToast('error', 'Delete Failed', error.message || 'Failed to delete ticket');
     } finally {
       setIsDeleting(false);
     }
@@ -190,6 +228,138 @@ export default function TicketsPage() {
   const handleCancelDelete = () => {
     setIsDeleteModalOpen(false);
     setTicketToDelete(null);
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/tickets/download-template');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'ticket_import_template.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('Error downloading template:', error);
+      showToast('error', 'Download Failed', error.message || 'Failed to download template');
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+      showToast('error', 'Invalid File Type', 'Please upload an Excel file (.xlsx or .xls)');
+      return;
+    }
+
+    // Validate file size (10MB max)
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxFileSize) {
+      showToast('error', 'File Too Large', 'Maximum file size is 10MB.');
+      return;
+    }
+
+    setIsImporting(true);
+    setImportingFileName(file.name);
+    try {
+      // Read file as base64
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const base64 = e.target?.result as string;
+          const fileData = base64.split(',')[1]; // Remove data:application/... prefix
+
+          // Step 1: Validate the file first
+          const validationResponse = await fetch('/api/tickets/validate-import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ fileData }),
+          });
+
+          const validationData = await validationResponse.json();
+
+          if (!validationResponse.ok) {
+            // Show validation errors
+            setValidationErrors(validationData.errors || ['Unknown validation error']);
+            setShowValidationModal(true);
+            setIsImporting(false);
+            setImportingFileName('');
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+            return;
+          }
+
+          // Step 2: If validation passes, proceed with import
+          const response = await fetch('/api/tickets/import', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              fileData,
+              fileName: file.name
+            }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.error || data.details || 'Failed to import file');
+          }
+
+          // Show success message
+          const { result } = data;
+          if (result.failed > 0) {
+            const errorSummary = result.errors?.slice(0, 10).map((e: any) =>
+              `Row ${e.row}: ${e.error}`
+            ) || [];
+            showToast(
+              'warning',
+              'Import Completed with Errors',
+              `${result.success} tickets imported successfully, ${result.failed} failed.`,
+              errorSummary.length > 0 ? [...errorSummary, result.failed > 10 ? `...and ${result.failed - 10} more errors` : ''].filter(Boolean) : undefined
+            );
+          } else {
+            showToast('success', 'Import Successful!', `${result.success} tickets have been imported successfully.`);
+          }
+
+          // Refresh tickets
+          await fetchTickets();
+        } catch (error: any) {
+          console.error('Error importing file:', error);
+          showToast('error', 'Import Failed', error.message || 'Failed to import file');
+        } finally {
+          setIsImporting(false);
+          setImportingFileName('');
+          // Reset file input
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('Error reading file:', error);
+      showToast('error', 'File Read Error', error.message || 'Failed to read file');
+      setIsImporting(false);
+      setImportingFileName('');
+    }
   };
 
   const filteredTickets = tickets
@@ -285,15 +455,80 @@ export default function TicketsPage() {
           <h1 className="text-2xl font-bold text-white">Tickets Management</h1>
           <p className="text-slate-400">{isAdmin ? 'Manage and track all support tickets.' : 'View tickets assigned to you.'}</p>
         </div>
-        {canCreateTicket && (
-          <button
-            onClick={() => setIsAddModalOpen(true)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
-          >
-            <Plus size={20} />
-            <span>Create Ticket</span>
-          </button>
-        )}
+        <div className="flex flex-wrap gap-3">
+          {canCreateTicket && (
+            <button
+              onClick={() => setIsAddModalOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl transition-colors shadow-lg shadow-blue-900/20"
+            >
+              <Plus size={20} />
+              <span>Create Ticket</span>
+            </button>
+          )}
+
+          <div className="relative" ref={actionsDropdownRef}>
+            <button
+              onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
+            >
+              <span>Actions</span>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${isActionsDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isActionsDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="p-1 space-y-1">
+                  <button
+                    onClick={() => {
+                      setShowInstructionsModal(true);
+                      setIsActionsDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-blue-400 hover:text-blue-300 hover:bg-slate-800 rounded-lg transition-colors font-medium"
+                  >
+                    <AlertCircle size={16} />
+                    <span>Import Instructions</span>
+                  </button>
+                  <div className="border-t border-slate-700 my-1"></div>
+                  <button
+                    onClick={() => {
+                      handleDownloadTemplate();
+                      setIsActionsDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>Download Template</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleImportClick();
+                      setIsActionsDropdownOpen(false);
+                    }}
+                    disabled={isImporting}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isImporting ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Upload size={16} />
+                    )}
+                    <span>{isImporting ? 'Importing...' : 'Import XLSX'}</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsImportLogsModalOpen(true);
+                      setIsActionsDropdownOpen(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <History size={16} />
+                    <span>Import History</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Filters & Search */}
@@ -475,6 +710,15 @@ export default function TicketsPage() {
         )}
       </div>
 
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       <AddTicketModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
@@ -491,6 +735,263 @@ export default function TicketsPage() {
           setSelectedTicket(updatedTicket);
         }}
       />
+
+      <ImportLoadingModal
+        isOpen={isImporting}
+        fileName={importingFileName}
+      />
+
+      <TicketImportLogsModal
+        isOpen={isImportLogsModalOpen}
+        onClose={() => setIsImportLogsModalOpen(false)}
+      />
+
+      {/* Validation Errors Modal */}
+      {showValidationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                  <AlertTriangle size={20} className="text-red-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Validation Errors</h2>
+              </div>
+              <button
+                onClick={() => setShowValidationModal(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6">
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
+                <p className="text-red-200 font-medium">
+                  Your file contains validation errors. Please fix the errors below and try again.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                {validationErrors.map((error, index) => (
+                  <div key={index} className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm">
+                    <p className="text-red-400 font-mono">{error}</p>
+                  </div>
+                ))}
+              </div>
+
+              {validationErrors.length >= 20 && (
+                <div className="mt-4 text-center text-slate-400 text-sm">
+                  Showing first 20 errors. Please fix these and re-upload to see more.
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
+              <button
+                onClick={() => setShowValidationModal(false)}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Import Instructions Modal */}
+      {showInstructionsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-blue-400" />
+                </div>
+                <h2 className="text-xl font-bold text-white">Ticket Import Instructions</h2>
+              </div>
+              <button
+                onClick={() => setShowInstructionsModal(false)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-auto p-6">
+              <div className="space-y-6">
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4">
+                  <h3 className="text-blue-400 font-semibold mb-2">Before You Start</h3>
+                  <ol className="list-decimal list-inside space-y-2 text-slate-300">
+                    <li>Download the Excel template by clicking "Download Template"</li>
+                    <li>Fill in your ticket data following the format in the template</li>
+                    <li>Make sure all required fields are filled correctly</li>
+                    <li>Save the file and click "Import XLSX" to upload</li>
+                  </ol>
+                </div>
+
+                <div>
+                  <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                    <AlertTriangle size={18} className="text-yellow-400" />
+                    Required Fields
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Store Code:</span>
+                      <span className="text-slate-400"> Must match an existing store in your system (e.g., ST001, ST002)</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Station Name:</span>
+                      <span className="text-slate-400"> Fallback station if device not found in inventory (e.g., Drive Thru, Front Counter)</span>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Note: If Device matches inventory, that device's station will be used instead
+                      </div>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">RCC Reference Number:</span>
+                      <span className="text-slate-400"> External reference number (e.g., RCC-2024-001)</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Date Reported:</span>
+                      <span className="text-slate-400"> Format: MM/DD/YYYY (e.g., 01/15/2024)</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Time Reported:</span>
+                      <span className="text-slate-400"> Format: HH:MM AM/PM (e.g., 09:30 AM)</span>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Device:</span>
+                      <span className="text-slate-400"> Device description. Format: Category Brand Model Serial</span>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Example: "POS NCR 7167 SN123456" or "Headset Plantronics CS540 SN789012"
+                      </div>
+                      <div className="mt-1 text-xs text-blue-400">
+                        💡 If device exists in store inventory, its station will be used automatically
+                      </div>
+                    </div>
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-3">
+                      <span className="font-semibold text-white">Severity:</span>
+                      <span className="text-slate-400"> Must be exactly: sev1 (low), sev2 (medium), or sev3 (critical)</span>
+                    </div>
+                    <div className="bg-slate-950 border border-red-500/20 rounded-lg p-3 border-2">
+                      <span className="font-semibold text-red-400">Reported By (Employee ID):</span>
+                      <span className="text-slate-300"> MUST match an existing employee ID in your system (e.g., EMP001)</span>
+                      <div className="mt-2 text-xs text-red-300">
+                        ⚠️ The employee must exist in the system before importing.
+                      </div>
+                    </div>
+                    <div className="bg-slate-950 border border-red-500/20 rounded-lg p-3 border-2">
+                      <span className="font-semibold text-red-400">Assigned To (Employee ID):</span>
+                      <span className="text-slate-300"> MUST match an existing employee ID in your system (e.g., EMP100)</span>
+                      <div className="mt-2 text-xs text-red-300">
+                        ⚠️ This assigns the ticket to a technician/field engineer. Employee must exist in the system.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
+                    <span className="text-green-400">✓</span>
+                    Auto-Filled Fields
+                  </h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="bg-slate-950 border border-green-500/20 rounded-lg p-3">
+                      <span className="font-semibold text-green-400">Manager on Duty:</span>
+                      <span className="text-slate-400"> Automatically assigned based on the store (uses first manager for the store)</span>
+                      <div className="mt-1 text-xs text-slate-500">
+                        No need to include this column in your import file
+                      </div>
+                    </div>
+                    <div className="bg-slate-950 border border-green-500/20 rounded-lg p-3">
+                      <span className="font-semibold text-green-400">Station (Conditional):</span>
+                      <span className="text-slate-400"> If Device matches store inventory, station is taken from device</span>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Otherwise, Station Name column is used to find or create the station
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-white font-semibold mb-3">Important Notes</h3>
+                  <ul className="space-y-2 text-sm text-slate-300">
+                    <li className="flex gap-2">
+                      <span className="text-red-400">⚠️</span>
+                      <span className="font-semibold">Both Reported By and Assigned To employee IDs are REQUIRED for every ticket</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-red-400">⚠️</span>
+                      <span className="font-semibold">RCC Reference Number is REQUIRED for every ticket</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Maximum 1000 rows per import</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Maximum file size: 10MB</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Device field should match format: Category Brand Model Serial</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>If Device matches store inventory, its station will be used (Station Name column ignored)</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Delete example rows from the template before importing your data</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Do not modify the header row (column names)</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>Test with a small batch first (5-10 tickets) to verify the format</span>
+                    </li>
+                    <li className="flex gap-2">
+                      <span className="text-blue-400">•</span>
+                      <span>The system will validate your file before importing and show any errors</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                  <h3 className="text-amber-400 font-semibold mb-2">Common Errors to Avoid</h3>
+                  <ul className="space-y-1 text-sm text-slate-300">
+                    <li>✗ Leaving RCC Reference Number blank</li>
+                    <li>✗ Leaving Reported By or Assigned To employee IDs blank</li>
+                    <li>✗ Using employee names instead of employee IDs</li>
+                    <li>✗ Wrong date format (use MM/DD/YYYY, not DD/MM/YYYY)</li>
+                    <li>✗ Wrong time format (use 09:30 AM, not 9:30 or 09:30)</li>
+                    <li>✗ Severity not lowercase (use "sev1" not "SEV1" or "Sev1")</li>
+                    <li>✗ Store codes that don't exist in your system</li>
+                    <li>✗ Reporter or Assigned employee IDs that don't exist in your system</li>
+                    <li>✗ Device field not properly formatted (use Category Brand Model Serial)</li>
+                    <li>✗ Device string doesn't exactly match inventory format (must be exact for auto station)</li>
+                    <li>✗ Forgetting to remove example rows from template</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-slate-800 flex justify-between items-center gap-3">
+              <div className="text-sm text-slate-400">
+                Need help? View the Instructions sheet in the template file
+              </div>
+              <button
+                onClick={() => setShowInstructionsModal(false)}
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors font-medium"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
@@ -552,6 +1053,9 @@ export default function TicketsPage() {
           </div>
         </div>
       )}
+
+      {/* Toast Container */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }
