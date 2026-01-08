@@ -35,6 +35,7 @@ export default function TicketOverviewPage() {
   const [modalTitle, setModalTitle] = useState('');
   const [modalTickets, setModalTickets] = useState<any[]>([]);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [isExportingModal, setIsExportingModal] = useState(false);
 
   const isLoading = authLoading || permissionsLoading;
 
@@ -315,6 +316,49 @@ export default function TicketOverviewPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Tickets');
 
     return workbook;
+  };
+
+  const handleExportModalData = async () => {
+    if (modalTickets.length === 0) {
+      alert('No tickets to export');
+      return;
+    }
+
+    setIsExportingModal(true);
+    try {
+      // Convert modal tickets to Excel
+      const workbook = convertTicketsToExcel(modalTickets);
+
+      if (!workbook) {
+        alert('Failed to generate Excel file.');
+        return;
+      }
+
+      // Write workbook to binary string
+      const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', cellStyles: true });
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+
+      // Create filename based on modal title and date range
+      const sanitizedTitle = modalTitle.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      const filename = startDate && endDate
+        ? `${sanitizedTitle}_${startDate}_${endDate}.xlsx`
+        : `${sanitizedTitle}.xlsx`;
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export data. Please try again.');
+    } finally {
+      setIsExportingModal(false);
+    }
   };
 
   const handleStatCardClick = async (type: 'total' | 'critical' | 'category' | 'store') => {
@@ -754,18 +798,40 @@ export default function TicketOverviewPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-[95vw] max-w-7xl max-h-[90vh] flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-slate-800">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 border-b border-slate-800 gap-3 sm:gap-0">
               <div className="flex items-center gap-3">
                 <Ticket className="text-blue-400" size={24} />
-                <h2 className="text-2xl font-bold text-white">{modalTitle}</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-white">{modalTitle}</h2>
                 <span className="text-slate-400 text-sm">({modalTickets.length} tickets)</span>
               </div>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
-              >
-                <X size={24} />
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleExportModalData}
+                  disabled={isExportingModal || loadingModal || modalTickets.length === 0}
+                  className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-all duration-200 ${
+                    isExportingModal || loadingModal || modalTickets.length === 0 ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
+                >
+                  {isExportingModal ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span className="hidden sm:inline">Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileDown size={18} />
+                      <span className="hidden sm:inline">Export Data</span>
+                      <span className="sm:hidden">Export</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                >
+                  <X size={24} />
+                </button>
+              </div>
             </div>
 
             {/* Modal Body */}
