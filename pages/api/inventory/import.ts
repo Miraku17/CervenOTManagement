@@ -309,22 +309,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         let storeId: string | null = null;
         const storeName = row['Store Name'].toString().trim();
         const storeCode = row['Store Code'].toString().trim();
-        const storeKey = `${storeName}|${storeCode}`.toUpperCase();
+        const storeCacheKey = storeCode.toUpperCase(); // Use store code as cache key since it's unique
 
-        if (storeCache.has(storeKey)) {
-          storeId = storeCache.get(storeKey)!;
+        if (storeCache.has(storeCacheKey)) {
+          storeId = storeCache.get(storeCacheKey)!;
         } else {
+          // First, check if store with this code already exists (store_code is unique)
           const { data: existingStore, error: findStoreError } = await supabaseAdmin
             .from('stores')
-            .select('id')
-            .or(`store_name.ilike.${storeName},store_code.ilike.${storeCode}`)
+            .select('id, store_name, store_code')
+            .ilike('store_code', storeCode)
             .maybeSingle();
 
+          if (findStoreError) {
+            throw new Error(`Error checking for existing store - ${findStoreError.message}`);
+          }
+
           if (existingStore && existingStore.id) {
+            // Store code already exists - use the existing store
             storeId = existingStore.id;
-            storeCache.set(storeKey, existingStore.id);
+            storeCache.set(storeCacheKey, existingStore.id);
+
+            // Log a warning if the names don't match
+            if (existingStore.store_name.toLowerCase() !== storeName.toLowerCase()) {
+              console.warn(`Row ${rowNumber}: Store code "${storeCode}" already exists with name "${existingStore.store_name}". Using existing store. Import has "${storeName}".`);
+            }
           } else {
-            // Create new store
+            // Store doesn't exist - create new store
             const { data: newStore, error: storeError } = await supabaseAdmin
               .from('stores')
               .insert({
@@ -334,10 +345,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               .select('id')
               .single();
 
-            if (storeError) throw new Error(`Could not create store - ${storeError.message}. Please verify Store Name and Store Code are correct`);
+            if (storeError) {
+              // Provide more detailed error message
+              const errorMsg = storeError.message.includes('duplicate')
+                ? `Store code "${storeCode}" already exists in the database. If you see this error, please contact support as there may be a caching issue.`
+                : storeError.message;
+              throw new Error(`Could not create store - ${errorMsg}. Please verify Store Name and Store Code are correct`);
+            }
+
             if (newStore?.id) {
               storeId = newStore.id;
-              storeCache.set(storeKey, newStore.id);
+              storeCache.set(storeCacheKey, newStore.id);
             }
           }
         }
