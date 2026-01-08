@@ -343,7 +343,7 @@ export default function TicketOverviewPage() {
           break;
         case 'critical':
           title = 'Critical Tickets (SEV3)';
-          filteredTickets = filteredTickets.filter((t: any) => t.sev === 'SEV3');
+          filteredTickets = filteredTickets.filter((t: any) => t.sev?.toUpperCase() === 'SEV3');
           break;
         case 'category':
           const topCategory = stats?.byProblemCategory[0];
@@ -451,7 +451,7 @@ export default function TicketOverviewPage() {
   const severityData = stats.bySeverity.map(item => ({
     name: item.severity,
     value: item.count,
-    color: item.severity === 'SEV3' ? '#ef4444' : item.severity === 'SEV2' ? '#f59e0b' : '#3b82f6'
+    color: item.severity.toUpperCase() === 'SEV3' ? '#ef4444' : item.severity.toUpperCase() === 'SEV2' ? '#f59e0b' : '#3b82f6'
   }));
 
   const problemCategoryData = stats.byProblemCategory.slice(0, 8).map((item, index) => ({
@@ -460,8 +460,8 @@ export default function TicketOverviewPage() {
     color: COLORS[index % COLORS.length]
   }));
 
-  // Calculate Summary Stats
-  const criticalCount = stats.bySeverity.find(s => s.severity === 'SEV3')?.count || 0;
+  // Calculate Summary Stats (case-insensitive)
+  const criticalCount = stats.bySeverity.find(s => s.severity.toUpperCase() === 'SEV3')?.count || 0;
   const criticalPercentage = stats.total > 0 ? ((criticalCount / stats.total) * 100).toFixed(1) : '0';
   
   const topCategory = stats.byProblemCategory[0];
@@ -803,8 +803,8 @@ export default function TicketOverviewPage() {
                           ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
                           : 'Unassigned';
 
-                        const sevColor = ticket.sev === 'SEV3' ? 'text-red-400 bg-red-500/10' :
-                                        ticket.sev === 'SEV2' ? 'text-amber-400 bg-amber-500/10' :
+                        const sevColor = ticket.sev?.toUpperCase() === 'SEV3' ? 'text-red-400 bg-red-500/10' :
+                                        ticket.sev?.toUpperCase() === 'SEV2' ? 'text-amber-400 bg-amber-500/10' :
                                         'text-blue-400 bg-blue-500/10';
 
                         const statusColor = ticket.status === 'closed' ? 'text-emerald-400 bg-emerald-500/10' :
