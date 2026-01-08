@@ -10,6 +10,15 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/services/supabase';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
 
 interface Asset {
   id: string;
@@ -729,47 +738,47 @@ export default function AssetInventoryPage() {
       {/* Inventory Table */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
         <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-                <thead>
-                    <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
-                        <th className="p-4 font-semibold">Category</th>
-                        <th className="p-4 font-semibold">Brand</th>
-                        <th className="p-4 font-semibold">Model</th>
-                        <th className="p-4 font-semibold">Serial Number</th>
-                        <th className="p-4 font-semibold">Status</th>
-                        <th className="p-4 font-semibold text-right">Actions</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Category</TableHead>
+                        <TableHead>Brand</TableHead>
+                        <TableHead>Model</TableHead>
+                        <TableHead>Serial Number</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
                     {loading ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">
+                      <TableRow>
+                        <TableCell colSpan={6} className="p-8 text-center">
                           <div className="flex items-center justify-center gap-2">
-                            <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
+                            <Loader2 className="w-5 h-5 animate-spin" />
                             <span>Loading assets...</span>
                           </div>
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : filteredAssets.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="p-8 text-center text-slate-400">
+                      <TableRow>
+                        <TableCell colSpan={6} className="p-8 text-center text-muted-foreground">
                           {searchTerm ? 'No assets found matching your search.' : 'No assets yet. Click "Add Asset" to create one.'}
-                        </td>
-                      </tr>
+                        </TableCell>
+                      </TableRow>
                     ) : (
                       filteredAssets.map((asset) => (
-                        <tr key={asset.id} onClick={() => handleViewDetails(asset)} className="hover:bg-slate-800/50 transition-colors group">
-                            <td className="p-4 text-slate-300 font-medium">
-                                <span className="px-2 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs">
+                        <TableRow key={asset.id} onClick={() => handleViewDetails(asset)} className="cursor-pointer">
+                            <TableCell className="font-medium">
+                                <span className="px-2 py-1 rounded-md bg-muted border text-xs">
                                   {asset.categories?.name || 'N/A'}
                                 </span>
-                            </td>
-                            <td className="p-4 text-slate-400">{asset.brands?.name || 'N/A'}</td>
-                            <td className="p-4 text-slate-400">
+                            </TableCell>
+                            <TableCell>{asset.brands?.name || 'N/A'}</TableCell>
+                            <TableCell>
                                 {asset.models?.name || '-'}
-                            </td>
-                            <td className="p-4 text-slate-400 font-mono text-sm">{asset.serial_number || '-'}</td>
-                            <td className="p-4">
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{asset.serial_number || '-'}</TableCell>
+                            <TableCell>
                                 <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${
                                   asset.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                   asset.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
@@ -779,8 +788,8 @@ export default function AssetInventoryPage() {
                                 }`}>
                                   {asset.status || 'Available'}
                                 </span>
-                            </td>
-                            <td className="p-4 text-right">
+                            </TableCell>
+                            <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-2">
                                 {!isReadOnly && (
                                   <button
@@ -805,118 +814,35 @@ export default function AssetInventoryPage() {
                                   </button>
                                 )}
                               </div>
-                            </td>
-                        </tr>
+                            </TableCell>
+                        </TableRow>
                       ))
                     )}
-                </tbody>
-            </table>
+                </TableBody>
+            </Table>
         </div>
 
         {/* Pagination Controls */}
         {!loading && filteredAssets.length > 0 && (
-          <div className="flex items-center justify-between px-6 py-4 border-t border-slate-800">
-            {/* Page Info */}
-            <div className="flex items-center gap-4">
-              <p className="text-sm text-slate-400">
-                Showing {showAll ? 1 : ((currentPage - 1) * pageSize) + 1} to {showAll ? totalCount : Math.min(currentPage * pageSize, totalCount)} of {totalCount} assets
-              </p>
-
-              {/* Page Size Selector */}
-              <div className="flex items-center gap-2">
-                <label htmlFor="pageSize" className="text-sm text-slate-400">
-                  Per page:
-                </label>
-                <select
-                  id="pageSize"
-                  value={showAll ? 'all' : pageSize}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === 'all') {
-                      setShowAll(true);
-                      setCurrentPage(1);
-                    } else {
-                      setShowAll(false);
-                      setPageSize(Number(value));
-                      setCurrentPage(1);
-                    }
-                  }}
-                  className="bg-slate-800 border border-slate-700 text-slate-300 text-sm rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value="all">All</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Page Navigation */}
-            {!showAll && (
-              <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                First
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Previous
-              </button>
-
-              {/* Page Numbers */}
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  let pageNum;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (currentPage <= 3) {
-                    pageNum = i + 1;
-                  } else if (currentPage >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = currentPage - 2 + i;
-                  }
-
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
-                        currentPage === pageNum
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-slate-800 hover:bg-slate-700 text-slate-300'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Next
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 text-sm bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-800"
-              >
-                Last
-              </button>
-            </div>
-            )}
-          </div>
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            showAll={showAll}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              if (size === 'all') {
+                setShowAll(true);
+                setCurrentPage(1);
+              } else {
+                setShowAll(false);
+                setPageSize(size);
+                setCurrentPage(1);
+              }
+            }}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         )}
       </div>
 

@@ -47,7 +47,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const categoryFilter = (req.query.category as string) || '';
     const storeFilter = (req.query.store as string) || '';
     const brandFilter = (req.query.brand as string) || '';
-    const serialStatusFilter = (req.query.serial_status as string) || 'all'; // 'all', 'with', 'without'
 
     // Calculate stats from total inventory (always constant, ignores filters)
     const { count: totalItems } = await supabaseAdmin
@@ -79,51 +78,66 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       uniqueStores,
     };
 
-    // Build filtered query
-    let query = supabaseAdmin
-      .from('store_inventory')
-      .select(`
-        id,
-        created_at,
-        updated_at,
-        created_by,
-        updated_by,
-        serial_number,
-        under_warranty,
-        warranty_date,
-        status,
-        stores:store_id (
-          id,
-          store_name,
-          store_code
-        ),
-        stations:station_id (
-          id,
-          name
-        ),
-        categories:category_id (
-          id,
-          name
-        ),
-        brands:brand_id (
-          id,
-          name
-        ),
-        models:model_id (
-          id,
-          name
-        )
-      `, { count: 'exact' })
-      .is('deleted_at', null)
-      .order('created_at', { ascending: false })
-      .range(0, 99999); // Override Supabase's default 1000 row limit
+    // Build filtered query - fetch all items in batches to avoid the 1000 row limit
+    // We need to fetch all data because filtering happens in memory (nested relations)
+    let allFilteredItems: any[] = [];
+    let fetchError = null;
+    let rangeStart = 0;
+    const batchSize = 1000;
+    let hasMore = true;
 
-    // Apply filters at database level where possible
-    // Note: Supabase doesn't support filtering on nested relations directly,
-    // so we need to filter in memory for some fields
+    while (hasMore) {
+      const { data, error } = await supabaseAdmin
+        .from('store_inventory')
+        .select(`
+          id,
+          created_at,
+          updated_at,
+          created_by,
+          updated_by,
+          serial_number,
+          under_warranty,
+          warranty_date,
+          status,
+          stores:store_id (
+            id,
+            store_name,
+            store_code
+          ),
+          stations:station_id (
+            id,
+            name
+          ),
+          categories:category_id (
+            id,
+            name
+          ),
+          brands:brand_id (
+            id,
+            name
+          ),
+          models:model_id (
+            id,
+            name
+          )
+        `)
+        .is('deleted_at', null)
+        .order('created_at', { ascending: false })
+        .range(rangeStart, rangeStart + batchSize - 1);
 
-    // Fetch filtered items
-    const { data: allFilteredItems, error: fetchError } = await query;
+      if (error) {
+        fetchError = error;
+        break;
+      }
+
+      if (data && data.length > 0) {
+        allFilteredItems = [...allFilteredItems, ...data];
+        rangeStart += batchSize;
+        hasMore = data.length === batchSize;
+      } else {
+        hasMore = false;
+      }
+    }
 
     if (fetchError) throw fetchError;
 
@@ -147,12 +161,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const brandName = Array.isArray(item.brands) ? item.brands[0]?.name : item.brands?.name;
         return brandName === brandFilter;
       });
-    }
-
-    if (serialStatusFilter === 'with') {
-      filteredItems = filteredItems.filter((item: any) => !!item.serial_number);
-    } else if (serialStatusFilter === 'without') {
-      filteredItems = filteredItems.filter((item: any) => !item.serial_number);
     }
 
     if (searchTerm) {
@@ -215,6 +223,46 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       })
     );
 
+    // Extract filter options from all items
+    const categories = Array.from(
+      new Set(
+        allFilteredItems
+          .map((item: any) => {
+            const categoryName = Array.isArray(item.categories)
+              ? item.categories[0]?.name
+              : item.categories?.name;
+            return categoryName;
+          })
+          .filter(Boolean)
+      )
+    ).sort();
+
+    const stores = Array.from(
+      new Set(
+        allFilteredItems
+          .map((item: any) => {
+            const storeName = Array.isArray(item.stores)
+              ? item.stores[0]?.store_name
+              : item.stores?.store_name;
+            return storeName;
+          })
+          .filter(Boolean)
+      )
+    ).sort();
+
+    const brands = Array.from(
+      new Set(
+        allFilteredItems
+          .map((item: any) => {
+            const brandName = Array.isArray(item.brands)
+              ? item.brands[0]?.name
+              : item.brands?.name;
+            return brandName;
+          })
+          .filter(Boolean)
+      )
+    ).sort();
+
     return res.status(200).json({
       items: inventoryItems || [],
       stats,
@@ -223,6 +271,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         pageSize: limit,
         totalCount: totalCount || 0,
         totalPages: Math.ceil((totalCount || 0) / limit),
+      },
+      filterOptions: {
+        categories,
+        stores,
+        brands,
       },
       hasEditAccess: hasEditAccess || hasManageStoreInventory,
       isEditOnly: hasEditAccess && !hasManageStoreInventory,
