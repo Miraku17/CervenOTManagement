@@ -467,11 +467,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         setLoading(false);
         return;
     }
-    if (!formData.serviced_by) {
-        setError('Serviced By is required');
-        setLoading(false);
-        return;
-    }
     if (!formData.station_id) {
         setError('Station is required (auto-filled from device selection)');
         setLoading(false);
@@ -600,7 +595,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between p-6 border-b border-slate-800">
           <h2 className="text-xl font-bold text-white">Create New Ticket</h2>
@@ -689,7 +684,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               {/* Serviced By - Employee Selector */}
               <div ref={employeeDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">
-                  Serviced By <span className="text-red-500">*</span>
+                  Serviced By <span className="text-slate-500 text-xs">(Optional)</span>
                   {selectedEmployee && <span className="text-xs text-slate-500 ml-2">(Selected: {selectedEmployee.fullName})</span>}
                 </label>
                 <div className="relative">
@@ -703,7 +698,6 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     onFocus={() => setShowEmployeeDropdown(true)}
                     className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-20 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     placeholder="Search for an employee..."
-                    required={true}
                   />
                   {selectedEmployee && (
                     <button
