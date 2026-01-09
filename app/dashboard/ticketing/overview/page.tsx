@@ -884,9 +884,10 @@ export default function TicketOverviewPage() {
                                         ticket.sev?.toUpperCase() === 'SEV2' ? 'text-amber-400 bg-amber-500/10' :
                                         'text-blue-400 bg-blue-500/10';
 
-                        const statusColor = ticket.status === 'closed' ? 'text-emerald-400 bg-emerald-500/10' :
-                                           ticket.status === 'in progress' ? 'text-blue-400 bg-blue-500/10' :
-                                           ticket.status === 'on hold' ? 'text-amber-400 bg-amber-500/10' :
+                        const normalizedStatus = (ticket.status || '').toLowerCase().replace(/_/g, ' ');
+                        const statusColor = normalizedStatus === 'closed' ? 'text-emerald-400 bg-emerald-500/10' :
+                                           normalizedStatus === 'in progress' ? 'text-blue-400 bg-blue-500/10' :
+                                           normalizedStatus === 'on hold' ? 'text-amber-400 bg-amber-500/10' :
                                            'text-slate-400 bg-slate-500/10';
 
                         return (
@@ -909,7 +910,7 @@ export default function TicketOverviewPage() {
                             </td>
                             <td className="py-3 px-4">
                               <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${statusColor}`}>
-                                {ticket.status || 'N/A'}
+                                {(ticket.status || 'N/A').replace(/_/g, ' ')}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-slate-300 text-sm">

@@ -23,6 +23,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
+    // Get filter params
+    const statusFilter = req.query.status as string;
+    const searchTerm = req.query.search as string;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+
     // Build the base query for counting
     let countQuery = supabaseAdmin
       .from('tickets')
@@ -31,6 +37,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // If user is not admin, filter by tickets they are servicing
     if (req.user.role !== 'admin') {
       countQuery = countQuery.eq('serviced_by', req.user.id);
+    }
+
+    // Apply status filter (handle both underscore and space formats)
+    if (statusFilter && statusFilter !== 'all') {
+      // Convert filter to database format (e.g., "in progress" -> "in_progress")
+      const dbStatus = statusFilter.toLowerCase().replace(/ /g, '_');
+      countQuery = countQuery.eq('status', dbStatus);
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      countQuery = countQuery.or(`rcc_reference_number.ilike.%${searchTerm}%,request_type.ilike.%${searchTerm}%,device.ilike.%${searchTerm}%`);
+    }
+
+    // Apply date range filters
+    if (startDate) {
+      countQuery = countQuery.gte('date_reported', startDate);
+    }
+    if (endDate) {
+      countQuery = countQuery.lte('date_reported', endDate);
     }
 
     // Get total count
@@ -70,6 +96,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // If user is not admin, filter by tickets they are servicing
     if (req.user.role !== 'admin') {
       query = query.eq('serviced_by', req.user.id);
+    }
+
+    // Apply status filter (handle both underscore and space formats)
+    if (statusFilter && statusFilter !== 'all') {
+      // Convert filter to database format (e.g., "in progress" -> "in_progress")
+      const dbStatus = statusFilter.toLowerCase().replace(/ /g, '_');
+      query = query.eq('status', dbStatus);
+    }
+
+    // Apply search filter
+    if (searchTerm) {
+      query = query.or(`rcc_reference_number.ilike.%${searchTerm}%,request_type.ilike.%${searchTerm}%,device.ilike.%${searchTerm}%`);
+    }
+
+    // Apply date range filters
+    if (startDate) {
+      query = query.gte('date_reported', startDate);
+    }
+    if (endDate) {
+      query = query.lte('date_reported', endDate);
     }
 
     const { data: tickets, error } = await query;

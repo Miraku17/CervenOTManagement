@@ -70,8 +70,33 @@ interface TicketsResponse {
   };
 }
 
-const fetchTickets = async (page: number, limit: number): Promise<TicketsResponse> => {
-  const response = await fetch(`/api/tickets/get?page=${page}&limit=${limit}`);
+const fetchTickets = async (
+  page: number,
+  limit: number,
+  statusFilter?: string,
+  searchTerm?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<TicketsResponse> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (statusFilter && statusFilter !== 'all') {
+    params.append('status', statusFilter);
+  }
+  if (searchTerm) {
+    params.append('search', searchTerm);
+  }
+  if (startDate) {
+    params.append('startDate', startDate);
+  }
+  if (endDate) {
+    params.append('endDate', endDate);
+  }
+
+  const response = await fetch(`/api/tickets/get?${params.toString()}`);
   if (!response.ok) {
     throw new Error('Failed to fetch tickets');
   }
@@ -112,11 +137,16 @@ export default function TicketsPage() {
 
   // Fetch tickets with TanStack Query
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tickets', currentPage, showAll ? 999999 : pageLimit],
-    queryFn: () => fetchTickets(currentPage, showAll ? 999999 : pageLimit),
+    queryKey: ['tickets', currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate],
+    queryFn: () => fetchTickets(currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm, startDate, endDate]);
 
   // Check user role using useEffect
   React.useEffect(() => {
@@ -343,24 +373,8 @@ export default function TicketsPage() {
     }
   };
 
-  // Client-side filtering of tickets
+  // Filtering is now done server-side, just sort client-side
   const filteredTickets = (data?.tickets || [])
-    .filter(ticket => {
-      const matchesSearch =
-        ticket.rcc_reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.stores?.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const normalizedTicketStatus = ticket.status.toLowerCase().replace(/_/g, ' ');
-      const matchesStatus = statusFilter === 'all' || normalizedTicketStatus === statusFilter.toLowerCase();
-
-      const ticketDate = new Date(ticket.date_reported);
-      const matchesStartDate = !startDate || ticketDate >= new Date(startDate);
-      const matchesEndDate = !endDate || ticketDate <= new Date(endDate);
-
-      return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
-    })
     .sort((a, b) => {
       const dateA = new Date(`${a.date_reported}T${a.time_reported}`);
       const dateB = new Date(`${b.date_reported}T${b.time_reported}`);
@@ -368,7 +382,7 @@ export default function TicketsPage() {
     });
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase().replace(/_/g, ' ')) {
+    switch ((status || '').toLowerCase().replace(/_/g, ' ')) {
       case 'open': return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
       case 'in progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
       case 'on hold': return 'bg-orange-500/20 text-orange-400 border-orange-500/20';
