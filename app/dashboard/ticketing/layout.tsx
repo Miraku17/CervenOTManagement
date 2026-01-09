@@ -164,6 +164,18 @@ export default function TicketingLayout({
             <SidebarLabel>Analytics</SidebarLabel>
             <div className="space-y-1">
               <button
+                onClick={() => handleNavigate('/dashboard/ticketing/dashboard')}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+                  pathname === '/dashboard/ticketing/dashboard'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <LayoutDashboard size={18} className={pathname === '/dashboard/ticketing/dashboard' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                <span className="font-medium text-sm">Dashboard</span>
+              </button>
+              
+              <button
                 onClick={() => handleNavigate('/dashboard/ticketing/overview')}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
                   pathname === '/dashboard/ticketing/overview'

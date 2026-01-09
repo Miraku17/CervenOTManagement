@@ -323,6 +323,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasManageTicketsPermission, setHasManageTicketsPermission] = useState(false);
   const [editData, setEditData] = useState<Partial<Ticket>>({});
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -349,9 +350,9 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Check if user is admin or assigned employee
+  // Check if user is admin and has manage_tickets permission
   useEffect(() => {
-    const checkUserRole = async () => {
+    const checkUserPermissions = async () => {
       if (!user?.id) return;
 
       try {
@@ -362,12 +363,24 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           .single();
 
         setIsAdmin(profile?.role === 'admin');
+
+        // Check if user has manage_tickets permission
+        const { data: permissions } = await supabase
+          .from('user_permissions')
+          .select('permission_id, permissions(name)')
+          .eq('user_id', user.id);
+
+        const hasPermission = permissions?.some(
+          (p: any) => p.permissions?.name === 'manage_tickets'
+        );
+
+        setHasManageTicketsPermission(hasPermission || false);
       } catch (error) {
-        console.error('Error checking user role:', error);
+        console.error('Error checking user permissions:', error);
       }
     };
 
-    checkUserRole();
+    checkUserPermissions();
   }, [user?.id]);
 
   // Fetch KB articles when modal opens
@@ -463,7 +476,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   if (!isOpen || !ticket) return null;
 
-  const canEdit = isAdmin || (user?.id === ticket.serviced_by);
+  const canEdit = hasManageTicketsPermission;
 
   // Get signed URL for attachment (for private buckets)
   const getAttachmentUrl = async (filePath: string): Promise<string> => {
@@ -766,7 +779,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
         
         {/* Header */}

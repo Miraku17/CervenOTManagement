@@ -13,18 +13,43 @@ export const config = {
 };
 
 interface ImportRow {
-  'Store Code': string;
-  'Station Name': string;
+  'Date Reported'?: string;
+  'Time Reported'?: string;
+  'Date Responded'?: string;
+  'Time Responded'?: string;
   'RCC Reference Number': string;
-  'Date Reported': string;
-  'Time Reported': string;
-  'Request Type': string;
-  'Device': string;
-  'Problem Category': string;
-  'Severity': string;
+  'Store Code': string;
+  'Store Name'?: string;
+  'Request type'?: string;
+  'Device'?: string;
+  'Station'?: string;
+  'Brand'?: string;
+  'M/MT Model'?: string;
+  'Serial Number'?: string;
   'Request Detail': string;
-  'Reported By (Employee ID)': string;
-  'Assigned To (Employee ID)': string;
+  '----- Action Taken -----'?: string;
+  'Problem Category'?: string;
+  'Sev': string;
+  'Final resolution'?: string;
+  'Status'?: string;
+  'Part/s replaced'?: string;
+  'New Parts Serial'?: string;
+  'Old Parts Serial'?: string;
+  'Date Ack'?: string;
+  'Time Ack'?: string;
+  'Date Attended'?: string;
+  'Store Arrival'?: string;
+  'Work Start'?: string;
+  'Pause Time\n(Start)'?: string;
+  'Pause Time\n(End)'?: string;
+  'Work End'?: string;
+  'Date Resolved'?: string;
+  'Reported by'?: string;
+  'Serviced by'?: string;
+  'MOD'?: string;
+  'SLA Count\n(Hrs)'?: string;
+  'Downtime'?: string;
+  'SLA Status'?: string;
 }
 
 interface ValidationError {
@@ -106,9 +131,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Validate required columns exist
     const requiredColumns = [
-      'Store Code', 'Station Name', 'RCC Reference Number', 'Date Reported', 'Time Reported',
-      'Request Type', 'Device', 'Problem Category', 'Severity',
-      'Request Detail', 'Reported By (Employee ID)', 'Assigned To (Employee ID)'
+      'RCC Reference Number',
+      'Store Code',
+      'Sev',
+      'Request Detail'
     ];
     const firstRow = data[0];
     const availableColumns = Object.keys(firstRow);
@@ -128,7 +154,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
 
     // Check row count limits
-    const MAX_ROWS = 1000;
+    const MAX_ROWS = 5000;
     if (nonEmptyData.length > MAX_ROWS) {
       return res.status(400).json({
         errors: [`File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import.`]
@@ -137,80 +163,139 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const validationErrors: ValidationError[] = [];
 
-    // Fetch all stores once for validation
-    const { data: stores } = await supabaseAdmin
-      .from('stores')
-      .select('store_code');
-    const validStoreCodes = new Set(stores?.map(s => s.store_code.toUpperCase()) || []);
+    // Helper function to validate date parsing
+    const validateDateParsing = (dateValue: any, fieldName: string, rowNumber: number): boolean => {
+      if (!dateValue) return true; // Optional field
 
-    // Fetch all employees once for validation
+      try {
+        if (dateValue instanceof Date) {
+          // Valid Date object
+          if (isNaN(dateValue.getTime())) {
+            validationErrors.push({ row: rowNumber, field: fieldName, message: 'Invalid date value' });
+            return false;
+          }
+          return true;
+        } else if (typeof dateValue === 'number') {
+          // Excel serial date - validate it's reasonable
+          if (dateValue < 1 || dateValue > 100000) {
+            validationErrors.push({ row: rowNumber, field: fieldName, message: 'Invalid Excel date serial number' });
+            return false;
+          }
+          return true;
+        } else if (typeof dateValue === 'string') {
+          // String date - check if it's a valid date format or just text
+          const dateString = dateValue.toString().trim();
+          const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+
+          // If it contains letters (text), just warn - row will be skipped during import
+          if (/[a-zA-Z]/.test(dateString)) {
+            console.warn(`Row ${rowNumber} - ${fieldName}: Text value "${dateString}" will cause row to be skipped`);
+            return true; // Don't fail validation, just skip row during import
+          }
+
+          if (!dateRegex.test(dateString)) {
+            validationErrors.push({ row: rowNumber, field: fieldName, message: 'Invalid date format. Use MM/DD/YYYY' });
+            return false;
+          }
+          return true;
+        }
+        return true;
+      } catch (error) {
+        validationErrors.push({ row: rowNumber, field: fieldName, message: 'Failed to parse date' });
+        return false;
+      }
+    };
+
+    // Helper function to validate time parsing
+    const validateTimeParsing = (timeValue: any, fieldName: string, rowNumber: number): boolean => {
+      if (!timeValue) return true; // Optional field
+
+      try {
+        // Check if it's a Python time object (has hour/minute properties but not a Date)
+        if (timeValue && typeof timeValue === 'object' && 'hour' in timeValue && 'minute' in timeValue) {
+          return true; // Python datetime.time object is valid
+        }
+
+        if (timeValue instanceof Date) {
+          // Valid Date object with time (including datetime objects)
+          return true;
+        } else if (typeof timeValue === 'number') {
+          // Excel time serial - can be fraction (0-1) or large number (datetime)
+          // Accept both time-only and datetime values
+          return true;
+        } else if (typeof timeValue === 'string') {
+          // String time - allow various formats, will be parsed in import
+          const timeString = timeValue.toString().trim();
+          if (!timeString) return true; // Empty string is okay
+
+          // Allow HH:MM AM/PM format
+          const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9](:[0-5][0-9])?\s?(AM|PM|am|pm)$/i;
+          // Also allow 24-hour format HH:MM:SS or HH:MM
+          const time24Regex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+
+          if (!timeRegex.test(timeString) && !time24Regex.test(timeString)) {
+            // If it's text (not a time), just warn but don't fail - will be treated as null
+            console.warn(`Row ${rowNumber} - ${fieldName}: Text value "${timeString}" will be ignored`);
+            return true; // Don't fail validation, just treat as null
+          }
+          return true;
+        }
+        return true;
+      } catch (error) {
+        validationErrors.push({ row: rowNumber, field: fieldName, message: 'Failed to parse time' });
+        return false;
+      }
+    };
+
+    // Fetch all employees once for validation (by name)
     const { data: employees } = await supabaseAdmin
       .from('profiles')
-      .select('employee_id');
-    const validEmployeeIds = new Set(employees?.map(e => e.employee_id) || []);
+      .select('first_name, last_name');
+    const employeeNames = new Set(
+      employees?.map(e => `${e.first_name} ${e.last_name}`.toLowerCase()) || []
+    );
 
-    // Validate each row
-    for (let i = 0; i < Math.min(nonEmptyData.length, 100); i++) { // Validate first 100 rows
+    // Validate each row (validate all rows, not just first 100)
+    for (let i = 0; i < nonEmptyData.length; i++) {
       const { row, originalIndex } = nonEmptyData[i];
       const rowNumber = originalIndex + 2; // Excel row number
 
       // Check required fields
       if (!row['Store Code']) {
         validationErrors.push({ row: rowNumber, field: 'Store Code', message: 'Missing Store Code' });
-      } else {
-        const storeCode = row['Store Code'].toString().trim().toUpperCase();
-        if (!validStoreCodes.has(storeCode)) {
-          validationErrors.push({ row: rowNumber, field: 'Store Code', message: `Store "${row['Store Code']}" not found in system` });
-        }
-      }
-
-      if (!row['Station Name']) {
-        validationErrors.push({ row: rowNumber, field: 'Station Name', message: 'Missing Station Name' });
       }
 
       if (!row['RCC Reference Number']) {
         validationErrors.push({ row: rowNumber, field: 'RCC Reference Number', message: 'Missing RCC Reference Number' });
       }
 
-      if (!row['Date Reported']) {
-        validationErrors.push({ row: rowNumber, field: 'Date Reported', message: 'Missing Date Reported' });
+      // Validate Date Reported (optional now, but validate format if provided)
+      if (row['Date Reported']) {
+        validateDateParsing(row['Date Reported'], 'Date Reported', rowNumber);
+      }
+
+      // Validate optional date fields
+      validateDateParsing(row['Date Responded'], 'Date Responded', rowNumber);
+      validateDateParsing(row['Date Ack'], 'Date Ack', rowNumber);
+      validateDateParsing(row['Date Attended'], 'Date Attended', rowNumber);
+      validateDateParsing(row['Date Resolved'], 'Date Resolved', rowNumber);
+
+      // Validate optional time fields
+      validateTimeParsing(row['Time Reported'], 'Time Reported', rowNumber);
+      validateTimeParsing(row['Time Responded'], 'Time Responded', rowNumber);
+      validateTimeParsing(row['Time Ack'], 'Time Ack', rowNumber);
+      validateTimeParsing(row['Store Arrival'], 'Store Arrival', rowNumber);
+      validateTimeParsing(row['Work Start'], 'Work Start', rowNumber);
+      validateTimeParsing(row['Pause Time\n(Start)'], 'Pause Time (Start)', rowNumber);
+      validateTimeParsing(row['Pause Time\n(End)'], 'Pause Time (End)', rowNumber);
+      validateTimeParsing(row['Work End'], 'Work End', rowNumber);
+
+      if (!row['Sev']) {
+        validationErrors.push({ row: rowNumber, field: 'Sev', message: 'Missing Severity' });
       } else {
-        const dateReported = row['Date Reported'];
-        if (typeof dateReported === 'string') {
-          const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
-          if (!dateRegex.test(dateReported.trim())) {
-            validationErrors.push({ row: rowNumber, field: 'Date Reported', message: 'Invalid date format. Use MM/DD/YYYY' });
-          }
-        }
-      }
-
-      if (!row['Time Reported']) {
-        validationErrors.push({ row: rowNumber, field: 'Time Reported', message: 'Missing Time Reported' });
-      } else {
-        const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM|am|pm)$/i;
-        if (!timeRegex.test(row['Time Reported'].toString().trim())) {
-          validationErrors.push({ row: rowNumber, field: 'Time Reported', message: 'Invalid time format. Use HH:MM AM/PM' });
-        }
-      }
-
-      if (!row['Request Type']) {
-        validationErrors.push({ row: rowNumber, field: 'Request Type', message: 'Missing Request Type' });
-      }
-
-      if (!row['Device']) {
-        validationErrors.push({ row: rowNumber, field: 'Device', message: 'Missing Device' });
-      }
-
-      if (!row['Problem Category']) {
-        validationErrors.push({ row: rowNumber, field: 'Problem Category', message: 'Missing Problem Category' });
-      }
-
-      if (!row['Severity']) {
-        validationErrors.push({ row: rowNumber, field: 'Severity', message: 'Missing Severity' });
-      } else {
-        const severity = row['Severity'].toString().trim().toLowerCase();
-        if (!['sev1', 'sev2', 'sev3'].includes(severity)) {
-          validationErrors.push({ row: rowNumber, field: 'Severity', message: `Invalid Severity "${row['Severity']}". Must be sev1, sev2, or sev3` });
+        const severity = row['Sev'].toString().trim().toLowerCase();
+        if (!['sev1', 'sev2', 'sev3', 'sev4'].includes(severity)) {
+          validationErrors.push({ row: rowNumber, field: 'Sev', message: `Invalid Severity "${row['Sev']}". Must be Sev1, Sev2, Sev3, or Sev4` });
         }
       }
 
@@ -218,22 +303,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         validationErrors.push({ row: rowNumber, field: 'Request Detail', message: 'Missing Request Detail' });
       }
 
-      if (!row['Reported By (Employee ID)']) {
-        validationErrors.push({ row: rowNumber, field: 'Reported By (Employee ID)', message: 'Missing Employee ID' });
-      } else {
-        const employeeId = row['Reported By (Employee ID)'].toString().trim();
-        if (!validEmployeeIds.has(employeeId)) {
-          validationErrors.push({ row: rowNumber, field: 'Reported By (Employee ID)', message: `Employee ID "${employeeId}" not found in system` });
-        }
-      }
-
-      // Validate Assigned To (required)
-      if (!row['Assigned To (Employee ID)']) {
-        validationErrors.push({ row: rowNumber, field: 'Assigned To (Employee ID)', message: 'Missing Assigned To Employee ID' });
-      } else {
-        const assignedId = row['Assigned To (Employee ID)'].toString().trim();
-        if (!validEmployeeIds.has(assignedId)) {
-          validationErrors.push({ row: rowNumber, field: 'Assigned To (Employee ID)', message: `Assigned Employee ID "${assignedId}" not found in system` });
+      // Validate Status enum if provided
+      if (row['Status']) {
+        const status = row['Status'].toString().trim().toLowerCase();
+        if (!['open', 'in_progress', 'on_hold', 'closed'].includes(status)) {
+          validationErrors.push({ row: rowNumber, field: 'Status', message: `Invalid Status "${row['Status']}". Must be one of: open, in_progress, on_hold, closed` });
         }
       }
     }
