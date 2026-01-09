@@ -15,18 +15,43 @@ export const config = {
 };
 
 interface ImportRow {
-  'Store Code': string;
-  'Station Name': string;
+  'Date Reported'?: string;
+  'Time Reported'?: string;
+  'Date Responded'?: string;
+  'Time Responded'?: string;
   'RCC Reference Number': string;
-  'Date Reported': string;
-  'Time Reported': string;
-  'Request Type': string;
-  'Device': string;
-  'Problem Category': string;
-  'Severity': string;
+  'Store Code': string;
+  'Store Name'?: string;
+  'Request type'?: string;
+  'Device'?: string;
+  'Station'?: string;
+  'Brand'?: string;
+  'M/MT Model'?: string;
+  'Serial Number'?: string;
   'Request Detail': string;
-  'Reported By (Employee ID)': string;
-  'Assigned To (Employee ID)': string;
+  '----- Action Taken -----'?: string;
+  'Problem Category'?: string;
+  'Sev': string;
+  'Final resolution'?: string;
+  'Status'?: string;
+  'Part/s replaced'?: string;
+  'New Parts Serial'?: string;
+  'Old Parts Serial'?: string;
+  'Date Ack'?: string;
+  'Time Ack'?: string;
+  'Date Attended'?: string;
+  'Store Arrival'?: string;
+  'Work Start'?: string;
+  'Pause Time\n(Start)'?: string;
+  'Pause Time\n(End)'?: string;
+  'Work End'?: string;
+  'Date Resolved'?: string;
+  'Reported by'?: string;
+  'Serviced by'?: string;
+  'MOD'?: string;
+  'SLA Count\n(Hrs)'?: string;
+  'Downtime'?: string;
+  'SLA Status'?: string;
 }
 
 interface ImportResult {
@@ -113,9 +138,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Validate required columns exist
     const requiredColumns = [
-      'Store Code', 'Station Name', 'RCC Reference Number', 'Date Reported', 'Time Reported',
-      'Request Type', 'Device', 'Problem Category', 'Severity',
-      'Request Detail', 'Reported By (Employee ID)', 'Assigned To (Employee ID)'
+      'RCC Reference Number',
+      'Store Code',
+      'Sev',
+      'Request Detail'
     ];
     const firstRow = data[0];
     const availableColumns = Object.keys(firstRow);
@@ -136,8 +162,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
 
     // Check row count limits
-    const MAX_ROWS = 1000;
-    const WARNING_THRESHOLD = 500;
+    const MAX_ROWS = 5000;
+    const WARNING_THRESHOLD = 1000;
 
     if (nonEmptyData.length > MAX_ROWS) {
       return res.status(400).json({
@@ -195,54 +221,57 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         // Validate required fields
         const missingFields = [];
         if (!row['Store Code']) missingFields.push('Store Code');
-        if (!row['Station Name']) missingFields.push('Station Name');
         if (!row['RCC Reference Number']) missingFields.push('RCC Reference Number');
-        if (!row['Date Reported']) missingFields.push('Date Reported');
-        if (!row['Time Reported']) missingFields.push('Time Reported');
-        if (!row['Request Type']) missingFields.push('Request Type');
-        if (!row['Device']) missingFields.push('Device');
-        if (!row['Problem Category']) missingFields.push('Problem Category');
-        if (!row['Severity']) missingFields.push('Severity');
+        if (!row['Sev']) missingFields.push('Sev');
         if (!row['Request Detail']) missingFields.push('Request Detail');
-        if (!row['Reported By (Employee ID)']) missingFields.push('Reported By (Employee ID)');
-        if (!row['Assigned To (Employee ID)']) missingFields.push('Assigned To (Employee ID)');
 
         if (missingFields.length > 0) {
           throw new Error(`Missing required field${missingFields.length > 1 ? 's' : ''}: ${missingFields.join(', ')}`);
         }
 
-        // Look up reporter by employee_id
-        const reporterEmployeeId = row['Reported By (Employee ID)'].toString().trim();
-        const { data: reporterEmployee, error: reporterError } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, employee_id')
-          .eq('employee_id', reporterEmployeeId)
-          .maybeSingle();
+        // Look up reporter by name (optional)
+        let reporterEmployee = null;
+        if (row['Reported by']) {
+          const reporterName = row['Reported by'].toString().trim();
+          const { data: reporterData, error: reporterError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .or(`first_name.ilike.%${reporterName}%,last_name.ilike.%${reporterName}%`)
+            .limit(1)
+            .maybeSingle();
 
-        if (reporterError || !reporterEmployee) {
-          throw new Error(`Reporter Employee ID "${reporterEmployeeId}" not found. Please check the employee ID.`);
+          if (reporterData && !reporterError) {
+            reporterEmployee = reporterData;
+          }
+          // If not found, reporterEmployee remains null (optional field)
         }
 
-        // Look up assigned employee (required)
-        const assignedEmpId = row['Assigned To (Employee ID)'].toString().trim();
-        const { data: assignedEmployee, error: assignedError } = await supabaseAdmin
-          .from('profiles')
-          .select('id, first_name, last_name, employee_id')
-          .eq('employee_id', assignedEmpId)
-          .maybeSingle();
+        // Look up assigned employee by name (serviced by) - optional
+        let assignedEmployee = null;
+        if (row['Serviced by']) {
+          const servicedByName = row['Serviced by'].toString().trim();
+          const { data: assignedData, error: assignedError } = await supabaseAdmin
+            .from('profiles')
+            .select('id, first_name, last_name')
+            .or(`first_name.ilike.%${servicedByName}%,last_name.ilike.%${servicedByName}%`)
+            .limit(1)
+            .maybeSingle();
 
-        if (assignedError || !assignedEmployee) {
-          throw new Error(`Assigned To Employee ID "${assignedEmpId}" not found. Please check the employee ID.`);
+          if (assignedData && !assignedError) {
+            assignedEmployee = assignedData;
+          }
+          // If not found, assignedEmployee remains null (optional field)
         }
 
         // Validate severity
-        const severity = row['Severity'].toString().trim().toLowerCase();
-        if (!['sev1', 'sev2', 'sev3'].includes(severity)) {
-          throw new Error(`Invalid Severity "${row['Severity']}" - Must be sev1, sev2, or sev3`);
+        const severity = row['Sev'].toString().trim().toLowerCase();
+        if (!['sev1', 'sev2', 'sev3', 'sev4'].includes(severity)) {
+          throw new Error(`Invalid Severity "${row['Sev']}" - Must be Sev1, Sev2, Sev3, or Sev4`);
         }
 
-        // Get store by code (with caching)
+        // Get store by code (with caching), create if doesn't exist
         const storeCode = row['Store Code'].toString().trim();
+        const storeName = row['Store Name'] ? row['Store Name'].toString().trim() : storeCode; // Use store code as name if not provided
         const storeCacheKey = storeCode.toUpperCase();
         let storeId: string | null = null;
 
@@ -255,121 +284,320 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             .ilike('store_code', storeCode)
             .maybeSingle();
 
-          if (storeError || !store) {
-            throw new Error(`Store with code "${storeCode}" not found. Please add the store first or check the store code.`);
+          if (storeError && storeError.code !== 'PGRST116') {
+            throw new Error(`Error looking up store "${storeCode}": ${storeError.message}`);
           }
 
-          storeId = store.id;
-          storeCache.set(storeCacheKey, store.id);
+          if (!store) {
+            // Store doesn't exist, create it
+            const { data: newStore, error: createStoreError } = await supabaseAdmin
+              .from('stores')
+              .insert({
+                store_code: storeCode,
+                store_name: storeName,
+                status: 'active'
+              })
+              .select('id')
+              .single();
+
+            if (createStoreError || !newStore) {
+              throw new Error(`Failed to create store "${storeCode}" - ${createStoreError?.message || 'Unknown error'}`);
+            }
+
+            storeId = newStore.id;
+            storeCache.set(storeCacheKey, newStore.id);
+            console.log(`Created new store: ${storeCode} - ${storeName}`);
+
+            // If MOD is provided, create store_managers entry
+            if (row['MOD']) {
+              const modName = row['MOD'].toString().trim();
+              const { error: managerError } = await supabaseAdmin
+                .from('store_managers')
+                .insert({
+                  store_id: newStore.id,
+                  manager_name: modName
+                });
+
+              if (managerError) {
+                console.warn(`Warning: Failed to create manager "${modName}" for store ${storeCode}: ${managerError.message}`);
+              } else {
+                console.log(`Created manager "${modName}" for store ${storeCode}`);
+              }
+            }
+          } else {
+            storeId = store.id;
+            storeCache.set(storeCacheKey, store.id);
+
+            // For existing stores, check if MOD needs to be added
+            if (row['MOD']) {
+              const modName = row['MOD'].toString().trim();
+
+              // Check if this manager already exists for this store
+              const { data: existingManager } = await supabaseAdmin
+                .from('store_managers')
+                .select('id')
+                .eq('store_id', store.id)
+                .ilike('manager_name', modName)
+                .maybeSingle();
+
+              // Only create if manager doesn't exist
+              if (!existingManager) {
+                const { error: managerError } = await supabaseAdmin
+                  .from('store_managers')
+                  .insert({
+                    store_id: store.id,
+                    manager_name: modName
+                  });
+
+                if (managerError) {
+                  console.warn(`Warning: Failed to add manager "${modName}" to existing store ${storeCode}: ${managerError.message}`);
+                } else {
+                  console.log(`Added manager "${modName}" to existing store ${storeCode}`);
+                }
+              }
+            }
+          }
         }
 
         // Try to match device to store inventory and get station from device
-        const deviceString = row['Device'].toString().trim();
         let stationId: string | null = null;
         let deviceMatchedFromInventory = false;
 
-        // Attempt to find device in store inventory by matching the device string
-        const { data: inventoryMatch } = await supabaseAdmin
-          .from('store_inventory')
-          .select(`
-            id,
-            station_id,
-            serial_number,
-            categories(name),
-            brands(name),
-            models(name)
-          `)
-          .eq('store_id', storeId)
-          .limit(100); // Get up to 100 items from this store
+        if (row['Device']) {
+          const deviceString = row['Device'].toString().trim();
 
-        // Try to match device string to inventory
-        if (inventoryMatch && inventoryMatch.length > 0) {
-          for (const item of inventoryMatch) {
-            const categoryName = (item.categories as any)?.name || '';
-            const brandName = (item.brands as any)?.name || '';
-            const modelName = (item.models as any)?.name || '';
-            const serial = item.serial_number || '';
+          // Attempt to find device in store inventory by matching the device string
+          const { data: inventoryMatch } = await supabaseAdmin
+            .from('store_inventory')
+            .select(`
+              id,
+              station_id,
+              serial_number,
+              categories(name),
+              brands(name),
+              models(name)
+            `)
+            .eq('store_id', storeId)
+            .limit(100); // Get up to 100 items from this store
 
-            const inventoryDeviceString = [categoryName, brandName, modelName, serial]
-              .filter(Boolean)
-              .join(' ');
+          // Try to match device string to inventory
+          if (inventoryMatch && inventoryMatch.length > 0) {
+            for (const item of inventoryMatch) {
+              const categoryName = (item.categories as any)?.name || '';
+              const brandName = (item.brands as any)?.name || '';
+              const modelName = (item.models as any)?.name || '';
+              const serial = item.serial_number || '';
 
-            // Check if the device strings match (case insensitive)
-            if (inventoryDeviceString.toLowerCase() === deviceString.toLowerCase()) {
-              stationId = item.station_id;
-              deviceMatchedFromInventory = true;
-              break;
+              const inventoryDeviceString = [categoryName, brandName, modelName, serial]
+                .filter(Boolean)
+                .join(' ');
+
+              // Check if the device strings match (case insensitive)
+              if (inventoryDeviceString.toLowerCase() === deviceString.toLowerCase()) {
+                stationId = item.station_id;
+                deviceMatchedFromInventory = true;
+                break;
+              }
             }
           }
         }
 
-        // If device not found in inventory, fall back to Station Name column
-        if (!stationId) {
-          const stationName = row['Station Name'].toString().trim();
-          const stationCacheKey = stationName.toUpperCase();
+        // If device not found in inventory, fall back to Station column (optional)
+        if (!stationId && row['Station']) {
+          const stationName = row['Station'].toString().trim();
+          if (stationName) {
+            const stationCacheKey = stationName.toUpperCase();
 
-          if (stationCache.has(stationCacheKey)) {
-            stationId = stationCache.get(stationCacheKey)!;
-          } else {
-            const { data: existingStation } = await supabaseAdmin
-              .from('stations')
-              .select('id')
-              .ilike('name', stationName)
-              .maybeSingle();
-
-            if (existingStation) {
-              stationId = existingStation.id;
-              stationCache.set(stationCacheKey, existingStation.id);
+            if (stationCache.has(stationCacheKey)) {
+              stationId = stationCache.get(stationCacheKey)!;
             } else {
-              // Create new station
-              const { data: newStation, error: stationError } = await supabaseAdmin
+              const { data: existingStation } = await supabaseAdmin
                 .from('stations')
-                .insert({ name: stationName })
                 .select('id')
-                .single();
+                .ilike('name', stationName)
+                .maybeSingle();
 
-              if (stationError || !newStation) {
-                throw new Error(`Failed to create station "${stationName}"`);
+              if (existingStation) {
+                stationId = existingStation.id;
+                stationCache.set(stationCacheKey, existingStation.id);
+              } else {
+                // Create new station
+                const { data: newStation, error: stationError } = await supabaseAdmin
+                  .from('stations')
+                  .insert({ name: stationName })
+                  .select('id')
+                  .single();
+
+                if (stationError || !newStation) {
+                  throw new Error(`Failed to create station "${stationName}"`);
+                }
+
+                stationId = newStation.id;
+                stationCache.set(stationCacheKey, newStation.id);
+              }
+            }
+          }
+        }
+
+        // Helper function to safely get optional field value
+        const getOptionalField = (fieldName: keyof ImportRow): string | null => {
+          const value = row[fieldName];
+          return value ? value.toString().trim() : null;
+        };
+
+        // Helper function to parse time fields (handles Date objects, Excel serial numbers, and strings)
+        const parseTime = (timeValue: any): string | null => {
+          if (!timeValue) return null;
+
+          try {
+            // Handle Python time objects (from openpyxl)
+            if (timeValue && typeof timeValue === 'object' && 'hour' in timeValue && 'minute' in timeValue) {
+              let hours = timeValue.hour;
+              const minutes = String(timeValue.minute).padStart(2, '0');
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${minutes} ${ampm}`;
+            }
+
+            if (timeValue instanceof Date) {
+              // JavaScript Date object (datetime or time-only)
+              let hours = timeValue.getHours();
+              const minutes = String(timeValue.getMinutes()).padStart(2, '0');
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${minutes} ${ampm}`;
+            } else if (typeof timeValue === 'number') {
+              // Excel serial number - could be time (0-1) or datetime (>1)
+              let fractionalDay = timeValue;
+
+              // If it's a datetime (>1), extract just the time portion
+              if (timeValue >= 1) {
+                fractionalDay = timeValue - Math.floor(timeValue);
               }
 
-              stationId = newStation.id;
-              stationCache.set(stationCacheKey, newStation.id);
+              const totalMinutes = Math.round(fractionalDay * 24 * 60);
+              let hours = Math.floor(totalMinutes / 60) % 24;
+              const minutes = totalMinutes % 60;
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+            } else if (typeof timeValue === 'string') {
+              const timeString = timeValue.toString().trim();
+              if (!timeString) return null;
+
+              // If it's 24-hour format, convert to 12-hour
+              const time24Match = timeString.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/);
+              if (time24Match) {
+                let hours = parseInt(time24Match[1]);
+                const minutes = time24Match[2];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12 || 12;
+                return `${hours}:${minutes} ${ampm}`;
+              }
+
+              // Check for 12-hour format with AM/PM
+              const time12Match = timeString.match(/^(0?[1-9]|1[0-2]):([0-5][0-9])(:[0-5][0-9])?\s?(AM|PM|am|pm)$/i);
+              if (time12Match) {
+                return timeString; // Already in correct format
+              }
+
+              // If it contains letters (text like "email ETA"), treat as null
+              if (/[a-zA-Z]/.test(timeString)) {
+                console.warn(`Ignoring text value in time field: "${timeString}"`);
+                return null;
+              }
+
+              // Return as-is for other formats
+              return timeString;
             }
-          }
-        }
-
-        // Parse date and time
-        const dateReported = row['Date Reported'];
-        let formattedDate: string;
-
-        if (typeof dateReported === 'number') {
-          // Excel serial date
-          const excelEpoch = new Date(1900, 0, 1);
-          const daysOffset = dateReported > 59 ? dateReported - 2 : dateReported - 1;
-          const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-          const year = jsDate.getFullYear();
-          const month = String(jsDate.getMonth() + 1).padStart(2, '0');
-          const day = String(jsDate.getDate()).padStart(2, '0');
-          formattedDate = `${year}-${month}-${day}`;
-        } else {
-          // String date - validate MM/DD/YYYY format
-          const dateString = dateReported.toString().trim();
-          const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
-
-          if (!dateRegex.test(dateString)) {
-            throw new Error('Date Reported must be in MM/DD/YYYY format (e.g., 01/15/2024)');
+          } catch (error) {
+            console.warn(`Failed to parse time value:`, timeValue, error);
+            return null;
           }
 
-          const [month, day, year] = dateString.split('/');
-          formattedDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          return null;
+        };
+
+        // Helper function to parse date fields (handles Date objects, Excel serial numbers, and strings)
+        const parseDate = (dateValue: any): string | null => {
+          if (!dateValue) return null;
+
+          try {
+            if (dateValue instanceof Date) {
+              // JavaScript Date object
+              const year = dateValue.getFullYear();
+              const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+              const day = String(dateValue.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            } else if (typeof dateValue === 'number') {
+              // Excel serial date
+              const excelEpoch = new Date(1900, 0, 1);
+              const daysOffset = dateValue > 59 ? dateValue - 2 : dateValue - 1;
+              const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+              const year = jsDate.getFullYear();
+              const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+              const day = String(jsDate.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            } else if (typeof dateValue === 'string') {
+              // String date - validate MM/DD/YYYY format
+              const dateString = dateValue.toString().trim();
+
+              // If it contains letters (text), treat as null
+              if (/[a-zA-Z]/.test(dateString)) {
+                console.warn(`Ignoring text value in date field: "${dateString}"`);
+                return null;
+              }
+
+              const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+              if (dateRegex.test(dateString)) {
+                const [month, day, year] = dateString.split('/');
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+
+              // Return null for invalid formats
+              return null;
+            }
+          } catch (error) {
+            console.warn(`Failed to parse date value:`, dateValue, error);
+            return null;
+          }
+
+          return null;
+        };
+
+        // Parse date and time (Date Reported is now optional)
+        const formattedDate = parseDate(row['Date Reported']);
+
+        // Check if Date Reported contains text (invalid)
+        const dateReportedHasText = row['Date Reported'] && typeof row['Date Reported'] === 'string' && /[a-zA-Z]/.test(row['Date Reported'].toString().trim());
+
+        // Skip this row if Date Reported contains text or is invalid
+        if (dateReportedHasText || (row['Date Reported'] && !formattedDate)) {
+          console.log(`Skipping row ${rowNumber}: Date Reported contains invalid/text value "${row['Date Reported']}"`);
+          continue; // Skip this row, don't count as success or failure
         }
 
-        // Parse time (HH:MM AM/PM format)
-        const timeReported = row['Time Reported'].toString().trim();
-        const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM|am|pm)$/i;
+        // Parse time (HH:MM AM/PM format) - optional
+        let timeReported = null;
+        if (row['Time Reported']) {
+          const timeValue = row['Time Reported'];
 
-        if (!timeRegex.test(timeReported)) {
-          throw new Error('Time Reported must be in HH:MM AM/PM format (e.g., 09:30 AM)');
+          if (timeValue instanceof Date) {
+            // JavaScript Date object (from XLSX parsing)
+            let hours = timeValue.getHours();
+            const minutes = String(timeValue.getMinutes()).padStart(2, '0');
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12 || 12; // Convert to 12-hour format
+            timeReported = `${hours}:${minutes} ${ampm}`;
+          } else {
+            const timeStr = timeValue.toString().trim();
+            const timeRegex = /^(0?[1-9]|1[0-2]):[0-5][0-9]\s?(AM|PM|am|pm)$/i;
+
+            if (!timeRegex.test(timeStr)) {
+              throw new Error('Time Reported must be in HH:MM AM/PM format (e.g., 09:30 AM)');
+            }
+            timeReported = timeStr;
+          }
         }
 
         // Get manager on duty for the store (with caching)
@@ -391,24 +619,169 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           managerCache.set(storeId!, modId);
         }
 
-        // Insert ticket
+        // Helper function to safely get optional field value
+        const getOptionalField = (fieldName: keyof ImportRow): string | null => {
+          const value = row[fieldName];
+          return value ? value.toString().trim() : null;
+        };
+
+        // Helper function to parse time fields (handles Date objects, Excel serial numbers, and strings)
+        const parseTime = (timeValue: any): string | null => {
+          if (!timeValue) return null;
+
+          try {
+            // Handle Python time objects (from openpyxl)
+            if (timeValue && typeof timeValue === 'object' && 'hour' in timeValue && 'minute' in timeValue) {
+              let hours = timeValue.hour;
+              const minutes = String(timeValue.minute).padStart(2, '0');
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${minutes} ${ampm}`;
+            }
+
+            if (timeValue instanceof Date) {
+              // JavaScript Date object (datetime or time-only)
+              let hours = timeValue.getHours();
+              const minutes = String(timeValue.getMinutes()).padStart(2, '0');
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${minutes} ${ampm}`;
+            } else if (typeof timeValue === 'number') {
+              // Excel serial number - could be time (0-1) or datetime (>1)
+              let fractionalDay = timeValue;
+
+              // If it's a datetime (>1), extract just the time portion
+              if (timeValue >= 1) {
+                fractionalDay = timeValue - Math.floor(timeValue);
+              }
+
+              const totalMinutes = Math.round(fractionalDay * 24 * 60);
+              let hours = Math.floor(totalMinutes / 60) % 24;
+              const minutes = totalMinutes % 60;
+              const ampm = hours >= 12 ? 'PM' : 'AM';
+              hours = hours % 12 || 12;
+              return `${hours}:${String(minutes).padStart(2, '0')} ${ampm}`;
+            } else if (typeof timeValue === 'string') {
+              const timeString = timeValue.toString().trim();
+              if (!timeString) return null;
+
+              // If it's 24-hour format, convert to 12-hour
+              const time24Match = timeString.match(/^([0-1]?[0-9]|2[0-3]):([0-5][0-9])(:[0-5][0-9])?$/);
+              if (time24Match) {
+                let hours = parseInt(time24Match[1]);
+                const minutes = time24Match[2];
+                const ampm = hours >= 12 ? 'PM' : 'AM';
+                hours = hours % 12 || 12;
+                return `${hours}:${minutes} ${ampm}`;
+              }
+
+              // Check for 12-hour format with AM/PM
+              const time12Match = timeString.match(/^(0?[1-9]|1[0-2]):([0-5][0-9])(:[0-5][0-9])?\s?(AM|PM|am|pm)$/i);
+              if (time12Match) {
+                return timeString; // Already in correct format
+              }
+
+              // If it contains letters (text like "email ETA"), treat as null
+              if (/[a-zA-Z]/.test(timeString)) {
+                console.warn(`Ignoring text value in time field: "${timeString}"`);
+                return null;
+              }
+
+              // Return as-is for other formats
+              return timeString;
+            }
+          } catch (error) {
+            console.warn(`Failed to parse time value:`, timeValue, error);
+            return null;
+          }
+
+          return null;
+        };
+
+        // Helper function to parse date fields (handles Date objects, Excel serial numbers, and strings)
+        const parseDate = (dateValue: any): string | null => {
+          if (!dateValue) return null;
+
+          try {
+            if (dateValue instanceof Date) {
+              // JavaScript Date object
+              const year = dateValue.getFullYear();
+              const month = String(dateValue.getMonth() + 1).padStart(2, '0');
+              const day = String(dateValue.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            } else if (typeof dateValue === 'number') {
+              // Excel serial date
+              const excelEpoch = new Date(1900, 0, 1);
+              const daysOffset = dateValue > 59 ? dateValue - 2 : dateValue - 1;
+              const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+              const year = jsDate.getFullYear();
+              const month = String(jsDate.getMonth() + 1).padStart(2, '0');
+              const day = String(jsDate.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            } else if (typeof dateValue === 'string') {
+              // String date - validate MM/DD/YYYY format
+              const dateString = dateValue.toString().trim();
+
+              // If it contains letters (text), treat as null
+              if (/[a-zA-Z]/.test(dateString)) {
+                console.warn(`Ignoring text value in date field: "${dateString}"`);
+                return null;
+              }
+
+              const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+              if (dateRegex.test(dateString)) {
+                const [month, day, year] = dateString.split('/');
+                return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              }
+
+              // Return null for invalid formats
+              return null;
+            }
+          } catch (error) {
+            console.warn(`Failed to parse date value:`, dateValue, error);
+            return null;
+          }
+
+          return null;
+        };
+
+        // Insert ticket with all fields from Excel template
         const { error: ticketError } = await supabaseAdmin
           .from('tickets')
           .insert({
             store_id: storeId,
             station_id: stationId,
-            mod_id: modId, // Manager on duty (auto-fetched from store)
+            mod_id: modId,
             rcc_reference_number: row['RCC Reference Number'].toString().trim(),
             date_reported: formattedDate,
             time_reported: timeReported,
-            request_type: row['Request Type'].toString().trim(),
-            device: row['Device'].toString().trim(),
-            problem_category: row['Problem Category'].toString().trim(),
+            date_responded: parseDate(row['Date Responded']),
+            time_responded: parseTime(row['Time Responded']),
+            request_type: getOptionalField('Request type'),
+            device: getOptionalField('Device'),
+            problem_category: getOptionalField('Problem Category'),
             sev: severity,
             request_detail: row['Request Detail'].toString().trim(),
-            reported_by: reporterEmployee.id, // Use the profile UUID (same as created_by)
-            serviced_by: assignedEmployee.id, // Assigned technician/engineer (required)
-            status: 'open', // Default status
+            action_taken: getOptionalField('----- Action Taken -----'),
+            final_resolution: getOptionalField('Final resolution'),
+            status: getOptionalField('Status')?.toLowerCase() || 'open',
+            parts_replaced: getOptionalField('Part/s replaced'),
+            new_parts_serial: getOptionalField('New Parts Serial'),
+            old_parts_serial: getOptionalField('Old Parts Serial'),
+            date_ack: parseDate(row['Date Ack']),
+            time_ack: parseTime(row['Time Ack']),
+            date_attended: parseDate(row['Date Attended']),
+            store_arrival: parseTime(row['Store Arrival']),
+            work_start: parseTime(row['Work Start']),
+            pause_time_start: parseTime(row['Pause Time\n(Start)']),
+            pause_time_end: parseTime(row['Pause Time\n(End)']),
+            work_end: parseTime(row['Work End']),
+            date_resolved: parseDate(row['Date Resolved']),
+            sla_count_hrs: getOptionalField('SLA Count\n(Hrs)') ? parseFloat(getOptionalField('SLA Count\n(Hrs)')!) : null,
+            downtime: getOptionalField('Downtime'),
+            sla_status: getOptionalField('SLA Status'),
+            reported_by: reporterEmployee?.id || null,
+            serviced_by: assignedEmployee?.id || null,
           });
 
         if (ticketError) {
