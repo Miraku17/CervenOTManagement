@@ -473,7 +473,7 @@ export default function DashboardPage() {
                               </span>
                             </td>
                             <td className="py-3 px-4">
-                              <span className={`px-2 py-1 rounded-lg text-xs font-semibold ${statusColor}`}>
+                              <span className={`px-2 py-1 rounded-lg text-xs font-semibold whitespace-nowrap ${statusColor}`}>
                                 {ticket.status?.replace(/_/g, ' ') || 'N/A'}
                               </span>
                             </td>
