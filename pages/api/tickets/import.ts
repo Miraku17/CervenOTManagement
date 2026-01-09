@@ -627,7 +627,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         let timeReported = null;
         if (row['Time Reported']) {
-          const timeValue = row['Time Reported'];
+          const timeValue: any = row['Time Reported'];
           if (timeValue instanceof Date) {
             let hours = timeValue.getHours();
             const minutes = String(timeValue.getMinutes()).padStart(2, '0');
