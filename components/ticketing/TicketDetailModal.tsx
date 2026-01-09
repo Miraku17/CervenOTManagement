@@ -218,12 +218,12 @@ interface LabelValueProps {
 }
 
 const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-  <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-5 mb-4">
-    <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-800">
+  <div className="bg-slate-950/50 border border-slate-800 rounded-xl p-3 sm:p-5 mb-4">
+    <div className="flex items-center gap-2 mb-3 sm:mb-4 pb-2 border-b border-slate-800">
       <Icon size={18} className="text-blue-400" />
       <h3 className="font-semibold text-slate-200">{title}</h3>
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-4 gap-x-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-y-3 sm:gap-y-4 gap-x-4 sm:gap-x-6">
       {children}
     </div>
   </div>
@@ -788,13 +788,13 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-2 sm:p-4 animate-in fade-in duration-200" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>
+      <div className="bg-slate-900 border border-slate-800 rounded-xl sm:rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col max-h-[95vh] sm:max-h-[90vh] animate-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-slate-800 bg-slate-900 sticky top-0 rounded-t-2xl z-10">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
+        <div className="flex flex-col sm:flex-row items-start justify-between p-4 sm:p-6 gap-4 sm:gap-0 border-b border-slate-800 bg-slate-900 sticky top-0 rounded-t-xl sm:rounded-t-2xl z-10">
+          <div className="w-full sm:w-auto">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               {isEditMode ? (
                 <div className="relative" ref={statusDropdownRef}>
                   <button
@@ -841,12 +841,12 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 {ticket.sev} Priority
               </span>
             </div>
-            <h2 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3 flex-wrap">
               {ticket.request_type}
-              <span className="text-slate-500 text-lg font-normal">#{ticket.rcc_reference_number}</span>
+              <span className="text-slate-500 text-base sm:text-lg font-normal">#{ticket.rcc_reference_number}</span>
             </h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-end sm:self-auto w-full sm:w-auto justify-end">
             {canEdit && !isEditMode && (
               <button
                 onClick={() => setIsEditMode(true)}
@@ -878,7 +878,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         </div>
 
         {/* Content */}
-        <div className="p-6 overflow-y-auto custom-scrollbar">
+        <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar">
           
           <DetailSection title="General Information" icon={FileText}>
             <LabelValue label="RCC Reference" value={ticket.rcc_reference_number} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
@@ -1227,13 +1227,13 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-900 rounded-b-2xl flex justify-end gap-3">
+        <div className="p-4 border-t border-slate-800 bg-slate-900 rounded-b-xl sm:rounded-b-2xl flex flex-col-reverse sm:flex-row justify-end gap-3">
           {isEditMode ? (
             <>
               <button
                 onClick={handleCancelEdit}
                 disabled={isSaving}
-                className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 <XCircle size={18} />
                 Cancel
@@ -1241,7 +1241,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               <button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium flex items-center gap-2 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2 bg-green-600 hover:bg-green-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2 disabled:opacity-50"
               >
                 {isSaving ? (
                   <>
@@ -1259,7 +1259,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           ) : (
             <button
               onClick={onClose}
-              className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
+              className="w-full sm:w-auto px-6 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors font-medium"
             >
               Close
             </button>
