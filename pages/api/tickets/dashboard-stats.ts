@@ -23,6 +23,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Check if user has manage_tickets permission
+    const hasManageTickets = await userHasPermission(req.user.id, 'manage_tickets');
+
     // Fetch all active/relevant tickets to process in memory or use multiple queries
     // specialized queries are better for performance but raw data might be easier for complex logic
     // Let's do a mix.
@@ -35,10 +42,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     let moreData = true;
 
     while (moreData) {
-      const { data, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('tickets')
         .select('id, status, sev, problem_category, serviced_by, sla_status, created_at')
         .range(from, to);
+
+      // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+      if (!hasManageTickets) {
+        query = query.eq('serviced_by', req.user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -60,6 +74,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       dueToday: 0,
       open: 0,
       onHold: 0,
+      inProgress: 0,
       unassigned: 0,
       total: allTickets.length,
       byPriority: [] as { name: string; value: number; color: string }[],
@@ -69,7 +84,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Helper to normalize status
     const isUnresolved = (status: string) => !['closed', 'resolved'].includes(status?.toLowerCase());
-    const isOpen = (status: string) => ['open', 'new', 'in progress', 'pending'].includes(status?.toLowerCase());
+    const isOpen = (status: string) => status?.toLowerCase() === 'open';
 
     const priorityMap = new Map<string, number>();
     // Initialize with expected priorities
@@ -102,6 +117,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       // On Hold
       if (status === 'on hold' || status === 'on_hold') {
         stats.onHold++;
+      }
+
+      // In Progress
+      if (status === 'in progress' || status === 'in_progress') {
+        stats.inProgress++;
       }
 
       // Unassigned

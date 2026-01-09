@@ -26,6 +26,7 @@ interface DashboardStats {
   dueToday: number;
   open: number;
   onHold: number;
+  inProgress: number;
   unassigned: number;
   total: number;
   byPriority: { name: string; value: number; color: string }[];
@@ -156,7 +157,7 @@ export default function DashboardPage() {
         setModalTitle('Unassigned Tickets');
         break;
       case 'total':
-        setModalTitle('All Tickets');
+        setModalTitle('In Progress Tickets');
         break;
     }
   };
@@ -178,7 +179,7 @@ export default function DashboardPage() {
       case 'open':
         filteredTickets = allTickets.filter((t: any) => {
           const status = t.status?.toLowerCase();
-          return ['open', 'in_progress'].includes(status);
+          return status === 'open';
         });
         break;
       case 'on_hold':
@@ -194,7 +195,11 @@ export default function DashboardPage() {
         });
         break;
       case 'total':
-        // No filtering needed
+        // Filter for in-progress tickets only
+        filteredTickets = allTickets.filter((t: any) => {
+          const status = t.status?.toLowerCase();
+          return status === 'in_progress' || status === 'in progress';
+        });
         break;
     }
 
@@ -290,8 +295,8 @@ export default function DashboardPage() {
           onClick={() => handleStatCardClick('unassigned')}
         />
         <StatCard
-          title="All Tickets"
-          value={stats.total}
+          title="In Progress Tickets"
+          value={stats.inProgress}
           icon={Files}
           iconBgColor="bg-indigo-900/20"
           iconColor="text-indigo-400"

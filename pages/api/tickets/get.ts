@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -16,6 +17,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (!req.user?.id) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
+
+    // Check if user has manage_tickets permission
+    const hasManageTickets = await userHasPermission(req.user.id, 'manage_tickets');
 
     // Get pagination params
     const page = parseInt(req.query.page as string) || 1;
@@ -34,8 +38,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .from('tickets')
       .select('*', { count: 'exact', head: true });
 
-    // If user is not admin, filter by tickets they are servicing
-    if (req.user.role !== 'admin') {
+    // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+    if (!hasManageTickets) {
       countQuery = countQuery.eq('serviced_by', req.user.id);
     }
 
@@ -93,8 +97,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .range(from, to)
       .order('created_at', { ascending: false });
 
-    // If user is not admin, filter by tickets they are servicing
-    if (req.user.role !== 'admin') {
+    // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+    if (!hasManageTickets) {
       query = query.eq('serviced_by', req.user.id);
     }
 

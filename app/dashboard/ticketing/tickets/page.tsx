@@ -185,8 +185,9 @@ export default function TicketsPage() {
     }
   }, [user?.id]);
 
-  const canCreateTicket = userPosition !== 'Field Engineer';
-  const canDeleteTicket = userPosition === 'Operations Manager';
+  // Permission checks
+  const canCreateTicket = hasPermission('manage_tickets') && userPosition !== 'Field Engineer';
+  const canDeleteTicket = hasPermission('manage_tickets') && userPosition === 'Operations Manager';
 
   // Toast helper function
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, description?: string, details?: string[]) => {
@@ -469,7 +470,11 @@ export default function TicketsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Tickets Management</h1>
-          <p className="text-slate-400">{isAdmin ? 'Manage and track all support tickets.' : 'View tickets assigned to you.'}</p>
+          <p className="text-slate-400">
+            {hasPermission('manage_tickets')
+              ? 'Manage and track all support tickets.'
+              : 'View tickets assigned to you.'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
           {canCreateTicket && (
@@ -482,7 +487,7 @@ export default function TicketsPage() {
             </button>
           )}
 
-          <div className="relative" ref={actionsDropdownRef}>
+          {/* <div className="relative" ref={actionsDropdownRef}>
             <button
               onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
@@ -543,7 +548,7 @@ export default function TicketsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -584,8 +589,8 @@ export default function TicketsPage() {
           </div>
         </div>
 
-        {/* Date Range Filter */}
-        <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+        {/* Temporarily commented out - Date Range Filter */}
+        {/* <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
             <Calendar size={18} className="flex-shrink-0 text-white" />
             <span className="text-sm font-medium whitespace-nowrap">Date Range:</span>
@@ -623,7 +628,7 @@ export default function TicketsPage() {
               </button>
             )}
           </div>
-        </div>
+        </div> */}
       </div>
 
 
@@ -817,8 +822,8 @@ export default function TicketsPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
+      {/* Temporarily commented out - Delete Confirmation Modal */}
+      {/* {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
@@ -873,7 +878,7 @@ export default function TicketsPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
