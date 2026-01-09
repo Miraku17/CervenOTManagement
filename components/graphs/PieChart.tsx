@@ -1,52 +1,127 @@
-import React from 'react';
+"use client"
 
-const MOCK_DATA = [
-  { name: 'Engineering', value: 400, color: '#3b82f6' },
-  { name: 'Management', value: 300, color: '#10b981' },
-  { name: 'Design', value: 300, color: '#f97316' },
-  { name: 'QA', value: 200, color: '#ef4444' },
-];
+import * as React from "react"
+import { TrendingUp } from "lucide-react"
+import { Label, Pie, PieChart } from "recharts"
 
-const PieChart: React.FC = () => {
-  const total = MOCK_DATA.reduce((acc, data) => acc + data.value, 0);
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import {
+  ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart"
 
-  let cumulative = 0;
-  const pieSlices = MOCK_DATA.map((data) => {
-    const percentage = (data.value / total) * 100;
-    const startAngle = (cumulative / total) * 360;
-    const endAngle = ((cumulative + data.value) / total) * 360;
-    cumulative += data.value;
+const chartData = [
+  { browser: "chrome", visitors: 275, fill: "var(--color-chrome)" },
+  { browser: "safari", visitors: 200, fill: "var(--color-safari)" },
+  { browser: "firefox", visitors: 287, fill: "var(--color-firefox)" },
+  { browser: "edge", visitors: 173, fill: "var(--color-edge)" },
+  { browser: "other", visitors: 190, fill: "var(--color-other)" },
+]
 
-    const largeArcFlag = percentage > 50 ? 1 : 0;
-    const x1 = 50 + 40 * Math.cos((Math.PI / 180) * startAngle);
-    const y1 = 50 + 40 * Math.sin((Math.PI / 180) * startAngle);
-    const x2 = 50 + 40 * Math.cos((Math.PI / 180) * endAngle);
-    const y2 = 50 + 40 * Math.sin((Math.PI / 180) * endAngle);
+const chartConfig = {
+  visitors: {
+    label: "Visitors",
+  },
+  chrome: {
+    label: "Chrome",
+    color: "hsl(var(--chart-1))",
+  },
+  safari: {
+    label: "Safari",
+    color: "hsl(var(--chart-2))",
+  },
+  firefox: {
+    label: "Firefox",
+    color: "hsl(var(--chart-3))",
+  },
+  edge: {
+    label: "Edge",
+    color: "hsl(var(--chart-4))",
+  },
+  other: {
+    label: "Other",
+    color: "hsl(var(--chart-5))",
+  },
+} satisfies ChartConfig
 
-    return <path key={data.name} d={`M 50,50 L ${x1},${y1} A 40,40 0 ${largeArcFlag},1 ${x2},${y2} Z`} fill={data.color} />;
-  });
+export function Component() {
+  const totalVisitors = React.useMemo(() => {
+    return chartData.reduce((acc, curr) => acc + curr.visitors, 0)
+  }, [])
 
   return (
-    <div className="bg-slate-800 p-6 rounded-2xl shadow-xl">
-      <h3 className="text-lg font-bold mb-4">Department Distribution</h3>
-      <div className="flex items-center">
-        <svg viewBox="0 0 100 100" className="w-40 h-40">
-          {pieSlices}
-        </svg>
-        <div className="ml-8 space-y-2">
-          {MOCK_DATA.map((data) => (
-            <div key={data.name} className="flex items-center">
-              <div
-                className="w-4 h-4 rounded-full mr-2"
-                style={{ backgroundColor: data.color }}
+    <Card className="flex flex-col">
+      <CardHeader className="items-center pb-0">
+        <CardTitle>Pie Chart - Donut with Text</CardTitle>
+        <CardDescription>January - June 2024</CardDescription>
+      </CardHeader>
+      <CardContent className="flex-1 pb-0">
+        <ChartContainer
+          config={chartConfig}
+          className="mx-auto aspect-square max-h-[250px]"
+        >
+          <PieChart>
+            <ChartTooltip
+              cursor={false}
+              content={<ChartTooltipContent hideLabel />}
+            />
+            <Pie
+              data={chartData}
+              dataKey="visitors"
+              nameKey="browser"
+              innerRadius={60}
+              strokeWidth={5}
+            >
+              <Label
+                content={({ viewBox }) => {
+                  if (viewBox && "cx" in viewBox && "cy" in viewBox) {
+                    return (
+                      <text
+                        x={viewBox.cx}
+                        y={viewBox.cy}
+                        textAnchor="middle"
+                        dominantBaseline="middle"
+                      >
+                        <tspan
+                          x={viewBox.cx}
+                          y={viewBox.cy}
+                          className="fill-foreground text-3xl font-bold"
+                        >
+                          {totalVisitors.toLocaleString()}
+                        </tspan>
+                        <tspan
+                          x={viewBox.cx}
+                          y={(viewBox.cy || 0) + 24}
+                          className="fill-muted-foreground"
+                        >
+                          Visitors
+                        </tspan>
+                      </text>
+                    )
+                  }
+                }}
               />
-              <p className="text-sm">{data.name}</p>
-            </div>
-          ))}
+            </Pie>
+          </PieChart>
+        </ChartContainer>
+      </CardContent>
+      <CardFooter className="flex-col gap-2 text-sm">
+        <div className="flex items-center gap-2 font-medium leading-none">
+          Trending up by 5.2% <TrendingUp className="h-4 w-4" />
         </div>
-      </div>
-    </div>
-  );
-};
-
-export default PieChart;
+        <div className="leading-none text-muted-foreground">
+          Showing total visitors for the last 6 months
+        </div>
+      </CardFooter>
+    </Card>
+  )
+}

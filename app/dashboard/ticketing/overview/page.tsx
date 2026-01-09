@@ -361,7 +361,7 @@ export default function TicketOverviewPage() {
     }
   };
 
-  const handleStatCardClick = async (type: 'total' | 'critical' | 'category' | 'store') => {
+  const handleStatCardClick = async (type: 'total' | 'top_sev' | 'category' | 'store') => {
     setLoadingModal(true);
     setShowModal(true);
 
@@ -385,9 +385,16 @@ export default function TicketOverviewPage() {
           title = 'All Tickets';
           // No filtering needed
           break;
-        case 'critical':
-          title = 'Critical Tickets (SEV3)';
-          filteredTickets = filteredTickets.filter((t: any) => t.sev?.toUpperCase() === 'SEV3');
+        case 'top_sev':
+          // Find the top severity dynamically
+          const topSev = stats?.bySeverity.reduce((prev, current) =>
+            (current.count > prev.count) ? current : prev,
+            stats.bySeverity[0] || { severity: 'N/A', count: 0 }
+          );
+          if (topSev) {
+            title = `Top Severity Tickets (${topSev.severity.toUpperCase()})`;
+            filteredTickets = filteredTickets.filter((t: any) => t.sev?.toUpperCase() === topSev.severity.toUpperCase());
+          }
           break;
         case 'category':
           const topCategory = stats?.byProblemCategory[0];
@@ -495,7 +502,7 @@ export default function TicketOverviewPage() {
   const severityData = stats.bySeverity.map(item => ({
     name: item.severity,
     value: item.count,
-    color: item.severity.toUpperCase() === 'SEV3' ? '#ef4444' : item.severity.toUpperCase() === 'SEV2' ? '#f59e0b' : '#3b82f6'
+    color: item.severity.toUpperCase() === 'SEV1' ? '#ef4444' : item.severity.toUpperCase() === 'SEV2' ? '#f59e0b' : '#3b82f6'
   }));
 
   const problemCategoryData = stats.byProblemCategory.slice(0, 8).map((item, index) => ({
@@ -505,9 +512,13 @@ export default function TicketOverviewPage() {
   }));
 
   // Calculate Summary Stats (case-insensitive)
-  const criticalCount = stats.bySeverity.find(s => s.severity.toUpperCase() === 'SEV3')?.count || 0;
-  const criticalPercentage = stats.total > 0 ? ((criticalCount / stats.total) * 100).toFixed(1) : '0';
-  
+  // Find the top severity (the one with the highest count)
+  const topSeverity = stats.bySeverity.reduce((prev, current) =>
+    (current.count > prev.count) ? current : prev,
+    stats.bySeverity[0] || { severity: 'N/A', count: 0 }
+  );
+  const topSevPercentage = stats.total > 0 ? ((topSeverity.count / stats.total) * 100).toFixed(1) : '0';
+
   const topCategory = stats.byProblemCategory[0];
   const topStore = stats.byStore[0];
 
@@ -592,12 +603,12 @@ export default function TicketOverviewPage() {
           onClick={() => handleStatCardClick('total')}
         />
         <StatCard
-          title="Critical (SEV3)"
-          value={criticalCount.toString()}
-          change={`${criticalPercentage}% of total`}
+          title={`Top SEV (${topSeverity.severity.toUpperCase()})`}
+          value={topSeverity.count.toString()}
+          change={`${topSevPercentage}% of total`}
           icon={<AlertTriangle />}
           color="rose"
-          onClick={() => handleStatCardClick('critical')}
+          onClick={() => handleStatCardClick('top_sev')}
         />
         <StatCard
           title="Top Category"
@@ -869,7 +880,7 @@ export default function TicketOverviewPage() {
                           ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
                           : 'Unassigned';
 
-                        const sevColor = ticket.sev?.toUpperCase() === 'SEV3' ? 'text-red-400 bg-red-500/10' :
+                        const sevColor = ticket.sev?.toUpperCase() === 'SEV1' ? 'text-red-400 bg-red-500/10' :
                                         ticket.sev?.toUpperCase() === 'SEV2' ? 'text-amber-400 bg-amber-500/10' :
                                         'text-blue-400 bg-blue-500/10';
 

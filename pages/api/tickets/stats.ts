@@ -26,31 +26,52 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get date range from query params
     const { startDate, endDate } = req.query;
 
-    // Build query with date filtering
-    let query = supabaseAdmin
-      .from('tickets')
-      .select(`
-        id,
-        sev,
-        problem_category,
-        date_reported,
-        stores(store_name),
-        serviced_by_user:serviced_by(first_name, last_name)
-      `);
+    // Fetch all tickets using pagination to bypass the 1000 row limit
+    let allTickets: any[] = [];
+    const PAGE_SIZE = 1000;
+    let from = 0;
+    let to = PAGE_SIZE - 1;
+    let moreData = true;
 
-    // Apply date filters if provided
-    if (startDate && typeof startDate === 'string') {
-      query = query.gte('date_reported', startDate);
-    }
-    if (endDate && typeof endDate === 'string') {
-      query = query.lte('date_reported', endDate);
+    while (moreData) {
+      let query = supabaseAdmin
+        .from('tickets')
+        .select(`
+          id,
+          sev,
+          problem_category,
+          date_reported,
+          stores(store_name),
+          serviced_by_user:serviced_by(first_name, last_name)
+        `)
+        .range(from, to);
+
+      // Apply date filters if provided
+      if (startDate && typeof startDate === 'string') {
+        query = query.gte('date_reported', startDate);
+      }
+      if (endDate && typeof endDate === 'string') {
+        query = query.lte('date_reported', endDate);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        allTickets = allTickets.concat(data);
+        if (data.length < PAGE_SIZE) {
+          moreData = false;
+        } else {
+          from += PAGE_SIZE;
+          to += PAGE_SIZE;
+        }
+      } else {
+        moreData = false;
+      }
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      throw error;
-    }
+    const data = allTickets;
 
     if (!data) {
       return res.status(200).json({
@@ -124,4 +145,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);
