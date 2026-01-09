@@ -70,8 +70,33 @@ interface TicketsResponse {
   };
 }
 
-const fetchTickets = async (page: number, limit: number): Promise<TicketsResponse> => {
-  const response = await fetch(`/api/tickets/get?page=${page}&limit=${limit}`);
+const fetchTickets = async (
+  page: number,
+  limit: number,
+  statusFilter?: string,
+  searchTerm?: string,
+  startDate?: string,
+  endDate?: string
+): Promise<TicketsResponse> => {
+  const params = new URLSearchParams({
+    page: page.toString(),
+    limit: limit.toString(),
+  });
+
+  if (statusFilter && statusFilter !== 'all') {
+    params.append('status', statusFilter);
+  }
+  if (searchTerm) {
+    params.append('search', searchTerm);
+  }
+  if (startDate) {
+    params.append('startDate', startDate);
+  }
+  if (endDate) {
+    params.append('endDate', endDate);
+  }
+
+  const response = await fetch(`/api/tickets/get?${params.toString()}`);
   if (!response.ok) {
     throw new Error('Failed to fetch tickets');
   }
@@ -112,11 +137,16 @@ export default function TicketsPage() {
 
   // Fetch tickets with TanStack Query
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tickets', currentPage, showAll ? 999999 : pageLimit],
-    queryFn: () => fetchTickets(currentPage, showAll ? 999999 : pageLimit),
+    queryKey: ['tickets', currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate],
+    queryFn: () => fetchTickets(currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
+
+  // Reset to page 1 when filters change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, searchTerm, startDate, endDate]);
 
   // Check user role using useEffect
   React.useEffect(() => {
@@ -155,8 +185,9 @@ export default function TicketsPage() {
     }
   }, [user?.id]);
 
-  const canCreateTicket = userPosition !== 'Field Engineer';
-  const canDeleteTicket = userPosition === 'Operations Manager';
+  // Permission checks
+  const canCreateTicket = hasPermission('manage_tickets') && userPosition !== 'Field Engineer';
+  const canDeleteTicket = hasPermission('manage_tickets') && userPosition === 'Operations Manager';
 
   // Toast helper function
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, description?: string, details?: string[]) => {
@@ -343,24 +374,8 @@ export default function TicketsPage() {
     }
   };
 
-  // Client-side filtering of tickets
+  // Filtering is now done server-side, just sort client-side
   const filteredTickets = (data?.tickets || [])
-    .filter(ticket => {
-      const matchesSearch =
-        ticket.rcc_reference_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.stores?.store_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.request_type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        ticket.device?.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const normalizedTicketStatus = ticket.status.toLowerCase().replace(/_/g, ' ');
-      const matchesStatus = statusFilter === 'all' || normalizedTicketStatus === statusFilter.toLowerCase();
-
-      const ticketDate = new Date(ticket.date_reported);
-      const matchesStartDate = !startDate || ticketDate >= new Date(startDate);
-      const matchesEndDate = !endDate || ticketDate <= new Date(endDate);
-
-      return matchesSearch && matchesStatus && matchesStartDate && matchesEndDate;
-    })
     .sort((a, b) => {
       const dateA = new Date(`${a.date_reported}T${a.time_reported}`);
       const dateB = new Date(`${b.date_reported}T${b.time_reported}`);
@@ -368,7 +383,7 @@ export default function TicketsPage() {
     });
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase().replace(/_/g, ' ')) {
+    switch ((status || '').toLowerCase().replace(/_/g, ' ')) {
       case 'open': return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
       case 'in progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
       case 'on hold': return 'bg-orange-500/20 text-orange-400 border-orange-500/20';
@@ -455,7 +470,11 @@ export default function TicketsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Tickets Management</h1>
-          <p className="text-slate-400">{isAdmin ? 'Manage and track all support tickets.' : 'View tickets assigned to you.'}</p>
+          <p className="text-slate-400">
+            {hasPermission('manage_tickets')
+              ? 'Manage and track all support tickets.'
+              : 'View tickets assigned to you.'}
+          </p>
         </div>
         <div className="flex flex-wrap gap-3">
           {canCreateTicket && (
@@ -468,7 +487,7 @@ export default function TicketsPage() {
             </button>
           )}
 
-          <div className="relative" ref={actionsDropdownRef}>
+          {/* <div className="relative" ref={actionsDropdownRef}>
             <button
               onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
@@ -529,7 +548,7 @@ export default function TicketsPage() {
                 </div>
               </div>
             )}
-          </div>
+          </div> */}
         </div>
       </div>
 
@@ -570,8 +589,8 @@ export default function TicketsPage() {
           </div>
         </div>
 
-        {/* Date Range Filter */}
-        <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+        {/* Temporarily commented out - Date Range Filter */}
+        {/* <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
           <div className="flex items-center gap-2 text-slate-400">
             <Calendar size={18} className="flex-shrink-0 text-white" />
             <span className="text-sm font-medium whitespace-nowrap">Date Range:</span>
@@ -609,7 +628,7 @@ export default function TicketsPage() {
               </button>
             )}
           </div>
-        </div>
+        </div> */}
       </div>
 
 
@@ -803,8 +822,8 @@ export default function TicketsPage() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
-      {isDeleteModalOpen && (
+      {/* Temporarily commented out - Delete Confirmation Modal */}
+      {/* {isDeleteModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
@@ -859,7 +878,7 @@ export default function TicketsPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onClose={removeToast} />

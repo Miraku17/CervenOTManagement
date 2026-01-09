@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Calendar, Clock, MapPin, Monitor, AlertTriangle, User, FileText, CheckCircle, Box, Activity, Timer, Edit2, Save, XCircle, ChevronDown, ExternalLink, Image as ImageIcon, Trash2, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
+import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
 
 interface Ticket {
@@ -319,11 +320,12 @@ const LabelValue = ({
 
 const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticket, onUpdate }) => {
   const { user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [isEditMode, setIsEditMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [hasManageTicketsPermission, setHasManageTicketsPermission] = useState(false);
+  const [userPosition, setUserPosition] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Ticket>>({});
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
@@ -352,35 +354,31 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   // Check if user is admin and has manage_tickets permission
   useEffect(() => {
-    const checkUserPermissions = async () => {
+    const fetchUserInfo = async () => {
       if (!user?.id) return;
 
       try {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role')
+          .select('role, positions(name)')
           .eq('id', user.id)
           .single();
 
         setIsAdmin(profile?.role === 'admin');
+        setUserPosition((profile?.positions as any)?.name || '');
 
-        // Check if user has manage_tickets permission
-        const { data: permissions } = await supabase
-          .from('user_permissions')
-          .select('permission_id, permissions(name)')
-          .eq('user_id', user.id);
-
-        const hasPermission = permissions?.some(
-          (p: any) => p.permissions?.name === 'manage_tickets'
-        );
-
-        setHasManageTicketsPermission(hasPermission || false);
+        // Debug logging
+        console.log('TicketDetailModal - User Info:', {
+          userId: user.id,
+          role: profile?.role,
+          position: (profile?.positions as any)?.name,
+        });
       } catch (error) {
-        console.error('Error checking user permissions:', error);
+        console.error('Error fetching user info:', error);
       }
     };
 
-    checkUserPermissions();
+    fetchUserInfo();
   }, [user?.id]);
 
   // Fetch KB articles when modal opens
@@ -476,7 +474,18 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   if (!isOpen || !ticket) return null;
 
-  const canEdit = hasManageTicketsPermission;
+  // Permission checks using the usePermissions hook
+  const canEdit = hasPermission('manage_tickets'); // All users with manage_tickets can edit
+  const canDelete = userPosition === 'Operations Manager'; // Only Operations Manager can delete
+
+  // Debug logging
+  console.log('TicketDetailModal - Render:', {
+    hasManageTicketsPermission: hasPermission('manage_tickets'),
+    userPosition,
+    canEdit,
+    canDelete,
+    isEditMode
+  });
 
   // Get signed URL for attachment (for private buckets)
   const getAttachmentUrl = async (filePath: string): Promise<string> => {
@@ -845,6 +854,18 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               >
                 <Edit2 size={16} />
                 Edit
+              </button>
+            )}
+            {canDelete && !isEditMode && (
+              <button
+                onClick={() => {
+                  // Delete functionality - to be implemented
+                  alert('Delete ticket functionality - Operations Manager only');
+                }}
+                className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors text-sm font-medium"
+              >
+                <Trash2 size={16} />
+                Delete
               </button>
             )}
             <button
