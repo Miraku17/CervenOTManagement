@@ -60,11 +60,38 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .select('*', { count: 'exact', head: true })
       .is('deleted_at', null);
 
-    // Get unique stores count (Total available stores)
-    const { count: uniqueStores } = await supabaseAdmin
-      .from('stores')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
+    // Get unique stores count (only stores that have inventory items)
+    // Use pagination to ensure we get all items
+    const uniqueStoreIds = new Set<string>();
+    let storeIdPage = 0;
+    let hasMoreStoreIds = true;
+    const STORE_PAGE_SIZE = 1000;
+
+    while (hasMoreStoreIds) {
+      const { data: storeInventoryItems } = await supabaseAdmin
+        .from('store_inventory')
+        .select('store_id')
+        .is('deleted_at', null)
+        .range(storeIdPage * STORE_PAGE_SIZE, (storeIdPage + 1) * STORE_PAGE_SIZE - 1);
+
+      if (storeInventoryItems && storeInventoryItems.length > 0) {
+        storeInventoryItems.forEach(item => {
+          if (item.store_id) {
+            uniqueStoreIds.add(item.store_id);
+          }
+        });
+
+        if (storeInventoryItems.length < STORE_PAGE_SIZE) {
+          hasMoreStoreIds = false;
+        } else {
+          storeIdPage++;
+        }
+      } else {
+        hasMoreStoreIds = false;
+      }
+    }
+
+    const uniqueStores = uniqueStoreIds.size;
 
     const stats = {
       totalItems: totalItems || 0,
