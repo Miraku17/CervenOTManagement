@@ -38,9 +38,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .from('tickets')
       .select('*', { count: 'exact', head: true });
 
-    // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+    // If user doesn't have manage_tickets permission, filter by tickets they are servicing OR unassigned
     if (!hasManageTickets) {
-      countQuery = countQuery.eq('serviced_by', req.user.id);
+      countQuery = countQuery.or(`serviced_by.eq.${req.user.id},serviced_by.is.null`);
     }
 
     // Apply status filter (handle both underscore and space formats)
@@ -74,12 +74,49 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     let query = supabaseAdmin
       .from('tickets')
       .select(`
-        *,
-        stores (
+        id,
+        store_id,
+        station_id,
+        mod_id,
+        reported_by,
+        serviced_by,
+        rcc_reference_number,
+        date_reported,
+        time_reported,
+        date_responded,
+        time_responded,
+        request_type,
+        device,
+        request_detail,
+        problem_category,
+        sev,
+        action_taken,
+        final_resolution,
+        status,
+        parts_replaced,
+        new_parts_serial,
+        old_parts_serial,
+        date_ack,
+        time_ack,
+        date_attended,
+        store_arrival,
+        work_start,
+        pause_time_start,
+        pause_time_end,
+        work_end,
+        date_resolved,
+        time_resolved,
+        sla_count_hrs,
+        downtime,
+        sla_status,
+        created_at,
+        kb_id,
+        stores:store_id (
+          id,
           store_name,
           store_code
         ),
-        stations (
+        stations:station_id (
           name
         ),
         reported_by_user:reported_by (
@@ -89,17 +126,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         serviced_by_user:serviced_by (
           first_name,
           last_name
-        ),
-        manager_on_duty:store_managers (
-          manager_name
         )
       `)
       .range(from, to)
       .order('created_at', { ascending: false });
 
-    // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+    // If user doesn't have manage_tickets permission, filter by tickets they are servicing OR unassigned
     if (!hasManageTickets) {
-      query = query.eq('serviced_by', req.user.id);
+      query = query.or(`serviced_by.eq.${req.user.id},serviced_by.is.null`);
     }
 
     // Apply status filter (handle both underscore and space formats)
@@ -126,6 +160,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (error) {
       throw error;
+    }
+
+    // Debug logging
+    console.log('Fetching tickets - hasManageTickets:', hasManageTickets, 'Total count:', total, 'Returned:', tickets?.length, 'Page:', page);
+
+    // Log store distribution
+    if (tickets && tickets.length > 0) {
+      const storeDistribution = tickets.reduce((acc: any, t: any) => {
+        const storeId = t.store_id || 'no-store';
+        acc[storeId] = (acc[storeId] || 0) + 1;
+        return acc;
+      }, {});
+      console.log('Store distribution in this page:', storeDistribution);
     }
 
     return res.status(200).json({

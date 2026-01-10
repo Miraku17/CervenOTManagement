@@ -61,6 +61,7 @@ const fetchAllTickets = async (): Promise<any[]> => {
 
     if (result.tickets && result.tickets.length > 0) {
       allTickets = allTickets.concat(result.tickets);
+      console.log(`Fetched page ${page}: ${result.tickets.length} tickets. Total so far: ${allTickets.length}`);
 
       // Check if there are more pages
       if (result.pagination && page < result.pagination.totalPages) {
@@ -73,6 +74,7 @@ const fetchAllTickets = async (): Promise<any[]> => {
     }
   }
 
+  console.log('Total tickets fetched:', allTickets.length);
   return allTickets;
 };
 
@@ -84,18 +86,20 @@ export default function DashboardPage() {
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
-  const { data: stats, isLoading, error } = useQuery({
+  const { data: stats, isLoading, error, refetch: refetchStats } = useQuery({
     queryKey: ['dashboard-stats'],
     queryFn: fetchDashboardStats,
     refetchInterval: 30000, // Refetch every 30 seconds
+    staleTime: 0, // Consider data stale immediately to ensure fresh data
   });
 
   // Fetch all tickets with TanStack Query for caching
-  const { data: allTickets, isLoading: isLoadingTickets } = useQuery({
+  const { data: allTickets, isLoading: isLoadingTickets, refetch } = useQuery({
     queryKey: ['all-tickets'],
     queryFn: fetchAllTickets,
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 30000, // Cache for 30 seconds
     enabled: showModal, // Only fetch when modal is open
+    refetchOnMount: true, // Refetch when component mounts
   });
 
   if (isLoading) {
@@ -214,9 +218,33 @@ export default function DashboardPage() {
       case 'store':
         // Filter by selected store ID
         if (selectedStoreId) {
+          console.log('Filtering for store ID:', selectedStoreId);
+          console.log('All tickets count:', allTickets.length);
+
+          // Debug: Log first few tickets to see their structure
+          console.log('Sample tickets:', allTickets.slice(0, 3).map((t: any) => ({
+            id: t.id,
+            ref: t.rcc_reference_number,
+            store_id: t.store_id,
+            stores: t.stores
+          })));
+
           filteredTickets = allTickets.filter((t: any) => {
-            return t.store_id === selectedStoreId;
+            // Handle both direct store_id field and potential nested access
+            const ticketStoreId = t.store_id || (t.stores && typeof t.stores === 'object' && !Array.isArray(t.stores) ? (t.stores as any).id : null);
+            const matches = ticketStoreId && String(ticketStoreId) === String(selectedStoreId);
+            if (!matches && t.stores) {
+              // Log non-matching tickets that have store info to debug
+              console.log('Non-match:', t.rcc_reference_number, 'store_id:', ticketStoreId, 'looking for:', selectedStoreId);
+            }
+            return matches;
           });
+
+          console.log('Filtered tickets for store:', filteredTickets.length);
+
+          // Check if there are tickets without store_id
+          const ticketsWithoutStoreId = allTickets.filter((t: any) => !t.store_id).length;
+          console.log('Tickets without store_id:', ticketsWithoutStoreId);
         }
         break;
     }

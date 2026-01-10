@@ -52,18 +52,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           serviced_by,
           sla_status,
           created_at,
-          store_id,
-          stores:store_id (
-            id,
-            store_name,
-            store_code
-          )
+          store_id
         `)
         .range(from, to);
 
-      // If user doesn't have manage_tickets permission, filter by tickets they are servicing
+      // If user doesn't have manage_tickets permission, filter by tickets they are servicing OR unassigned
       if (!hasManageTickets) {
-        query = query.eq('serviced_by', req.user.id);
+        query = query.or(`serviced_by.eq.${req.user.id},serviced_by.is.null`);
       }
 
       const { data, error } = await query;
@@ -166,19 +161,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
 
       // Count tickets per store
-      if (ticket.store_id && ticket.stores) {
+      if (ticket.store_id) {
         const storeId = ticket.store_id;
-        const storeName = ticket.stores.store_name || 'Unknown Store';
-        const storeCode = ticket.stores.store_code || '';
 
         if (storeTicketMap.has(storeId)) {
           const existing = storeTicketMap.get(storeId)!;
           existing.ticketCount++;
         } else {
-          storeTicketMap.set(storeId, { storeId, storeName, storeCode, ticketCount: 1 });
+          storeTicketMap.set(storeId, { storeId, storeName: '', storeCode: '', ticketCount: 1 });
         }
       }
     });
+
+    // Fetch store details for all stores in the map
+    if (storeTicketMap.size > 0) {
+      const storeIds = Array.from(storeTicketMap.keys());
+      const { data: stores } = await supabaseAdmin
+        .from('stores')
+        .select('id, store_name, store_code')
+        .in('id', storeIds);
+
+      if (stores) {
+        stores.forEach(store => {
+          const storeData = storeTicketMap.get(store.id);
+          if (storeData) {
+            storeData.storeName = store.store_name || 'Unknown Store';
+            storeData.storeCode = store.store_code || '';
+          }
+        });
+      }
+    }
 
     // Format Priority Data
     stats.byPriority = Array.from(priorityMap.entries()).map(([name, value]) => {
@@ -202,6 +214,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     stats.topRecurringStores = Array.from(storeTicketMap.values())
       .sort((a, b) => b.ticketCount - a.ticketCount)
       .slice(0, 10); // Top 10 stores
+
+    // Debug logging
+    console.log('Dashboard-stats - hasManageTickets:', hasManageTickets, 'Total tickets processed:', allTickets.length);
+    console.log('Top store:', stats.topRecurringStores[0]);
+
+    // Log all tickets for the top store
+    if (stats.topRecurringStores[0]) {
+      const topStoreId = stats.topRecurringStores[0].storeId;
+      const topStoreTickets = allTickets.filter(t => t.store_id === topStoreId);
+      console.log(`Tickets for top store (${topStoreId}):`, topStoreTickets.length);
+      console.log('Sample ticket IDs:', topStoreTickets.slice(0, 5).map(t => t.id));
+    }
 
     return res.status(200).json(stats);
 

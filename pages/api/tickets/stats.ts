@@ -41,7 +41,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           sev,
           problem_category,
           date_reported,
-          stores(store_name),
+          store_id,
+          serviced_by,
+          stores:store_id(id, store_name),
           serviced_by_user:serviced_by(first_name, last_name)
         `)
         .range(from, to);
@@ -73,7 +75,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const data = allTickets;
 
-    if (!data) {
+    console.log('Stats API - Total tickets fetched:', data.length);
+    if (data.length > 0) {
+      console.log('Sample ticket:', JSON.stringify(data[0], null, 2));
+    }
+
+    if (!data || data.length === 0) {
       return res.status(200).json({
         total: 0,
         byStore: [],
@@ -87,14 +94,28 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const total = data.length;
 
     // 1. Tickets by Store
-    const storeMap = new Map<string, number>();
+    const storeMap = new Map<string, { store_id: string; store_name: string; count: number }>();
     data.forEach(ticket => {
+      const storeId = ticket.store_id;
       const storeName = (ticket.stores as any)?.store_name || 'Unknown';
-      storeMap.set(storeName, (storeMap.get(storeName) || 0) + 1);
+
+      if (storeId) {
+        const key = storeId;
+        const existing = storeMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          storeMap.set(key, { store_id: storeId, store_name: storeName, count: 1 });
+        }
+      }
     });
-    const byStore = Array.from(storeMap.entries())
-      .map(([store_name, count]) => ({ store_name, count }))
+    const byStore = Array.from(storeMap.values())
       .sort((a, b) => b.count - a.count);
+
+    console.log('Stats API - Stores processed:', byStore.length);
+    if (byStore.length > 0) {
+      console.log('Top store:', byStore[0]);
+    }
 
     // 2. Tickets by Field Engineer
     const feMap = new Map<string, number>();

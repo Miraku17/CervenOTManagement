@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx-js-style';
 
 interface TicketStats {
   total: number;
-  byStore: { store_name: string; count: number }[];
+  byStore: { store_id: string; store_name: string; count: number }[];
   byFieldEngineer: { engineer_name: string; count: number }[];
   bySeverity: { severity: string; count: number }[];
   byProblemCategory: { category: string; count: number }[];
@@ -365,6 +365,8 @@ export default function TicketOverviewPage() {
     setLoadingModal(true);
     setShowModal(true);
 
+
+    console.log("Handle Star Card Clicked")
     try {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
@@ -407,7 +409,13 @@ export default function TicketOverviewPage() {
           const topStore = stats?.byStore[0];
           if (topStore) {
             title = `Tickets - ${topStore.store_name}`;
-            filteredTickets = filteredTickets.filter((t: any) => (t.stores as any)?.store_name === topStore.store_name);
+            console.log('Filtering for store:', topStore.store_name, 'ID:', topStore.store_id);
+            console.log('Total tickets before filter:', filteredTickets.length);
+            filteredTickets = filteredTickets.filter((t: any) => {
+              const matches = t.store_id === topStore.store_id;
+              return matches;
+            });
+            console.log('Filtered tickets:', filteredTickets.length);
           }
           break;
       }
