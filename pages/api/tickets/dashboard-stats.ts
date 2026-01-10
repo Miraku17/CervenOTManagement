@@ -44,7 +44,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     while (moreData) {
       let query = supabaseAdmin
         .from('tickets')
-        .select('id, status, sev, problem_category, serviced_by, sla_status, created_at')
+        .select(`
+          id,
+          status,
+          sev,
+          problem_category,
+          serviced_by,
+          sla_status,
+          created_at,
+          store_id,
+          stores:store_id (
+            id,
+            store_name,
+            store_code
+          )
+        `)
         .range(from, to);
 
       // If user doesn't have manage_tickets permission, filter by tickets they are servicing
@@ -79,7 +93,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       total: allTickets.length,
       byPriority: [] as { name: string; value: number; color: string }[],
       byStatus: [] as { name: string; value: number }[],
-      byCategory: [] as { name: string; value: number }[]
+      byCategory: [] as { name: string; value: number }[],
+      topRecurringStores: [] as { storeId: string; storeName: string; storeCode: string; ticketCount: number }[]
     };
 
     // Helper to normalize status
@@ -94,6 +109,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const statusMap = new Map<string, number>();
     const categoryMap = new Map<string, number>();
+    const storeTicketMap = new Map<string, { storeId: string; storeName: string; storeCode: string; ticketCount: number }>();
 
     allTickets.forEach(ticket => {
       const status = ticket.status?.toLowerCase() || 'unknown';
@@ -148,6 +164,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const cat = ticket.problem_category || 'Other';
         categoryMap.set(cat, (categoryMap.get(cat) || 0) + 1);
       }
+
+      // Count tickets per store
+      if (ticket.store_id && ticket.stores) {
+        const storeId = ticket.store_id;
+        const storeName = ticket.stores.store_name || 'Unknown Store';
+        const storeCode = ticket.stores.store_code || '';
+
+        if (storeTicketMap.has(storeId)) {
+          const existing = storeTicketMap.get(storeId)!;
+          existing.ticketCount++;
+        } else {
+          storeTicketMap.set(storeId, { storeId, storeName, storeCode, ticketCount: 1 });
+        }
+      }
     });
 
     // Format Priority Data
@@ -167,6 +197,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5); // Top 5
+
+    // Format Top Recurring Stores (stores with most tickets)
+    stats.topRecurringStores = Array.from(storeTicketMap.values())
+      .sort((a, b) => b.ticketCount - a.ticketCount)
+      .slice(0, 10); // Top 10 stores
 
     return res.status(200).json(stats);
 

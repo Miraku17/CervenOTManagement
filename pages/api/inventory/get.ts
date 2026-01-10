@@ -54,23 +54,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .select('*', { count: 'exact', head: true })
       .is('deleted_at', null);
 
-    // Get unique categories count
-    const { data: categoriesData } = await supabaseAdmin
-      .from('store_inventory')
-      .select('category_id')
-      .is('deleted_at', null)
-      .not('category_id', 'is', null);
+    // Get unique categories count (Total available categories)
+    const { count: uniqueCategories } = await supabaseAdmin
+      .from('categories')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
 
-    const uniqueCategories = new Set(categoriesData?.map((item: any) => item.category_id)).size;
-
-    // Get unique stores count
-    const { data: storesData } = await supabaseAdmin
-      .from('store_inventory')
-      .select('store_id')
-      .is('deleted_at', null)
-      .not('store_id', 'is', null);
-
-    const uniqueStores = new Set(storesData?.map((item: any) => item.store_id)).size;
+    // Get unique stores count (Total available stores)
+    const { count: uniqueStores } = await supabaseAdmin
+      .from('stores')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
 
     const stats = {
       totalItems: totalItems || 0,

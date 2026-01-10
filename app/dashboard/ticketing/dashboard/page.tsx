@@ -32,6 +32,7 @@ interface DashboardStats {
   byPriority: { name: string; value: number; color: string }[];
   byStatus: { name: string; value: number }[];
   byCategory: { name: string; value: number }[];
+  topRecurringStores: { storeId: string; storeName: string; storeCode: string; ticketCount: number }[];
 }
 
 const fetchDashboardStats = async (): Promise<DashboardStats> => {
@@ -78,7 +79,8 @@ const fetchAllTickets = async (): Promise<any[]> => {
 export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
-  const [modalType, setModalType] = useState<'open' | 'on_hold' | 'unassigned' | 'total' | null>(null);
+  const [modalType, setModalType] = useState<'open' | 'on_hold' | 'unassigned' | 'total' | 'store' | null>(null);
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
@@ -143,6 +145,7 @@ export default function DashboardPage() {
 
   const handleStatCardClick = (type: 'open' | 'on_hold' | 'unassigned' | 'total') => {
     setModalType(type);
+    setSelectedStoreId(null);
     setShowModal(true);
 
     // Set title immediately
@@ -160,6 +163,13 @@ export default function DashboardPage() {
         setModalTitle('In Progress Tickets');
         break;
     }
+  };
+
+  const handleStoreClick = (storeId: string, storeName: string) => {
+    setModalType('store');
+    setSelectedStoreId(storeId);
+    setModalTitle(`${storeName} - All Tickets`);
+    setShowModal(true);
   };
 
   // Filter tickets based on modal type
@@ -200,6 +210,14 @@ export default function DashboardPage() {
           const status = t.status?.toLowerCase();
           return status === 'in_progress' || status === 'in progress';
         });
+        break;
+      case 'store':
+        // Filter by selected store ID
+        if (selectedStoreId) {
+          filteredTickets = allTickets.filter((t: any) => {
+            return t.store_id === selectedStoreId;
+          });
+        }
         break;
     }
 
@@ -408,6 +426,57 @@ export default function DashboardPage() {
         </Card>
 
       </div>
+
+      {/* Top Recurring Stores Section */}
+      <Card className="bg-slate-900 border-slate-800">
+        <CardHeader>
+          <CardTitle className="text-white text-base sm:text-lg">Stores with Highest Number of Tickets</CardTitle>
+          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+            Stores generating the most support requests
+          </p>
+        </CardHeader>
+        <CardContent>
+          {stats.topRecurringStores && stats.topRecurringStores.length > 0 ? (
+            <div className="space-y-2 sm:space-y-3">
+              {stats.topRecurringStores.map((store, index) => (
+                <div
+                  key={store.storeId}
+                  onClick={() => handleStoreClick(store.storeId, store.storeName)}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group gap-2 sm:gap-0"
+                >
+                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500/10 text-blue-400 font-bold text-xs sm:text-sm group-hover:bg-blue-500/20 transition-colors flex-shrink-0">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+                        {store.storeName}
+                      </p>
+                      {store.storeCode && (
+                        <p className="text-[10px] sm:text-xs text-slate-400 font-mono">
+                          {store.storeCode}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 ml-9 sm:ml-0">
+                    <span className="text-xl sm:text-2xl font-bold text-blue-400 group-hover:text-blue-300 transition-colors">
+                      {store.ticketCount}
+                    </span>
+                    <span className="text-[10px] sm:text-xs text-slate-400 whitespace-nowrap">
+                      {store.ticketCount === 1 ? 'ticket' : 'tickets'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-32 text-slate-400 text-xs sm:text-sm">
+              No store data available
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Modal for displaying tickets */}
       {showModal && (

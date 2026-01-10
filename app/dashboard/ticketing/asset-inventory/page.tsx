@@ -92,7 +92,7 @@ export default function AssetInventoryPage() {
   // Stats state (for all assets, not just current page)
   const [stats, setStats] = useState({
     totalAssets: 0,
-    withSerialNumber: 0,
+    availablePrinters: 0,
     uniqueCategories: 0,
   });
   
@@ -200,7 +200,7 @@ export default function AssetInventoryPage() {
 
       if (response.ok) {
         setAssets(data.assets || []);
-        setStats(data.stats || { totalAssets: 0, withSerialNumber: 0, uniqueCategories: 0 });
+        setStats(data.stats || { totalAssets: 0, availablePrinters: 0, uniqueCategories: 0 });
         setTotalCount(data.pagination.totalCount);
         setTotalPages(data.pagination.totalPages);
       } else {
@@ -710,13 +710,13 @@ export default function AssetInventoryPage() {
              <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
                 <div className="flex items-start justify-between">
                     <div>
-                        <p className="text-slate-400 text-sm mb-1">With Serial Number</p>
+                        <p className="text-slate-400 text-sm mb-1">Available Printers</p>
                         <h3 className="text-2xl font-bold text-white">
-                          {loading ? '-' : stats.withSerialNumber}
+                          {loading ? '-' : stats.availablePrinters}
                         </h3>
                     </div>
                     <div className="p-2 bg-emerald-500/10 rounded-lg text-emerald-400">
-                        <Tag size={24} />
+                        <Printer size={24} />
                     </div>
                 </div>
             </div>

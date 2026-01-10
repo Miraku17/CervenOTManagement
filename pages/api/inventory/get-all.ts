@@ -43,89 +43,96 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Fetch ALL store inventory items (including soft-deleted)
-    const { data: items, error } = await supabaseAdmin
-      .from('store_inventory')
-      .select(`
-        id,
-        created_at,
-        updated_at,
-        deleted_at,
-        created_by,
-        updated_by,
-        deleted_by,
-        serial_number,
-        under_warranty,
-        warranty_date,
-        status,
-        stores:store_id (
-          id,
-          store_name,
-          store_code
-        ),
-        stations:station_id (
-          id,
-          name
-        ),
-        categories:category_id (
-          id,
-          name
-        ),
-        brands:brand_id (
-          id,
-          name
-        ),
-        models:model_id (
-          id,
-          name
-        )
-      `)
-      .order('created_at', { ascending: false });
+    // Fetch ALL store inventory items (including soft-deleted) using pagination
+    let allItems: any[] = [];
+    const PAGE_SIZE = 1000;
+    let page = 0;
+    let hasMore = true;
 
-    if (error) throw error;
+    while (hasMore) {
+      const { data: items, error } = await supabaseAdmin
+        .from('store_inventory')
+        .select(`
+          id,
+          created_at,
+          updated_at,
+          deleted_at,
+          created_by,
+          updated_by,
+          deleted_by,
+          serial_number,
+          under_warranty,
+          warranty_date,
+          status,
+          stores:store_id (
+            id,
+            store_name,
+            store_code
+          ),
+          stations:station_id (
+            id,
+            name
+          ),
+          categories:category_id (
+            id,
+            name
+          ),
+          brands:brand_id (
+            id,
+            name
+          ),
+          models:model_id (
+            id,
+            name
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
-    // Fetch user details for created_by, updated_by, and deleted_by
-    const inventoryItems = await Promise.all(
-      (items || []).map(async (item) => {
-        let created_by_user = null;
-        let updated_by_user = null;
-        let deleted_by_user = null;
+      if (error) throw error;
 
-        if (item.created_by && supabaseAdmin) {
-          const { data: creator } = await supabaseAdmin
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', item.created_by)
-            .single();
-          created_by_user = creator;
+      if (items && items.length > 0) {
+        allItems = [...allItems, ...items];
+        if (items.length < PAGE_SIZE) {
+          hasMore = false;
+        } else {
+          page++;
         }
+      } else {
+        hasMore = false;
+      }
+    }
 
-        if (item.updated_by && supabaseAdmin) {
-          const { data: updater } = await supabaseAdmin
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', item.updated_by)
-            .single();
-          updated_by_user = updater;
-        }
+    // Collect all unique user IDs
+    const userIds = new Set<string>();
+    allItems.forEach(item => {
+      if (item.created_by) userIds.add(item.created_by);
+      if (item.updated_by) userIds.add(item.updated_by);
+      if (item.deleted_by) userIds.add(item.deleted_by);
+    });
 
-        if (item.deleted_by && supabaseAdmin) {
-          const { data: deleter } = await supabaseAdmin
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', item.deleted_by)
-            .single();
-          deleted_by_user = deleter;
-        }
+    // Fetch user profiles in batch
+    const profilesMap = new Map();
+    if (userIds.size > 0 && supabaseAdmin) {
+      const { data: profiles, error: profilesError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', Array.from(userIds));
+      
+      if (!profilesError && profiles) {
+        profiles.forEach(profile => {
+          profilesMap.set(profile.id, profile);
+        });
+      }
+    }
 
-        return {
-          ...item,
-          created_by_user,
-          updated_by_user,
-          deleted_by_user,
-        };
-      })
-    );
+    // Attach user details
+    const inventoryItems = allItems.map((item) => ({
+      ...item,
+      created_by_user: item.created_by ? profilesMap.get(item.created_by) || null : null,
+      updated_by_user: item.updated_by ? profilesMap.get(item.updated_by) || null : null,
+      deleted_by_user: item.deleted_by ? profilesMap.get(item.deleted_by) || null : null,
+    }));
 
     return res.status(200).json({
       items: inventoryItems || [],

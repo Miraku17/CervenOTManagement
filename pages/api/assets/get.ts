@@ -46,18 +46,28 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const to = from + limit - 1;
 
     // Get stats (count all assets, not just current page)
-    const { data: allAssets, error: statsError } = await supabaseAdmin
+    const { data: allAssetsStats, error: statsError } = await supabaseAdmin
       .from('asset_inventory')
-      .select('serial_number, category_id')
-      .is('deleted_at', null)
-      .range(0, 99999); // Override Supabase's default 1000 row limit
+      .select('status, categories:category_id(name)')
+      .is('deleted_at', null);
 
     if (statsError) throw statsError;
 
+    // Get total categories count
+    const { count: totalCategories } = await supabaseAdmin
+      .from('categories')
+      .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null);
+
+    const availablePrinters = allAssetsStats?.filter((a: any) => 
+      a.status === 'Available' && 
+      (Array.isArray(a.categories) ? a.categories[0]?.name : a.categories?.name) === 'Printer'
+    ).length || 0;
+
     const stats = {
-      totalAssets: allAssets?.length || 0,
-      withSerialNumber: allAssets?.filter(a => a.serial_number).length || 0,
-      uniqueCategories: new Set(allAssets?.map(a => a.category_id).filter(Boolean)).size || 0,
+      totalAssets: allAssetsStats?.length || 0,
+      availablePrinters,
+      uniqueCategories: totalCategories || 0,
     };
 
     // Fetch all assets with joined data (we'll filter in memory for search)
