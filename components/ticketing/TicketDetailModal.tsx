@@ -1444,39 +1444,39 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
       {/* Delete Ticket Confirmation Modal */}
       {showDeleteTicketConfirm && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 sm:p-6 md:p-8 shadow-2xl transform transition-all scale-100 flex flex-col items-center gap-3 sm:gap-4 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
-              <AlertTriangle size={28} className="text-red-500 sm:w-8 sm:h-8" />
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-3 sm:p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-lg sm:rounded-xl p-4 sm:p-5 md:p-6 shadow-2xl transform transition-all scale-100 flex flex-col items-center gap-3 max-w-sm sm:max-w-md w-full mx-3 sm:mx-4 animate-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 sm:w-14 sm:h-14 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+              <AlertTriangle size={24} className="text-red-500 sm:w-7 sm:h-7" />
             </div>
-            <h3 className="text-lg sm:text-xl font-bold text-white text-center">Delete Ticket?</h3>
-            <p className="text-sm sm:text-base text-slate-400 text-center leading-relaxed">
+            <h3 className="text-base sm:text-lg font-bold text-white text-center">Delete Ticket?</h3>
+            <p className="text-xs sm:text-sm text-slate-400 text-center leading-relaxed">
               Are you sure you want to permanently delete ticket <span className="text-white font-medium">#{ticket?.rcc_reference_number}</span>?
-              <span className="block mt-2 text-red-400 font-medium">
+              <span className="block mt-2 text-red-400 font-medium text-xs sm:text-sm">
                 This action cannot be undone.
               </span>
             </p>
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mt-2">
+            <div className="flex flex-col-reverse sm:flex-row gap-2 w-full mt-1">
               <button
                 onClick={() => setShowDeleteTicketConfirm(false)}
                 disabled={isDeleting}
-                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:flex-1 px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white rounded-md transition-all font-medium text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteTicket}
                 disabled={isDeleting}
-                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:flex-1 px-3 py-2 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-md transition-all font-medium flex items-center justify-center gap-1.5 text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isDeleting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                     <span>Deleting...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    <Trash2 size={14} className="sm:w-4 sm:h-4" />
                     <span>Delete Permanently</span>
                   </>
                 )}
