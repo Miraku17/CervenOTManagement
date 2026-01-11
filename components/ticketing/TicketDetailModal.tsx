@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
+import { ToastContainer, ToastProps } from '@/components/Toast';
 
 interface Ticket {
   id: string;
@@ -162,28 +163,17 @@ const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string
 };
 
 // Fields that are stored as TIMESTAMP (date + time) in the DB, but edited as TIME in UI
-const TIMESTAMP_FIELDS = ['store_arrival', 'work_start', 'work_end', 'pause_time_start', 'pause_time_end'];
+const TIMESTAMP_FIELDS: string[] = [];
 
 const getTimestampTime = (isoString: string | null | undefined): string => {
   if (!isoString) return '';
-  // If it's a simple time string (e.g. "HH:mm:ss" or "HH:mm") and not an ISO string
-  if (!isoString.includes('T') && isoString.includes(':')) {
-    return isoString.substring(0, 5);
-  }
-  try {
-    return format(new Date(isoString), 'HH:mm');
-  } catch (e) {
-    return '';
-  }
+  // Since they are now TIME columns, they arrive as "HH:MM:SS"
+  return isoString.substring(0, 5);
 };
 
 const setTimestampTime = (originalIsoString: string | null | undefined, newTime: string): string => {
-  const dateBase = originalIsoString ? new Date(originalIsoString) : new Date();
-  const [hours, minutes] = newTime.split(':').map(Number);
-  dateBase.setHours(hours);
-  dateBase.setMinutes(minutes);
-  dateBase.setSeconds(0);
-  return dateBase.toISOString();
+  // Now just returns the time string since we are using TIME columns
+  return newTime;
 };
 
 // Helper functions for Status mapping
@@ -215,6 +205,7 @@ interface LabelValueProps {
   editData: Partial<Ticket>;
   setEditData: (data: Partial<Ticket>) => void;
   isSaving?: boolean;
+  dateAttended?: string | null;
 }
 
 const DetailSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
@@ -240,28 +231,21 @@ const LabelValue = ({
   isEditMode,
   editData,
   setEditData,
-  isSaving = false
+  isSaving = false,
+  dateAttended: propDateAttended
 }: LabelValueProps) => {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to handle time changes for timestamp fields
   const handleTimeChange = (val: string) => {
-    if (editKey && TIMESTAMP_FIELDS.includes(editKey)) {
-      // It's a timestamp field, we need to merge the new time with the existing date
-      const currentValue = editData[editKey] as string;
-      const newValue = setTimestampTime(currentValue, val);
-      setEditData({ ...editData, [editKey]: newValue });
-    } else if (editKey) {
-      // It's a regular time field
+    if (editKey) {
+      // It's a regular time field or date field
       setEditData({ ...editData, [editKey]: val });
     }
   };
 
   // Helper to get the display value for the time picker
   const getTimeValue = () => {
-    if (editKey && TIMESTAMP_FIELDS.includes(editKey)) {
-      return getTimestampTime(editData[editKey] as string);
-    }
     return (editData[editKey as keyof Ticket] as string) || '';
   };
 
@@ -278,29 +262,59 @@ const LabelValue = ({
             rows={3}
           />
         ) : type === 'date' ? (
-          <div 
-            className={`relative ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-            onClick={() => !isSaving && dateInputRef.current?.showPicker()}
-          >
-            <input
-              ref={dateInputRef}
-              disabled={isSaving}
-              type="date"
-              value={editData[editKey] as string || ''}
-              onChange={(e) => setEditData({ ...editData, [editKey]: e.target.value })}
-              className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm pl-3 pr-10 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:cursor-not-allowed"
-            />
-            <Calendar 
-              size={18} 
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-white pointer-events-none" 
-            />
+          <div className="flex items-center gap-2">
+            <div
+              className={`relative flex-1 ${isSaving ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              onClick={() => !isSaving && dateInputRef.current?.showPicker()}
+            >
+              <input
+                ref={dateInputRef}
+                disabled={isSaving}
+                type="date"
+                value={editData[editKey] as string || ''}
+                onChange={(e) => setEditData({ ...editData, [editKey]: e.target.value })}
+                className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm pl-3 pr-10 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none cursor-pointer disabled:cursor-not-allowed"
+              />
+              <Calendar
+                size={18}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white pointer-events-none"
+              />
+            </div>
+            {editData[editKey] && !isSaving && (
+              <button
+                type="button"
+                onClick={() => editKey && setEditData({ ...editData, [editKey]: '' })}
+                className="px-2 py-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors shrink-0"
+                title="Clear date"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
         ) : type === 'time' ? (
-          <div className={isSaving ? 'opacity-50 pointer-events-none' : ''}>
-             <TimePicker
-              value={getTimeValue()}
-              onChange={handleTimeChange}
-            />
+          <div className={`relative ${isSaving ? 'opacity-50 pointer-events-none' : ''}`}>
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <TimePicker
+                  value={getTimeValue()}
+                  onChange={handleTimeChange}
+                />
+              </div>
+              {getTimeValue() && !isSaving && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (editKey) {
+                      setEditData({ ...editData, [editKey]: '' });
+                    }
+                  }}
+                  className="px-2 py-2 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors shrink-0"
+                  title="Clear time"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <input
@@ -340,6 +354,9 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]); // New files to upload on save
   const [pendingPreviewUrls, setPendingPreviewUrls] = useState<string[]>([]); // Preview URLs for pending files
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [toasts, setToasts] = useState<ToastProps[]>([]);
+  const [showDeleteTicketConfirm, setShowDeleteTicketConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -443,6 +460,15 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     }
   }, [isOpen, ticket?.id]);
 
+  // Helper to format time strings from HH:MM:SS to HH:MM
+  const formatTimeField = (timeString: string | null | undefined): string => {
+    if (!timeString) return '';
+    // If it's already in HH:MM format or shorter, return as is
+    if (timeString.length <= 5) return timeString;
+    // Extract HH:MM from HH:MM:SS
+    return timeString.substring(0, 5);
+  };
+
   // Reset edit data when ticket changes
   useEffect(() => {
     if (ticket) {
@@ -454,17 +480,17 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         new_parts_serial: ticket.new_parts_serial || '',
         old_parts_serial: ticket.old_parts_serial || '',
         date_ack: ticket.date_ack || '',
-        time_ack: ticket.time_ack || '',
+        time_ack: formatTimeField(ticket.time_ack),
         date_attended: ticket.date_attended || '',
         store_arrival: ticket.store_arrival || '',
         work_start: ticket.work_start || '',
         work_end: ticket.work_end || '',
         date_resolved: ticket.date_resolved || '',
-        time_resolved: ticket.time_resolved || '',
+        time_resolved: formatTimeField(ticket.time_resolved),
         sla_status: ticket.sla_status || '',
         downtime: ticket.downtime || '',
         date_responded: ticket.date_responded || '',
-        time_responded: ticket.time_responded || '',
+        time_responded: formatTimeField(ticket.time_responded),
         pause_time_start: ticket.pause_time_start || '',
         pause_time_end: ticket.pause_time_end || '',
         kb_id: ticket.kb_id || '',
@@ -472,11 +498,23 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     }
   }, [ticket]);
 
+  // Helper function to show toast
+  const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, description?: string) => {
+    const id = Date.now().toString();
+    setToasts(prev => [...prev, { id, type, message, description, onClose: removeToast }]);
+  };
+
+  // Helper function to remove toast
+  const removeToast = (id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id));
+  };
+
   if (!isOpen || !ticket) return null;
 
   // Permission checks using the usePermissions hook
   const canEdit = hasPermission('manage_tickets'); // All users with manage_tickets can edit
-  const canDelete = userPosition === 'Operations Manager'; // Only Operations Manager can delete
+  // Check if user is Operations Manager (case-insensitive)
+  const canDelete = userPosition?.toLowerCase() === 'operations manager';
 
   // Debug logging
   console.log('TicketDetailModal - Render:', {
@@ -527,7 +565,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     // Calculate total after adding new files
     const currentTotal = attachments.length - attachmentsToDelete.length + pendingAttachments.length;
     if (currentTotal + files.length > 10) {
-      alert(`You can only have up to 10 attachments per ticket. Current total: ${currentTotal}`);
+      showToast('error', 'Too Many Attachments', `You can only have up to 10 attachments per ticket. Current total: ${currentTotal}`);
       return;
     }
 
@@ -535,11 +573,11 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     const validFiles: File[] = [];
     for (const file of files) {
       if (!file.type.startsWith('image/')) {
-        alert(`${file.name} is not an image file`);
+        showToast('error', 'Invalid File Type', `${file.name} is not an image file`);
         continue;
       }
       if (file.size > 5 * 1024 * 1024) {
-        alert(`${file.name} is too large. Maximum size is 5MB`);
+        showToast('error', 'File Too Large', `${file.name} is too large. Maximum size is 5MB`);
         continue;
       }
       validFiles.push(file);
@@ -569,6 +607,46 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     setPendingPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Handle ticket deletion
+  const handleDeleteTicket = async () => {
+    if (!ticket || !user?.id) return;
+
+    setIsDeleting(true);
+
+    try {
+      const response = await fetch('/api/tickets/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ticket.id })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete ticket');
+      }
+
+      showToast('success', 'Ticket Deleted', 'The ticket has been permanently deleted.');
+      setShowDeleteTicketConfirm(false);
+
+      // Close modal and notify parent to refresh list
+      setTimeout(() => {
+        onClose();
+        if (onUpdate) {
+          // Trigger refresh by passing null or similar signal
+          window.location.reload(); // Or use a better refresh mechanism
+        }
+      }, 1000);
+
+    } catch (error: any) {
+      console.error('Error deleting ticket:', error);
+      showToast('error', 'Delete Failed', error.message || 'Failed to delete ticket');
+      setShowDeleteTicketConfirm(false);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
       const handleSave = async () => {
       if (!ticket || !user?.id) return;
   
@@ -591,7 +669,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           resolvedDate.setHours(parseInt(resolvedHours), parseInt(resolvedMinutes), 0, 0);
   
           if (resolvedDate < reportedDate) {
-            alert('Date Resolved cannot be earlier than Date Reported.');
+            showToast('error', 'Invalid Date', 'Date Resolved cannot be earlier than Date Reported.');
             setIsSaving(false);
             return;
           }
@@ -702,7 +780,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       setShowSuccessModal(true);
     } catch (error: any) {
       console.error('Error updating ticket:', error);
-      alert(error.message || 'Failed to update ticket');
+      showToast('error', 'Update Failed', error.message || 'Failed to update ticket');
     } finally {
       setIsSaving(false);
     }
@@ -858,10 +936,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             )}
             {canDelete && !isEditMode && (
               <button
-                onClick={() => {
-                  // Delete functionality - to be implemented
-                  alert('Delete ticket functionality - Operations Manager only');
-                }}
+                onClick={() => setShowDeleteTicketConfirm(true)}
                 className="flex items-center gap-2 px-3 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg transition-colors text-sm font-medium"
               >
                 <Trash2 size={16} />
@@ -1009,7 +1084,23 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               editable
               editKey="date_attended"
               type="date"
-              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+              isEditMode={isEditMode}
+              editData={editData}
+              setEditData={(newData) => {
+                // Check if date_attended changed
+                if (newData.date_attended !== editData.date_attended) {
+                    // Update dependent fields in editData to ensure they are sent to API
+                    // even if they weren't explicitly touched in this edit session
+                   ['work_end', 'pause_time_start', 'pause_time_end'].forEach(field => {
+                       const currentVal = (editData[field as keyof Ticket] as string) || (ticket[field as keyof Ticket] as string);
+                       if (currentVal) {
+                           (newData as any)[field] = currentVal.substring(0, 5);
+                       }
+                   });
+                }
+                setEditData(newData);
+              }}
+              isSaving={isSaving}
             />
             <LabelValue
               label="Store Arrival"
@@ -1033,6 +1124,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               editable
               editKey="work_end"
               type="time"
+              dateAttended={ticket.date_attended}
               isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
             />
             <LabelValue
@@ -1041,6 +1133,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               editable
               editKey="pause_time_start"
               type="time"
+              dateAttended={ticket.date_attended}
               isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
             />
             <LabelValue
@@ -1049,6 +1142,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               editable
               editKey="pause_time_end"
               type="time"
+              dateAttended={ticket.date_attended}
               isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
             />
             <LabelValue label="Downtime" value={ticket.downtime} editable editKey="downtime" isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
@@ -1347,6 +1441,53 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
           </div>
         </div>
       )}
+
+      {/* Delete Ticket Confirmation Modal */}
+      {showDeleteTicketConfirm && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200 p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-xl p-4 sm:p-6 md:p-8 shadow-2xl transform transition-all scale-100 flex flex-col items-center gap-3 sm:gap-4 max-w-md w-full mx-4 animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 bg-red-500/10 rounded-full flex items-center justify-center border border-red-500/20">
+              <AlertTriangle size={28} className="text-red-500 sm:w-8 sm:h-8" />
+            </div>
+            <h3 className="text-lg sm:text-xl font-bold text-white text-center">Delete Ticket?</h3>
+            <p className="text-sm sm:text-base text-slate-400 text-center leading-relaxed">
+              Are you sure you want to permanently delete ticket <span className="text-white font-medium">#{ticket?.rcc_reference_number}</span>?
+              <span className="block mt-2 text-red-400 font-medium">
+                This action cannot be undone.
+              </span>
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full mt-2">
+              <button
+                onClick={() => setShowDeleteTicketConfirm(false)}
+                disabled={isDeleting}
+                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white rounded-lg transition-all font-medium text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteTicket}
+                disabled={isDeleting}
+                className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-3 bg-red-600 hover:bg-red-500 active:bg-red-700 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2 text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} className="sm:w-[18px] sm:h-[18px]" />
+                    <span>Delete Permanently</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 };

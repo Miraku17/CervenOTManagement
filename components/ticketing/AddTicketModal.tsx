@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown, Upload, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { X, Save, AlertCircle, Clock, Calendar, User, ChevronDown, Upload, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { formatInTimeZone } from 'date-fns-tz';
 import { supabase } from '@/services/supabase';
 import { compressImages } from '@/lib/imageCompression';
@@ -91,6 +91,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
   const [deviceSearchTerm, setDeviceSearchTerm] = useState('');
   const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
+  const [isLoadingDevices, setIsLoadingDevices] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -246,9 +247,11 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     const fetchInventory = async () => {
       if (!selectedStore) {
         setInventoryItems([]);
+        setIsLoadingDevices(false);
         return;
       }
 
+      setIsLoadingDevices(true);
       try {
         const response = await fetch(`/api/inventory/get?store_id=${selectedStore.id}`);
         const data = await response.json();
@@ -258,6 +261,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       } catch (err) {
         console.error('Error fetching inventory:', err);
         setInventoryItems([]);
+      } finally {
+        setIsLoadingDevices(false);
       }
     };
 
@@ -578,6 +583,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       setSelectedInventoryItem(null);
       setDeviceSearchTerm('');
       setShowDeviceDropdown(false);
+      setIsLoadingDevices(false);
       setSelectedKbArticle(null);
 
       // Clean up image previews
@@ -853,11 +859,14 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                   }}
                   onFocus={() => setShowDeviceDropdown(true)}
                   className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-20 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                  placeholder={!selectedStore ? "Select a store first..." : "Search for a device..."}
-                  disabled={!selectedStore}
+                  placeholder={!selectedStore ? "Select a store first..." : isLoadingDevices ? "Loading devices..." : "Search for a device..."}
+                  disabled={!selectedStore || isLoadingDevices}
                   required={!selectedInventoryItem}
                 />
-                {selectedInventoryItem && (
+                {isLoadingDevices && (
+                  <Loader2 className="absolute right-10 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={16} />
+                )}
+                {selectedInventoryItem && !isLoadingDevices && (
                   <button
                     type="button"
                     onClick={handleClearDeviceSelection}
@@ -867,13 +876,20 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     <X size={16} />
                   </button>
                 )}
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                {!isLoadingDevices && (
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                )}
               </div>
 
               {/* Device Dropdown Menu */}
               {showDeviceDropdown && selectedStore && (
                 <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                  {filteredDevices.length > 0 ? (
+                  {isLoadingDevices ? (
+                    <div className="px-4 py-8 flex flex-col items-center justify-center text-slate-400">
+                      <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                      <p className="text-sm">Loading devices...</p>
+                    </div>
+                  ) : filteredDevices.length > 0 ? (
                     filteredDevices.map((item) => {
                       const categoryName = item.categories?.name || '';
                       const brandName = item.brands?.name || '';

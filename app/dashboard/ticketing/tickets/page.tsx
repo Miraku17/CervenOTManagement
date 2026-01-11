@@ -778,15 +778,6 @@ export default function TicketsPage() {
                       {ticket.sev}
                     </span>
                   </div>
-                  {canDeleteTicket && (
-                    <button
-                      onClick={(e) => handleDeleteClick(ticket.id, e)}
-                      className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors shrink-0"
-                      title="Delete ticket"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  )}
                 </div>
 
                 {/* Body */}

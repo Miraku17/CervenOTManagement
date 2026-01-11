@@ -35,7 +35,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   } = req.body;
 
   // Validation
-  if (!store_id || !station_id || !rcc_reference_number || !request_type || !device || !request_detail || !problem_category || !sev || !serviced_by) {
+  if (!store_id || !station_id || !rcc_reference_number || !request_type || !device || !request_detail || !problem_category || !sev) {
     return res.status(400).json({ error: 'All required fields must be filled' });
   }
 
