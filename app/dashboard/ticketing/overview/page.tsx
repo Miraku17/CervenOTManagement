@@ -812,6 +812,51 @@ export default function TicketOverviewPage() {
         </div>
       </div>
 
+      {/* Stores with Highest Number of Tickets */}
+      <div className="bg-slate-900 border border-slate-800 p-6 rounded-xl shadow-lg shadow-slate-950/20">
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <Store size={18} className="text-blue-400" />
+          Stores with Highest Number of Tickets
+        </h3>
+        <p className="text-sm text-slate-400 mb-6">
+          Stores generating the most support requests
+        </p>
+        {stats.byStore && stats.byStore.length > 0 ? (
+          <div className="space-y-3">
+            {stats.byStore.slice(0, 10).map((store, index) => (
+              <div
+                key={store.store_id}
+                onClick={() => handleStatCardClick('store')}
+                className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-blue-500/10 text-blue-400 font-bold text-sm group-hover:bg-blue-500/20 transition-colors flex-shrink-0">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
+                      {store.store_name}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl font-bold text-blue-400 group-hover:text-blue-300 transition-colors">
+                    {store.count}
+                  </span>
+                  <span className="text-xs text-slate-400 whitespace-nowrap">
+                    {store.count === 1 ? 'ticket' : 'tickets'}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-32 text-slate-400 text-sm">
+            No store data available
+          </div>
+        )}
+      </div>
+
       {/* Ticket Details Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">

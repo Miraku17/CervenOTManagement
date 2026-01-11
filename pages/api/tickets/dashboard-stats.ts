@@ -176,19 +176,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch store details for all stores in the map
     if (storeTicketMap.size > 0) {
       const storeIds = Array.from(storeTicketMap.keys());
-      const { data: stores } = await supabaseAdmin
+      const { data: stores, error: storesError } = await supabaseAdmin
         .from('stores')
         .select('id, store_name, store_code')
         .in('id', storeIds);
 
+      if (storesError) {
+        console.error('Error fetching store details:', storesError);
+      }
+
       if (stores) {
+        console.log('Fetched stores:', stores.length, 'Sample:', stores[0]);
         stores.forEach(store => {
           const storeData = storeTicketMap.get(store.id);
           if (storeData) {
-            storeData.storeName = store.store_name || 'Unknown Store';
+            storeData.storeName = store.store_name || '';
             storeData.storeCode = store.store_code || '';
           }
         });
+      }
+
+      // Log any stores that didn't get names populated
+      const storesWithoutNames = Array.from(storeTicketMap.values()).filter(s => !s.storeName);
+      if (storesWithoutNames.length > 0) {
+        console.log('Stores without names:', storesWithoutNames.map(s => s.storeId));
       }
     }
 

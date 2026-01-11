@@ -199,6 +199,76 @@ export default function TicketsPage() {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
 
+  // Generate import report as downloadable .txt file
+  const generateImportReport = (result: any, fileName: string) => {
+    const lines: string[] = [];
+    const timestamp = new Date().toLocaleString();
+
+    lines.push('='.repeat(80));
+    lines.push('TICKET IMPORT REPORT');
+    lines.push('='.repeat(80));
+    lines.push(`File: ${fileName}`);
+    lines.push(`Date: ${timestamp}`);
+    lines.push('');
+    lines.push('SUMMARY:');
+    lines.push(`  - Successfully imported: ${result.success}`);
+    lines.push(`  - Failed: ${result.failed}`);
+    lines.push(`  - Skipped: ${result.skipped || 0}`);
+    lines.push(`  - With missing data: ${result.warnings?.length || 0}`);
+    lines.push('');
+
+    // Errors section
+    if (result.errors && result.errors.length > 0) {
+      lines.push('='.repeat(80));
+      lines.push('ERRORS (Failed Rows)');
+      lines.push('='.repeat(80));
+      result.errors.forEach((err: any) => {
+        lines.push(`Row ${err.row}: ${err.error}`);
+      });
+      lines.push('');
+    }
+
+    // Skipped rows section
+    if (result.skippedRows && result.skippedRows.length > 0) {
+      lines.push('='.repeat(80));
+      lines.push('SKIPPED ROWS');
+      lines.push('='.repeat(80));
+      result.skippedRows.forEach((skip: any) => {
+        lines.push(`Row ${skip.row}: ${skip.reason}`);
+      });
+      lines.push('');
+    }
+
+    // Warnings section
+    if (result.warnings && result.warnings.length > 0) {
+      lines.push('='.repeat(80));
+      lines.push('ROWS WITH MISSING DATA (Defaults Applied)');
+      lines.push('='.repeat(80));
+      result.warnings.forEach((warn: any) => {
+        lines.push(`Row ${warn.row}:`);
+        lines.push(`  Missing Fields: ${warn.missingFields.join(', ')}`);
+        lines.push(`  Applied Defaults: ${warn.defaults}`);
+        lines.push('');
+      });
+    }
+
+    lines.push('='.repeat(80));
+    lines.push('END OF REPORT');
+    lines.push('='.repeat(80));
+
+    // Create and download the file
+    const reportContent = lines.join('\n');
+    const blob = new Blob([reportContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `import-report-${new Date().getTime()}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleTicketClick = (ticket: Ticket) => {
     setSelectedTicket(ticket);
     setIsDetailModalOpen(true);
@@ -339,15 +409,63 @@ export default function TicketsPage() {
           }
 
           const { result } = importData;
+
+          // Generate and download report if there are issues
+          if (result.errors?.length > 0 || result.warnings?.length > 0 || result.skippedRows?.length > 0) {
+            generateImportReport(result, file.name);
+          }
+
+          // Prepare messages
+          const messages: string[] = [];
+
           if (result.failed > 0) {
             const errorSummary = result.errors?.slice(0, 10).map((e: any) =>
               `Row ${e.row}: ${e.error}`
             ) || [];
+            messages.push(...errorSummary);
+            if (result.failed > 10) {
+              messages.push(`...and ${result.failed - 10} more errors`);
+            }
+          }
+
+          if (result.skippedRows && result.skippedRows.length > 0) {
+            if (messages.length > 0) messages.push(''); // Empty line separator
+            messages.push('--- Skipped Rows ---');
+            const skippedSummary = result.skippedRows.slice(0, 5).map((s: any) =>
+              `Row ${s.row}: ${s.reason}`
+            );
+            messages.push(...skippedSummary);
+            if (result.skippedRows.length > 5) {
+              messages.push(`...and ${result.skippedRows.length - 5} more skipped rows`);
+            }
+          }
+
+          if (result.warnings && result.warnings.length > 0) {
+            if (messages.length > 0) messages.push(''); // Empty line separator
+            messages.push('--- Rows with Missing Data (defaults applied) ---');
+            const warningSummary = result.warnings.slice(0, 10).map((w: any) =>
+              `Row ${w.row}: Missing [${w.missingFields.join(', ')}] - Applied defaults: ${w.defaults}`
+            );
+            messages.push(...warningSummary);
+            if (result.warnings.length > 10) {
+              messages.push(`...and ${result.warnings.length - 10} more rows with missing data`);
+            }
+          }
+
+          if (result.failed > 0) {
             showToast(
               'warning',
-              'Import Completed with Errors',
-              `${result.success} tickets imported successfully, ${result.failed} failed.`,
-              errorSummary.length > 0 ? [...errorSummary, result.failed > 10 ? `...and ${result.failed - 10} more errors` : ''].filter(Boolean) : undefined
+              'Import Completed with Issues',
+              `${result.success} imported, ${result.failed} failed${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}${result.warnings?.length > 0 ? `, ${result.warnings.length} with missing data` : ''}.`,
+              messages.length > 0 ? messages : undefined
+            );
+          } else if (result.skipped > 0 || (result.warnings && result.warnings.length > 0)) {
+            const hasIssues = result.skippedRows?.length > 0 || result.warnings?.length > 0;
+            showToast(
+              'warning',
+              'Import Successful with Warnings',
+              `${result.success} tickets imported${result.skipped > 0 ? `, ${result.skipped} skipped` : ''}${result.warnings?.length > 0 ? `, ${result.warnings.length} with missing data` : ''}.${hasIssues ? ' A detailed report has been downloaded.' : ''}`,
+              messages
             );
           } else {
             showToast('success', 'Import Successful!', `${result.success} tickets have been imported successfully.`);
@@ -771,7 +889,7 @@ export default function TicketsPage() {
 
       {/* Validation Errors Modal */}
       {showValidationModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-red-500/30 rounded-2xl w-full max-w-2xl shadow-2xl max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
               <div className="flex items-center gap-3">

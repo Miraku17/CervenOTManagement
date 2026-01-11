@@ -455,57 +455,6 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* Top Recurring Stores Section */}
-      <Card className="bg-slate-900 border-slate-800">
-        <CardHeader>
-          <CardTitle className="text-white text-base sm:text-lg">Stores with Highest Number of Tickets</CardTitle>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Stores generating the most support requests
-          </p>
-        </CardHeader>
-        <CardContent>
-          {stats.topRecurringStores && stats.topRecurringStores.length > 0 ? (
-            <div className="space-y-2 sm:space-y-3">
-              {stats.topRecurringStores.map((store, index) => (
-                <div
-                  key={store.storeId}
-                  onClick={() => handleStoreClick(store.storeId, store.storeName)}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group gap-2 sm:gap-0"
-                >
-                  <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                    <div className="flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-500/10 text-blue-400 font-bold text-xs sm:text-sm group-hover:bg-blue-500/20 transition-colors flex-shrink-0">
-                      {index + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-semibold text-white truncate group-hover:text-blue-300 transition-colors">
-                        {store.storeName}
-                      </p>
-                      {store.storeCode && (
-                        <p className="text-[10px] sm:text-xs text-slate-400 font-mono">
-                          {store.storeCode}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 ml-9 sm:ml-0">
-                    <span className="text-xl sm:text-2xl font-bold text-blue-400 group-hover:text-blue-300 transition-colors">
-                      {store.ticketCount}
-                    </span>
-                    <span className="text-[10px] sm:text-xs text-slate-400 whitespace-nowrap">
-                      {store.ticketCount === 1 ? 'ticket' : 'tickets'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-xs sm:text-sm">
-              No store data available
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Modal for displaying tickets */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, width: '100vw', height: '100vh' }}>

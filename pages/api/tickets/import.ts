@@ -57,7 +57,10 @@ interface ImportRow {
 interface ImportResult {
   success: number;
   failed: number;
+  skipped: number;
   errors: Array<{ row: number; error: string; data?: any }>;
+  warnings: Array<{ row: number; missingFields: string[]; defaults: string }>;
+  skippedRows: Array<{ row: number; reason: string }>;
 }
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -136,7 +139,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Validate required columns exist
+    // Validate required columns exist in the Excel file
     const requiredColumns = [
       'RCC Reference Number',
       'Store Code',
@@ -197,7 +200,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const result: ImportResult = {
       success: 0,
       failed: 0,
+      skipped: 0,
       errors: [],
+      warnings: [],
+      skippedRows: [],
     };
 
     // --- Performance Optimization: Pre-fetch caches ---
@@ -438,24 +444,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
 
       try {
-        // Validate required fields
-        const missingFields = [];
-        if (!row['Store Code']) missingFields.push('Store Code');
-        if (!row['RCC Reference Number']) missingFields.push('RCC Reference Number');
-        if (!row['Sev']) missingFields.push('Sev');
-        if (!row['Request Detail']) missingFields.push('Request Detail');
+        // Track missing fields for warnings
+        const missingFields: string[] = [];
+        const appliedDefaults: string[] = [];
 
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required field${missingFields.length > 1 ? 's' : ''}: ${missingFields.join(', ')}`);
-        }
-
-        // Validate severity
-        const severity = row['Sev'].toString().trim().toLowerCase();
-        if (!['sev1', 'sev2', 'sev3', 'sev4'].includes(severity)) {
-          throw new Error(`Invalid Severity "${row['Sev']}" - Must be Sev1, Sev2, Sev3, or Sev4`);
+        // Validate severity only if provided
+        let severity = 'sev3'; // Default severity for testing
+        if (row['Sev']) {
+          severity = row['Sev'].toString().trim().toLowerCase();
+          if (!['sev1', 'sev2', 'sev3', 'sev4'].includes(severity)) {
+            throw new Error(`Invalid Severity "${row['Sev']}" - Must be Sev1, Sev2, Sev3, or Sev4`);
+          }
+        } else {
+          missingFields.push('Sev');
+          appliedDefaults.push('Sev=sev3');
         }
 
         // --- Store Lookup/Creation ---
+        // Skip row if no store code provided (for testing)
+        if (!row['Store Code']) {
+          result.skipped++;
+          result.skippedRows.push({
+            row: rowNumber,
+            reason: 'Missing Store Code'
+          });
+          continue;
+        }
+
         const storeCode = row['Store Code'].toString().trim();
         const storeName = row['Store Name'] ? row['Store Name'].toString().trim() : storeCode;
         const storeCacheKey = storeCode.toUpperCase();
@@ -616,13 +631,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         // --- Prepare Ticket Object ---
+        // Parse date - if invalid, just leave it null (don't skip the row)
         const formattedDate = parseDate(row['Date Reported']);
-        // Check if Date Reported contains text (invalid)
-        const dateReportedHasText = row['Date Reported'] && typeof row['Date Reported'] === 'string' && /[a-zA-Z]/.test(row['Date Reported'].toString().trim());
 
-        if (dateReportedHasText || (row['Date Reported'] && !formattedDate)) {
-             // console.log(`Skipping row ${rowNumber}: Date Reported contains invalid/text value`);
-             continue; 
+        // Track if date was invalid
+        if (row['Date Reported'] && !formattedDate) {
+          const dateValue = row['Date Reported'].toString().trim();
+          if (dateValue) {
+            missingFields.push('Date Reported (invalid format)');
+            appliedDefaults.push(`Date Reported=null (was: "${dateValue}")`);
+          }
         }
 
         let timeReported = null;
@@ -642,12 +660,48 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         const dateAttended = parseDate(row['Date Attended']);
-        
+
+        // Map alternative status names to canonical ones
+        const rawStatus = getOptionalField(row, 'Status')?.toLowerCase() || 'open';
+        const statusMappings: { [key: string]: string } = {
+          'ongoing': 'in_progress',
+          'hold': 'on_hold',
+        };
+        const normalizedStatus = statusMappings[rawStatus] || rawStatus;
+
+        // Check for missing required fields and track them
+        let rccRefNumber = '';
+        if (row['RCC Reference Number']) {
+          rccRefNumber = row['RCC Reference Number'].toString().trim();
+        } else {
+          missingFields.push('RCC Reference Number');
+          rccRefNumber = `AUTO-${Date.now()}-${i}`;
+          appliedDefaults.push(`RCC Reference Number=${rccRefNumber}`);
+        }
+
+        let requestDetail = '';
+        if (row['Request Detail']) {
+          requestDetail = row['Request Detail'].toString().trim();
+        } else {
+          missingFields.push('Request Detail');
+          requestDetail = 'No details provided';
+          appliedDefaults.push('Request Detail=No details provided');
+        }
+
+        // Add warning if there are missing fields
+        if (missingFields.length > 0) {
+          result.warnings.push({
+            row: rowNumber,
+            missingFields: missingFields,
+            defaults: appliedDefaults.join(', ')
+          });
+        }
+
         const ticket = {
             store_id: storeId,
             station_id: stationId,
             mod_id: modId,
-            rcc_reference_number: row['RCC Reference Number'].toString().trim(),
+            rcc_reference_number: rccRefNumber,
             date_reported: formattedDate,
             time_reported: timeReported,
             date_responded: parseDate(row['Date Responded']),
@@ -656,10 +710,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             device: getOptionalField(row, 'Device'),
             problem_category: getOptionalField(row, 'Problem Category'),
             sev: severity,
-            request_detail: row['Request Detail'].toString().trim(),
+            request_detail: requestDetail,
             action_taken: getOptionalField(row, '----- Action Taken -----'),
             final_resolution: getOptionalField(row, 'Final resolution'),
-            status: getOptionalField(row, 'Status')?.toLowerCase() || 'open',
+            status: normalizedStatus,
             parts_replaced: getOptionalField(row, 'Part/s replaced'),
             new_parts_serial: getOptionalField(row, 'New Parts Serial'),
             old_parts_serial: getOptionalField(row, 'Old Parts Serial'),
