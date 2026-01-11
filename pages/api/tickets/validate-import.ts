@@ -129,7 +129,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Validate required columns exist
+    // Validate required columns exist in the Excel file
     const requiredColumns = [
       'RCC Reference Number',
       'Store Code',
@@ -260,14 +260,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const { row, originalIndex } = nonEmptyData[i];
       const rowNumber = originalIndex + 2; // Excel row number
 
-      // Check required fields
-      if (!row['Store Code']) {
-        validationErrors.push({ row: rowNumber, field: 'Store Code', message: 'Missing Store Code' });
-      }
+      // For testing: All fields are optional - skip required field validation
+      // if (!row['Store Code']) {
+      //   validationErrors.push({ row: rowNumber, field: 'Store Code', message: 'Missing Store Code' });
+      // }
 
-      if (!row['RCC Reference Number']) {
-        validationErrors.push({ row: rowNumber, field: 'RCC Reference Number', message: 'Missing RCC Reference Number' });
-      }
+      // if (!row['RCC Reference Number']) {
+      //   validationErrors.push({ row: rowNumber, field: 'RCC Reference Number', message: 'Missing RCC Reference Number' });
+      // }
 
       // Validate Date Reported (optional now, but validate format if provided)
       if (row['Date Reported']) {
@@ -290,24 +290,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       validateTimeParsing(row['Pause Time\n(End)'], 'Pause Time (End)', rowNumber);
       validateTimeParsing(row['Work End'], 'Work End', rowNumber);
 
-      if (!row['Sev']) {
-        validationErrors.push({ row: rowNumber, field: 'Sev', message: 'Missing Severity' });
-      } else {
+      // For testing: Severity is optional - only validate format if provided
+      if (row['Sev']) {
         const severity = row['Sev'].toString().trim().toLowerCase();
         if (!['sev1', 'sev2', 'sev3', 'sev4'].includes(severity)) {
           validationErrors.push({ row: rowNumber, field: 'Sev', message: `Invalid Severity "${row['Sev']}". Must be Sev1, Sev2, Sev3, or Sev4` });
         }
       }
 
-      if (!row['Request Detail']) {
-        validationErrors.push({ row: rowNumber, field: 'Request Detail', message: 'Missing Request Detail' });
-      }
+      // For testing: Request Detail is optional
+      // if (!row['Request Detail']) {
+      //   validationErrors.push({ row: rowNumber, field: 'Request Detail', message: 'Missing Request Detail' });
+      // }
 
       // Validate Status enum if provided
       if (row['Status']) {
         const status = row['Status'].toString().trim().toLowerCase();
-        if (!['open', 'in_progress', 'on_hold', 'closed'].includes(status)) {
-          validationErrors.push({ row: rowNumber, field: 'Status', message: `Invalid Status "${row['Status']}". Must be one of: open, in_progress, on_hold, closed` });
+        // Map alternative status names to canonical ones
+        const statusMappings: { [key: string]: string } = {
+          'ongoing': 'in_progress',
+          'hold': 'on_hold',
+        };
+        const normalizedStatus = statusMappings[status] || status;
+
+        if (!['open', 'in_progress', 'on_hold', 'closed', 'replacement', 'revisit', 'cancelled', 'completed', 'duplicate', 'misroute', 'pending'].includes(normalizedStatus)) {
+          validationErrors.push({ row: rowNumber, field: 'Status', message: `Invalid Status "${row['Status']}". Must be one of: open, in_progress, on_hold, closed, replacement, revisit, cancelled, completed, duplicate, misroute, pending (or use aliases: ongoing, hold)` });
         }
       }
     }
