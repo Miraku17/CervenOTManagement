@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'PUT' && req.method !== 'PATCH') {
@@ -23,77 +24,148 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Ticket ID is required' });
     }
 
-    // Fetch the existing ticket to check authorization and get current data
+    // Check if user has manage_tickets permission
+    const hasManageTickets = await userHasPermission(req.user.id, 'manage_tickets');
+
+    if (!hasManageTickets) {
+      return res.status(403).json({
+        error: 'Unauthorized: You do not have permission to update tickets'
+      });
+    }
+
+    // Fetch the existing ticket to get current data for SLA calculation
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved')
+      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end')
       .eq('id', id)
       .single();
 
     if (fetchError || !existingTicket) {
       console.error('Error fetching ticket for update:', fetchError);
-      return res.status(404).json({ 
-        error: 'Ticket not found', 
-        details: fetchError 
+      return res.status(404).json({
+        error: 'Ticket not found',
+        details: fetchError
       });
     }
 
-    // Authorization check: Only admin or assigned employee can update
-    const isAdmin = req.user.role === 'admin';
-    const isAssignedEmployee = existingTicket.serviced_by === req.user.id;
+    // Calculate SLA Count Hours: (Date Attended & Work End) - (Date & Time Acknowledge)
+    // If pause exists: SLA Count - (Pause End - Pause Start)
+    const dateAck = updateData.date_ack || existingTicket.date_ack;
+    const timeAck = updateData.time_ack || existingTicket.time_ack;
+    const dateAttended = updateData.date_attended || existingTicket.date_attended;
+    const workEnd = updateData.work_end || existingTicket.work_end;
+    const pauseStart = updateData.pause_time_start || existingTicket.pause_time_start;
+    const pauseEnd = updateData.pause_time_end || existingTicket.pause_time_end;
 
-    if (!isAdmin && !isAssignedEmployee) {
-      return res.status(403).json({
-        error: 'Unauthorized: Only admins or the assigned employee can update this ticket'
-      });
-    }
-
-    // Remove fields that shouldn't be updated by non-admins
-    if (!isAdmin) {
-      // Non-admins cannot change who the ticket is assigned to
-      delete updateData.serviced_by;
-      delete updateData.reported_by;
-      delete updateData.store_id;
-      delete updateData.station_id;
-      delete updateData.mod_id;
-      delete updateData.sev;
-    }
-
-    // Calculate SLA Count Hours if date_resolved and time_resolved are available
-    const dateReported = updateData.date_reported || existingTicket.date_reported;
-    const timeReported = updateData.time_reported || existingTicket.time_reported;
-    const dateResolved = updateData.date_resolved || existingTicket.date_resolved;
-    const timeResolved = updateData.time_resolved || existingTicket.time_resolved;
-
-    if (dateReported && timeReported && dateResolved && timeResolved) {
+    if (dateAck && timeAck && dateAttended && workEnd) {
       try {
-        // Parse reported date and time
-        const reportedDate = new Date(dateReported);
-        const [reportedHours, reportedMinutes] = timeReported.split(':');
-        reportedDate.setHours(parseInt(reportedHours), parseInt(reportedMinutes), 0, 0);
-
-        // Parse resolved date and time
-        const resolvedDate = new Date(dateResolved);
-        const [resolvedHours, resolvedMinutes] = timeResolved.split(':');
-        resolvedDate.setHours(parseInt(resolvedHours), parseInt(resolvedMinutes), 0, 0);
-
-        // Calculate difference in hours
-        const diffInMs = resolvedDate.getTime() - reportedDate.getTime();
-
-        if (diffInMs < 0) {
-          return res.status(400).json({ error: 'Date Resolved cannot be earlier than Date Reported' });
+        // Validate time format (HH:MM or HH:MM:SS)
+        const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+        if (!timePattern.test(timeAck)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Time Acknowledge. Expected format: HH:MM (e.g., 09:30)'
+          });
         }
 
-        const diffInHours = diffInMs / (1000 * 60 * 60);
+        // Parse acknowledge date and time
+        const ackDate = new Date(dateAck);
+        const [ackHours, ackMinutes] = timeAck.split(':');
+        ackDate.setHours(parseInt(ackHours), parseInt(ackMinutes), 0, 0);
+
+        // Validate acknowledge date is valid
+        if (isNaN(ackDate.getTime())) {
+          return res.status(400).json({
+            error: 'Invalid Date Acknowledge. Please provide a valid date.'
+          });
+        }
+
+        // Combine Date Attended + Work End time to create full work end timestamp
+        const workEndDate = new Date(dateAttended);
+        const [workEndHours, workEndMinutes] = workEnd.split(':');
+        workEndDate.setHours(parseInt(workEndHours), parseInt(workEndMinutes), 0, 0);
+
+        // Validate date attended is valid
+        if (isNaN(workEndDate.getTime())) {
+          return res.status(400).json({
+            error: 'Invalid Date Attended. Please provide a valid date.'
+          });
+        }
+
+        // Calculate difference in hours
+        const diffInMs = workEndDate.getTime() - ackDate.getTime();
+
+        if (diffInMs < 0) {
+          return res.status(400).json({
+            error: 'Work End cannot be earlier than Date/Time Acknowledge'
+          });
+        }
+
+        let diffInHours = diffInMs / (1000 * 60 * 60);
+
+        // Validate and subtract pause time if both pause start and end exist
+        if (pauseStart && pauseEnd) {
+          // Combine Date Attended with pause times (pause times only store time, date comes from date_attended)
+          const pauseStartDate = new Date(dateAttended);
+          const [pStartHours, pStartMinutes] = pauseStart.split(':');
+          pauseStartDate.setHours(parseInt(pStartHours), parseInt(pStartMinutes), 0, 0);
+
+          const pauseEndDate = new Date(dateAttended);
+          const [pEndHours, pEndMinutes] = pauseEnd.split(':');
+          pauseEndDate.setHours(parseInt(pEndHours), parseInt(pEndMinutes), 0, 0);
+
+          // Validate pause dates are valid
+          if (isNaN(pauseStartDate.getTime())) {
+            return res.status(400).json({
+              error: 'Invalid Pause Start time. Please provide a valid time.'
+            });
+          }
+
+          if (isNaN(pauseEndDate.getTime())) {
+            return res.status(400).json({
+              error: 'Invalid Pause End time. Please provide a valid time.'
+            });
+          }
+
+          // Validate pause end is after pause start
+          const pauseDiffInMs = pauseEndDate.getTime() - pauseStartDate.getTime();
+          if (pauseDiffInMs <= 0) {
+            return res.status(400).json({
+              error: 'Pause End must be after Pause Start'
+            });
+          }
+
+          // Validate pause period is within work period
+          if (pauseStartDate.getTime() < ackDate.getTime()) {
+            return res.status(400).json({
+              error: 'Pause Start cannot be before Date/Time Acknowledge'
+            });
+          }
+
+          if (pauseEndDate.getTime() > workEndDate.getTime()) {
+            return res.status(400).json({
+              error: 'Pause End cannot be after Work End'
+            });
+          }
+
+          const pauseHours = pauseDiffInMs / (1000 * 60 * 60);
+          diffInHours = diffInHours - pauseHours;
+        } else if ((pauseStart && !pauseEnd) || (!pauseStart && pauseEnd)) {
+          // Validate both pause times are provided together
+          return res.status(400).json({
+            error: 'Both Pause Start and Pause End must be provided together'
+          });
+        }
 
         // Round to 2 decimal places and ensure it's not negative
         updateData.sla_count_hrs = Math.max(0, Math.round(diffInHours * 100) / 100);
       } catch (error) {
         console.error('Error calculating SLA count hours:', error);
-        // Continue without setting sla_count_hrs if calculation fails
+        return res.status(400).json({
+          error: 'Failed to calculate SLA count hours. Please check all date and time values are correct.'
+        });
       }
-    } else if (updateData.date_resolved === null || updateData.time_resolved === null) {
-      // If date_resolved or time_resolved is being cleared, also clear sla_count_hrs
+    } else if (updateData.date_ack === null || updateData.time_ack === null || updateData.date_attended === null || updateData.work_end === null) {
+      // If required fields are being cleared, also clear sla_count_hrs
       updateData.sla_count_hrs = null;
     }
 
