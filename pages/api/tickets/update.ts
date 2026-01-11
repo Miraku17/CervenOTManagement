@@ -50,20 +50,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Calculate SLA Count Hours: (Date Attended & Work End) - (Date & Time Acknowledge)
     // If pause exists: SLA Count - (Pause End - Pause Start)
-    const dateAck = updateData.date_ack || existingTicket.date_ack;
-    const timeAck = updateData.time_ack || existingTicket.time_ack;
-    const dateAttended = updateData.date_attended || existingTicket.date_attended;
-    const workEnd = updateData.work_end || existingTicket.work_end;
-    const pauseStart = updateData.pause_time_start || existingTicket.pause_time_start;
-    const pauseEnd = updateData.pause_time_end || existingTicket.pause_time_end;
+    const dateAck = updateData.date_ack !== undefined ? updateData.date_ack : existingTicket.date_ack;
+    const timeAck = updateData.time_ack !== undefined ? updateData.time_ack : existingTicket.time_ack;
+    const dateAttended = updateData.date_attended !== undefined ? updateData.date_attended : existingTicket.date_attended;
+    const workEnd = updateData.work_end !== undefined ? updateData.work_end : existingTicket.work_end;
+    const pauseStart = updateData.pause_time_start !== undefined ? updateData.pause_time_start : existingTicket.pause_time_start;
+    const pauseEnd = updateData.pause_time_end !== undefined ? updateData.pause_time_end : existingTicket.pause_time_end;
 
     if (dateAck && timeAck && dateAttended && workEnd) {
       try {
         // Validate time format (HH:MM or HH:MM:SS)
         const timePattern = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+
         if (!timePattern.test(timeAck)) {
           return res.status(400).json({
             error: 'Invalid time format for Time Acknowledge. Expected format: HH:MM (e.g., 09:30)'
+          });
+        }
+
+        if (!timePattern.test(workEnd)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Work End. Expected format: HH:MM (e.g., 17:30)'
+          });
+        }
+
+        // Validate pause time formats if provided
+        if (pauseStart && !timePattern.test(pauseStart)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Pause Start. Expected format: HH:MM (e.g., 12:00)'
+          });
+        }
+
+        if (pauseEnd && !timePattern.test(pauseEnd)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Pause End. Expected format: HH:MM (e.g., 13:00)'
           });
         }
 
@@ -102,52 +122,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         let diffInHours = diffInMs / (1000 * 60 * 60);
 
-        // Validate and subtract pause time if both pause start and end exist
+        // Subtract pause time if both pause start and end exist
         if (pauseStart && pauseEnd) {
-          // Combine Date Attended with pause times (pause times only store time, date comes from date_attended)
-          const pauseStartDate = new Date(dateAttended);
+          // Parse pause times and calculate duration in hours
           const [pStartHours, pStartMinutes] = pauseStart.split(':');
-          pauseStartDate.setHours(parseInt(pStartHours), parseInt(pStartMinutes), 0, 0);
-
-          const pauseEndDate = new Date(dateAttended);
           const [pEndHours, pEndMinutes] = pauseEnd.split(':');
-          pauseEndDate.setHours(parseInt(pEndHours), parseInt(pEndMinutes), 0, 0);
 
-          // Validate pause dates are valid
-          if (isNaN(pauseStartDate.getTime())) {
+          // Convert to total minutes for easier calculation
+          let pauseStartMinutes = parseInt(pStartHours) * 60 + parseInt(pStartMinutes);
+          let pauseEndMinutes = parseInt(pEndHours) * 60 + parseInt(pEndMinutes);
+
+          // Validate pause end is after pause start (should be same day)
+          if (pauseEndMinutes <= pauseStartMinutes) {
             return res.status(400).json({
-              error: 'Invalid Pause Start time. Please provide a valid time.'
+              error: 'Pause End must be after Pause Start. Both times should be on the same day.'
             });
           }
 
-          if (isNaN(pauseEndDate.getTime())) {
+          // Calculate pause duration in hours
+          const pauseDurationMinutes = pauseEndMinutes - pauseStartMinutes;
+          const pauseHours = pauseDurationMinutes / 60;
+
+          // Validate pause duration doesn't exceed total work duration
+          if (pauseHours > diffInHours) {
             return res.status(400).json({
-              error: 'Invalid Pause End time. Please provide a valid time.'
+              error: 'Pause duration cannot exceed total work duration'
             });
           }
 
-          // Validate pause end is after pause start
-          const pauseDiffInMs = pauseEndDate.getTime() - pauseStartDate.getTime();
-          if (pauseDiffInMs <= 0) {
-            return res.status(400).json({
-              error: 'Pause End must be after Pause Start'
-            });
-          }
-
-          // Validate pause period is within work period
-          if (pauseStartDate.getTime() < ackDate.getTime()) {
-            return res.status(400).json({
-              error: 'Pause Start cannot be before Date/Time Acknowledge'
-            });
-          }
-
-          if (pauseEndDate.getTime() > workEndDate.getTime()) {
-            return res.status(400).json({
-              error: 'Pause End cannot be after Work End'
-            });
-          }
-
-          const pauseHours = pauseDiffInMs / (1000 * 60 * 60);
+          // Subtract pause duration from total SLA hours
           diffInHours = diffInHours - pauseHours;
         } else if ((pauseStart && !pauseEnd) || (!pauseStart && pauseEnd)) {
           // Validate both pause times are provided together
