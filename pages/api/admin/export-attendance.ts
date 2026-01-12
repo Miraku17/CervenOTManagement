@@ -89,7 +89,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .select('*')
         .in('requested_by', batch)
         .gte('overtime_date', startDate)
-        .lte('overtime_date', endDate);
+        .lte('overtime_date', endDate)
+        .eq('final_status', 'approved');
 
       if (batchError) {
         console.error('Overtime_v2 fetch error for batch:', batchError);
