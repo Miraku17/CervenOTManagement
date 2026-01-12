@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye } from 'lucide-react';
+import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -68,6 +68,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
   const [isViewCreditsModalOpen, setIsViewCreditsModalOpen] = useState(false);
   const [showLeaveCreditsDropdown, setShowLeaveCreditsDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
   useEffect(() => {
     fetchRequests();
@@ -283,12 +284,16 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
   const filteredRequests = requests.filter(req => {
     const matchesFilter = filter === 'all' ? true : req.status === filter;
     const searchLower = searchTerm.toLowerCase();
-    const matchesSearch = 
+    const matchesSearch =
       req.employee.first_name.toLowerCase().includes(searchLower) ||
       req.employee.last_name.toLowerCase().includes(searchLower) ||
       req.employee.email.toLowerCase().includes(searchLower);
-    
+
     return matchesFilter && matchesSearch;
+  }).sort((a, b) => {
+    const dateA = new Date(a.created_at).getTime();
+    const dateB = new Date(b.created_at).getTime();
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
   });
 
   const getConfirmationConfig = () => {
@@ -434,20 +439,31 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
           />
         </div>
 
-        <div className="flex gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
-          {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
-                filter === f
-                  ? 'bg-blue-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700'
-              }`}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </button>
-          ))}
+        <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
+            {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all whitespace-nowrap ${
+                  filter === f
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700'
+                }`}
+              >
+                {f.charAt(0).toUpperCase() + f.slice(1)}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors whitespace-nowrap"
+            title={`Sort by ${sortOrder === 'newest' ? 'oldest' : 'newest'} first`}
+          >
+            <ArrowUpDown size={16} />
+            <span className="text-sm font-medium">{sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}</span>
+          </button>
         </div>
       </div>
 

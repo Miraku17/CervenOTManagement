@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ConfirmModal } from '@/components/ConfirmModal';
 
@@ -68,6 +68,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
   const [employeeFilter, setEmployeeFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
   // Filtered requests based on date and employee filters
   const filteredRequests = useMemo(() => {
@@ -89,8 +90,12 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
       }
 
       return true;
+    }).sort((a, b) => {
+      const dateA = new Date(a.requested_at).getTime();
+      const dateB = new Date(b.requested_at).getTime();
+      return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
-  }, [requests, dateFilter, employeeFilter]);
+  }, [requests, dateFilter, employeeFilter, sortOrder]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
@@ -489,7 +494,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
 
       {/* Filters */}
       <div className="bg-slate-900 rounded-xl border border-slate-800 p-4">
-        <div className="flex items-center gap-2 mb-3">
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-sm font-medium text-slate-300">Filters</span>
           {(dateFilter || employeeFilter) && (
@@ -498,11 +503,19 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                 setDateFilter('');
                 setEmployeeFilter('');
               }}
-              className="ml-auto text-xs text-blue-400 hover:text-blue-300 transition-colors"
+              className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
             >
               Clear All
             </button>
           )}
+          <button
+            onClick={() => setSortOrder(sortOrder === 'newest' ? 'oldest' : 'newest')}
+            className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg border border-slate-700 transition-colors whitespace-nowrap"
+            title={`Sort by ${sortOrder === 'newest' ? 'oldest' : 'newest'} first`}
+          >
+            <ArrowUpDown size={14} />
+            <span className="text-xs font-medium">{sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}</span>
+          </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Date Filter */}
