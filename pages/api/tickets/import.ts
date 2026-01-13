@@ -22,7 +22,8 @@ interface ImportRow {
   'RCC Reference Number': string;
   'Store Code': string;
   'Store Name'?: string;
-  'Request type'?: string;
+  'Station Name'?: string;
+  'Request Type'?: string;
   'Device'?: string;
   'Station'?: string;
   'Brand'?: string;
@@ -47,7 +48,9 @@ interface ImportRow {
   'Work End'?: string;
   'Date Resolved'?: string;
   'Reported by'?: string;
+  'Reported By (Employee ID)'?: string;
   'Serviced by'?: string;
+  'Assigned To (Employee ID)'?: string;
   'MOD'?: string;
   'SLA Count\n(Hrs)'?: string;
   'Downtime'?: string;
@@ -233,16 +236,44 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // 3. Profiles Cache (Employees)
+    // 3. Request Types Cache
+    const requestTypeCache = new Map<string, string>(); // request type name -> id
+    const { data: requestTypes, error: requestTypesError } = await supabaseAdmin
+      .from('request_types')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (!requestTypesError && requestTypes) {
+      requestTypes.forEach(rt => {
+        if (rt.name) requestTypeCache.set(rt.name.toUpperCase(), rt.id);
+      });
+    }
+
+    // 4. Problem Categories Cache
+    const problemCategoryCache = new Map<string, string>(); // problem category name -> id
+    const { data: problemCategories, error: problemCategoriesError } = await supabaseAdmin
+      .from('problem_categories')
+      .select('id, name')
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (!problemCategoriesError && problemCategories) {
+      problemCategories.forEach(pc => {
+        if (pc.name) problemCategoryCache.set(pc.name.toUpperCase(), pc.id);
+      });
+    }
+
+    // 5. Profiles Cache (Employees)
     // Create a map that can lookup by first name, last name, or full name
-    // Simplification: We'll search on demand if not found in a quick map, 
+    // Simplification: We'll search on demand if not found in a quick map,
     // or just pre-fetch basic info if the list isn't huge.
     // Assuming < 5000 employees, fetching all ID/Names is fine.
     const employeeCache = new Map<string, string>(); // name key -> id
     const { data: profiles, error: profilesError } = await supabaseAdmin
       .from('profiles')
       .select('id, first_name, last_name');
-    
+
     if (!profilesError && profiles) {
       profiles.forEach(p => {
         if (p.first_name) employeeCache.set(p.first_name.toLowerCase(), p.id);
@@ -262,6 +293,88 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const getOptionalField = (row: ImportRow, fieldName: keyof ImportRow): string | null => {
         const value = row[fieldName];
         return value ? value.toString().trim() : null;
+    };
+
+    // Get or create request type ID
+    const getOrCreateRequestType = async (name: string): Promise<string | null> => {
+        if (!name || !name.trim()) return null;
+
+        const nameKey = name.trim().toUpperCase();
+
+        // Check cache first
+        if (requestTypeCache.has(nameKey)) {
+            return requestTypeCache.get(nameKey)!;
+        }
+
+        // Check if it exists in database (case-insensitive)
+        const { data: existing } = await supabaseAdmin
+            .from('request_types')
+            .select('id')
+            .ilike('name', name.trim())
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .maybeSingle();
+
+        if (existing) {
+            requestTypeCache.set(nameKey, existing.id);
+            return existing.id;
+        }
+
+        // Create new request type
+        const { data: newRequestType, error } = await supabaseAdmin
+            .from('request_types')
+            .insert({ name: name.trim(), is_active: true })
+            .select('id')
+            .single();
+
+        if (error || !newRequestType) {
+            console.error('Error creating request type:', error);
+            return null;
+        }
+
+        requestTypeCache.set(nameKey, newRequestType.id);
+        return newRequestType.id;
+    };
+
+    // Get or create problem category ID
+    const getOrCreateProblemCategory = async (name: string): Promise<string | null> => {
+        if (!name || !name.trim()) return null;
+
+        const nameKey = name.trim().toUpperCase();
+
+        // Check cache first
+        if (problemCategoryCache.has(nameKey)) {
+            return problemCategoryCache.get(nameKey)!;
+        }
+
+        // Check if it exists in database (case-insensitive)
+        const { data: existing } = await supabaseAdmin
+            .from('problem_categories')
+            .select('id')
+            .ilike('name', name.trim())
+            .eq('is_active', true)
+            .is('deleted_at', null)
+            .maybeSingle();
+
+        if (existing) {
+            problemCategoryCache.set(nameKey, existing.id);
+            return existing.id;
+        }
+
+        // Create new problem category
+        const { data: newProblemCategory, error } = await supabaseAdmin
+            .from('problem_categories')
+            .insert({ name: name.trim(), is_active: true })
+            .select('id')
+            .single();
+
+        if (error || !newProblemCategory) {
+            console.error('Error creating problem category:', error);
+            return null;
+        }
+
+        problemCategoryCache.set(nameKey, newProblemCategory.id);
+        return newProblemCategory.id;
     };
 
     const parseTime = (timeValue: any): string | null => {
@@ -697,6 +810,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           });
         }
 
+        // Get or create request type and problem category IDs
+        const requestTypeValue = getOptionalField(row, 'Request Type');
+        const requestTypeId = requestTypeValue ? await getOrCreateRequestType(requestTypeValue) : null;
+
+        const problemCategoryValue = getOptionalField(row, 'Problem Category');
+        const problemCategoryId = problemCategoryValue ? await getOrCreateProblemCategory(problemCategoryValue) : null;
+
         const ticket = {
             store_id: storeId,
             station_id: stationId,
@@ -706,9 +826,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             time_reported: timeReported,
             date_responded: parseDate(row['Date Responded']),
             time_responded: parseTime(row['Time Responded']),
-            request_type: getOptionalField(row, 'Request type'),
+            request_type_id: requestTypeId,
             device: getOptionalField(row, 'Device'),
-            problem_category: getOptionalField(row, 'Problem Category'),
+            problem_category_id: problemCategoryId,
             sev: severity,
             request_detail: requestDetail,
             action_taken: getOptionalField(row, '----- Action Taken -----'),
