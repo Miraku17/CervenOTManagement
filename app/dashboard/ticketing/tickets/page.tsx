@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User } from 'lucide-react';
+import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
@@ -125,8 +125,10 @@ export default function TicketsPage() {
   const [importingFileName, setImportingFileName] = useState<string>('');
   const [isImportLogsModalOpen, setIsImportLogsModalOpen] = useState(false);
   const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
+  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const actionsDropdownRef = useRef<HTMLDivElement>(null);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
@@ -142,6 +144,39 @@ export default function TicketsPage() {
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
+
+  // Status options for dropdown
+  const statusOptions = [
+    { value: 'all', label: 'All Statuses', color: 'text-slate-400' },
+    { value: 'open', label: 'Open', color: 'text-blue-400' },
+    { value: 'in_progress', label: 'In Progress', color: 'text-yellow-400' },
+    { value: 'on_hold', label: 'On Hold', color: 'text-orange-400' },
+    { value: 'closed', label: 'Closed', color: 'text-green-400' },
+    { value: 'replacement', label: 'Replacement', color: 'text-purple-400' },
+    { value: 'revisit', label: 'Revisit', color: 'text-cyan-400' },
+    { value: 'cancelled', label: 'Cancelled', color: 'text-red-400' },
+    { value: 'completed', label: 'Completed', color: 'text-emerald-400' },
+    { value: 'duplicate', label: 'Duplicate', color: 'text-pink-400' },
+    { value: 'misroute', label: 'Misroute', color: 'text-amber-400' },
+    { value: 'pending', label: 'Pending', color: 'text-indigo-400' },
+  ];
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setIsStatusDropdownOpen(false);
+      }
+    };
+
+    if (isStatusDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isStatusDropdownOpen]);
 
   // Reset to page 1 when filters change
   React.useEffect(() => {
@@ -676,8 +711,9 @@ export default function TicketsPage() {
 
       {/* Filters & Search */}
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-          <div className="relative flex-1">
+        <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+          {/* Search Bar */}
+          <div className="relative w-full mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
             <input
               type="text"
@@ -687,28 +723,58 @@ export default function TicketsPage() {
               className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
+
+          {/* Filter Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            {/* Sort Button */}
             <button
               onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900 transition-colors mr-2"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900 transition-colors"
               title={`Sort by ${sortOrder === 'asc' ? 'newest' : 'oldest'} first`}
             >
               <ArrowUpDown size={16} />
               <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
             </button>
-            {['all', 'open', 'in progress', 'on hold', 'closed'].map((status) => (
+
+            {/* Status Filter Dropdown */}
+            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]" ref={statusDropdownRef}>
               <button
-                key={status}
-                onClick={() => setStatusFilter(status)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-colors border ${
-                  statusFilter === status
-                    ? 'bg-blue-600 text-white border-blue-500'
-                    : 'bg-slate-950 text-slate-400 border-slate-700 hover:bg-slate-900 hover:text-white'
-                }`}
+                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900 transition-colors"
               >
-                {status}
+                <Filter size={16} />
+                <span className="text-sm font-medium">
+                  {statusOptions.find(opt => opt.value === statusFilter)?.label || 'Filter by Status'}
+                </span>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
               </button>
-            ))}
+
+              {isStatusDropdownOpen && (
+                <div className="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-64 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                  <div className="max-h-96 overflow-y-auto">
+                    {statusOptions.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => {
+                          setStatusFilter(option.value);
+                          setIsStatusDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center justify-between border-b border-slate-800 last:border-0 ${
+                          statusFilter === option.value ? 'bg-slate-800' : ''
+                        }`}
+                      >
+                        <span className={`text-sm font-medium ${option.color}`}>
+                          {option.label}
+                        </span>
+                        {statusFilter === option.value && (
+                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
