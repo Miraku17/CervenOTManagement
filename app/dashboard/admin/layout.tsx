@@ -13,7 +13,8 @@ import {
   FileUp,
   Ticket,
   AlertTriangle,
-  BookOpen
+  BookOpen,
+  CalendarCheck
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -110,6 +111,7 @@ export default function AdminLayout({
     if (pathname.startsWith('/dashboard/admin/leave-requests')) return 'Leave Requests';
     if (pathname.startsWith('/dashboard/admin/import-schedule')) return 'Import Schedule';
     if (pathname.startsWith('/dashboard/admin/employee-schedule')) return 'Employee Schedule';
+    if (pathname.startsWith('/dashboard/admin/holidays')) return 'Holidays';
     if (pathname.startsWith('/dashboard/knowledge-base')) return 'Knowledge Base';
 
     return 'Dashboard';
@@ -224,6 +226,14 @@ export default function AdminLayout({
                   onClick={() => handleNavigate('/dashboard/admin/reports')}
                 />
               )}
+              {hasImportScheduleAccess() && (
+                <SidebarItem
+                  icon={<CalendarCheck size={18} />}
+                  label="Holidays"
+                  isActive={isActive('/dashboard/admin/holidays')}
+                  onClick={() => handleNavigate('/dashboard/admin/holidays')}
+                />
+              )}
               <SidebarItem
                 icon={<BookOpen size={18} />}
                 label="Knowledge Base"
@@ -322,6 +332,14 @@ export default function AdminLayout({
               isActive={isActive('/dashboard/knowledge-base')}
               onClick={() => handleNavigate('/dashboard/knowledge-base')}
             />
+            {hasImportScheduleAccess() && (
+              <SidebarItem
+                icon={<CalendarCheck size={24} />}
+                label="Holidays"
+                isActive={isActive('/dashboard/admin/holidays')}
+                onClick={() => handleNavigate('/dashboard/admin/holidays')}
+              />
+            )}
             {hasEditTimeAccess() && (
               <SidebarItem
                 icon={<Users size={24} />}

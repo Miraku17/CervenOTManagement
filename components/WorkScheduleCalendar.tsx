@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane, Edit2, Save, Trash2, CheckCircle, AlertCircle, AlertTriangle } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X, Clock, Coffee, Plane, Edit2, Save, Trash2, CheckCircle, AlertCircle, AlertTriangle, CalendarCheck } from 'lucide-react';
 import type { LeaveRequest } from '@/types';
 import { usePermissions } from '@/hooks/usePermissions';
 
@@ -13,6 +13,14 @@ interface WorkSchedule {
   is_rest_day: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+interface Holiday {
+  id: string;
+  date: string;
+  name: string;
+  holiday_type: string;
+  is_recurring: boolean;
 }
 
 interface WorkScheduleCalendarProps {
@@ -42,6 +50,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
 
   const [schedules, setSchedules] = useState<WorkSchedule[]>([]);
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -130,6 +139,27 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
     fetchSchedules();
   }, [userId, viewMonth, viewYear]);
 
+  // Fetch holidays when month/year changes
+  useEffect(() => {
+    const fetchHolidays = async () => {
+      try {
+        const response = await fetch(`/api/admin/holidays/get?year=${viewYear}`);
+
+        if (!response.ok) {
+          console.error('Failed to fetch holidays');
+          return;
+        }
+
+        const data = await response.json();
+        setHolidays(data.holidays || []);
+      } catch (error) {
+        console.error('Error fetching holidays:', error);
+      }
+    };
+
+    fetchHolidays();
+  }, [viewYear]);
+
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(viewYear, viewMonth, 1).getDay();
 
@@ -161,6 +191,11 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
     }
 
     return null;
+  };
+
+  // Helper function to check if a date is a holiday
+  const getHolidayForDate = (dateStr: string): Holiday | null => {
+    return holidays.find(holiday => holiday.date === dateStr) || null;
   };
 
   const monthName = new Date(viewYear, viewMonth).toLocaleString('default', { month: 'long' });
@@ -326,15 +361,19 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
       const dateStr = `${viewYear}-${String(viewMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const schedule = schedulesByDate[dateStr];
       const leaveRequest = getLeaveRequestForDate(dateStr);
+      const holiday = getHolidayForDate(dateStr);
       const isToday = d === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear();
       const isSelected = selectedDate === dateStr;
       const isRestDay = schedule?.is_rest_day;
       const hasSchedule = !!schedule;
       const hasLeave = !!leaveRequest;
+      const hasHoliday = !!holiday;
 
-      // Determine background color based on priority: leave > rest day > schedule
+      // Determine background color based on priority: holiday > leave > rest day > schedule
       let bgClass = 'border-slate-800 bg-slate-900/40 hover:bg-slate-800/60';
-      if (hasLeave) {
+      if (hasHoliday) {
+        bgClass = 'border-purple-500/30 bg-purple-500/10 hover:bg-purple-500/20';
+      } else if (hasLeave) {
         // Different colors based on leave status
         if (leaveRequest.status === 'approved') {
           bgClass = 'border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20';
@@ -364,7 +403,9 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
             <span className={`text-xs sm:text-sm font-medium ${isToday || isSelected ? 'text-blue-400' : 'text-slate-500'} group-hover:text-slate-300`}>
               {d}
             </span>
-            {hasLeave ? (
+            {hasHoliday ? (
+              <CalendarCheck className="w-3 h-3 sm:w-4 sm:h-4 text-purple-400" />
+            ) : hasLeave ? (
               <Plane className={`w-3 h-3 sm:w-4 sm:h-4 ${
                 leaveRequest.status === 'approved' ? 'text-emerald-500' :
                 leaveRequest.status === 'rejected' ? 'text-red-500' :
@@ -377,7 +418,13 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
             ) : null}
           </div>
 
-          {hasLeave ? (
+          {hasHoliday ? (
+            <div className="mt-auto z-10 relative">
+              <span className="text-[9px] sm:text-xs text-purple-400 font-medium truncate w-full block" title={holiday.name}>
+                {holiday.name}
+              </span>
+            </div>
+          ) : hasLeave ? (
             <div className="mt-auto z-10 relative">
               <span className={`text-[9px] sm:text-xs font-medium truncate w-full block ${
                 leaveRequest.status === 'approved' ? 'text-emerald-500' :
@@ -412,6 +459,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
 
   const selectedSchedule = selectedDate ? schedulesByDate[selectedDate] : null;
   const selectedLeaveRequest = selectedDate ? getLeaveRequestForDate(selectedDate) : null;
+  const selectedHoliday = selectedDate ? getHolidayForDate(selectedDate) : null;
 
   if (!isOpen) return null;
 
@@ -510,6 +558,10 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                     <span className="text-slate-400">Scheduled</span>
                   </div>
                   <div className="flex items-center gap-2">
+                    <CalendarCheck className="w-3 h-3 text-purple-400" />
+                    <span className="text-slate-400">Holiday</span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Coffee className="w-3 h-3 text-orange-500" />
                     <span className="text-slate-400">Rest Day</span>
                   </div>
@@ -540,220 +592,329 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
           onClick={() => setSelectedDate(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100"
+            className="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-800 border border-slate-700/50 w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden transform transition-all scale-100"
             onClick={e => e.stopPropagation()}
           >
-            <div className="p-4 sm:p-5 border-b border-slate-800 flex justify-between items-center bg-slate-900">
-              <div>
-                <h3 className="text-base sm:text-lg font-bold text-white">
-                  {hasMounted ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'short', month: 'long', day: 'numeric' }) : ''}
-                </h3>
-                <p className="text-slate-400 text-xs">Schedule Details</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {canEditSchedules && !selectedLeaveRequest && !isEditing && (
+            {/* Header */}
+            <div className="p-6 border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-sm">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-blue-500/30 flex items-center justify-center">
+                      <CalendarIcon className="w-6 h-6 text-blue-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-white">
+                        {hasMounted ? new Date(selectedDate).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : ''}
+                      </h3>
+                      <p className="text-slate-400 text-sm">Daily Overview</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {canEditSchedules && !selectedHoliday && !selectedLeaveRequest && !isEditing && (
+                    <button
+                      onClick={() => handleEdit(selectedSchedule, selectedDate)}
+                      className="p-2.5 hover:bg-slate-800 rounded-xl text-blue-400 hover:text-blue-300 transition-all hover:scale-105"
+                      title="Edit schedule"
+                    >
+                      <Edit2 className="w-5 h-5" />
+                    </button>
+                  )}
                   <button
-                    onClick={() => handleEdit(selectedSchedule, selectedDate)}
-                    className="p-2 hover:bg-slate-800 rounded-full text-blue-400 hover:text-blue-300 transition-colors"
-                    title="Edit schedule"
+                    onClick={() => setSelectedDate(null)}
+                    className="p-2.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition-all hover:scale-105"
                   >
-                    <Edit2 className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <X className="w-5 h-5" />
                   </button>
-                )}
-                <button
-                  onClick={() => setSelectedDate(null)}
-                  className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
-                >
-                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
-                </button>
+                </div>
               </div>
             </div>
 
-            <div className="p-3 sm:p-5 bg-slate-900/50 space-y-4">
-              {/* Leave Request Section */}
-              {selectedLeaveRequest && (
-                <div className={`rounded-xl p-4 border ${
-                  selectedLeaveRequest.status === 'approved' ? 'bg-emerald-500/10 border-emerald-500/20' :
-                  selectedLeaveRequest.status === 'rejected' ? 'bg-red-500/10 border-red-500/20' :
-                  'bg-amber-500/10 border-amber-500/20'
-                }`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <Plane className={`w-8 h-8 ${
-                      selectedLeaveRequest.status === 'approved' ? 'text-emerald-500' :
-                      selectedLeaveRequest.status === 'rejected' ? 'text-red-500' :
-                      'text-amber-500'
-                    }`} />
-                    <div>
-                      <h4 className={`text-lg font-bold ${
-                        selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
-                        selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
-                        'text-amber-400'
-                      }`}>{selectedLeaveRequest.leave_type}</h4>
-                      <p className="text-xs text-slate-400 uppercase tracking-wider">
-                        {selectedLeaveRequest.status}
-                      </p>
-                    </div>
-                  </div>
+            {/* Bento Grid Content */}
+            <div className="p-6 bg-slate-950/50 max-h-[70vh] overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-transparent">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Holiday Section - Highest Priority */}
+                {selectedHoliday && (
+                  <div className="md:col-span-2 bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent border border-purple-500/30 rounded-2xl p-5 shadow-lg shadow-purple-900/10 hover:shadow-purple-900/20 transition-all">
+                    <div className="flex items-start gap-4">
+                      <div className="w-14 h-14 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
+                        <CalendarCheck className="w-7 h-7 text-purple-400" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-xl font-bold text-purple-300 mb-1 truncate">{selectedHoliday.name}</h4>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {selectedHoliday.holiday_type.replace(/_/g, ' ').toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Date Range</span>
-                      <div className="text-sm text-white">
-                        {new Date(selectedLeaveRequest.start_date).toLocaleDateString()} - {new Date(selectedLeaveRequest.end_date).toLocaleDateString()}
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <span className="text-xs text-purple-400 uppercase block mb-1.5 font-semibold tracking-wider">Type</span>
+                            <p className="text-sm text-white font-medium">
+                              {selectedHoliday.holiday_type === 'regular' ? 'Regular Holiday' :
+                               selectedHoliday.holiday_type === 'special_non_working' ? 'Special Non-Working' :
+                               'Special Working'}
+                            </p>
+                          </div>
+                          <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <span className="text-xs text-purple-400 uppercase block mb-1.5 font-semibold tracking-wider">Recurring</span>
+                            <p className="text-sm text-white font-medium flex items-center gap-1">
+                              {selectedHoliday.is_recurring ? (
+                                <>
+                                  <CheckCircle className="w-4 h-4 text-green-400" />
+                                  <span>Yearly</span>
+                                </>
+                              ) : (
+                                <>
+                                  <X className="w-4 h-4 text-slate-500" />
+                                  <span>One-time</span>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
                       </div>
                     </div>
+                  </div>
+                )}
 
-                    <div>
-                      <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Reason</span>
-                      <p className="text-sm text-slate-300">{selectedLeaveRequest.reason}</p>
-                    </div>
-
-                    {selectedLeaveRequest.reviewer && (
-                      <div>
-                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Reviewed By</span>
-                        <div className="text-sm text-white">
-                          {selectedLeaveRequest.reviewer.first_name} {selectedLeaveRequest.reviewer.last_name}
+                {/* Leave Request Section */}
+                {selectedLeaveRequest && (
+                  <div className={`md:col-span-2 rounded-2xl p-5 border shadow-lg transition-all ${
+                    selectedLeaveRequest.status === 'approved' ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent border-emerald-500/30 shadow-emerald-900/10 hover:shadow-emerald-900/20' :
+                    selectedLeaveRequest.status === 'rejected' ? 'bg-gradient-to-br from-red-500/10 via-red-500/5 to-transparent border-red-500/30 shadow-red-900/10 hover:shadow-red-900/20' :
+                    'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent border-amber-500/30 shadow-amber-900/10 hover:shadow-amber-900/20'
+                  }`}>
+                    <div className="flex items-start gap-4">
+                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 ${
+                        selectedLeaveRequest.status === 'approved' ? 'bg-emerald-500/20 border border-emerald-500/30' :
+                        selectedLeaveRequest.status === 'rejected' ? 'bg-red-500/20 border border-red-500/30' :
+                        'bg-amber-500/20 border border-amber-500/30'
+                      }`}>
+                        <Plane className={`w-7 h-7 ${
+                          selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
+                          selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                          'text-amber-400'
+                        }`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className={`text-xl font-bold mb-1 truncate ${
+                              selectedLeaveRequest.status === 'approved' ? 'text-emerald-300' :
+                              selectedLeaveRequest.status === 'rejected' ? 'text-red-300' :
+                              'text-amber-300'
+                            }`}>{selectedLeaveRequest.leave_type}</h4>
+                            <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                              selectedLeaveRequest.status === 'approved' ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                              selectedLeaveRequest.status === 'rejected' ? 'bg-red-500/20 text-red-300 border border-red-500/30' :
+                              'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            }`}>
+                              {selectedLeaveRequest.status.toUpperCase()}
+                            </span>
+                          </div>
                         </div>
-                        {selectedLeaveRequest.reviewed_at && (
-                          <div className="text-xs text-slate-500">
-                            on {new Date(selectedLeaveRequest.reviewed_at).toLocaleDateString()}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                          <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <span className={`text-xs uppercase block mb-1.5 font-semibold tracking-wider ${
+                              selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
+                              selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                              'text-amber-400'
+                            }`}>Date Range</span>
+                            <p className="text-sm text-white font-medium">
+                              {new Date(selectedLeaveRequest.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {new Date(selectedLeaveRequest.end_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </p>
+                          </div>
+                          {selectedLeaveRequest.reviewer && (
+                            <div className="bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                              <span className={`text-xs uppercase block mb-1.5 font-semibold tracking-wider ${
+                                selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
+                                selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                                'text-amber-400'
+                              }`}>Reviewed By</span>
+                              <p className="text-sm text-white font-medium">
+                                {selectedLeaveRequest.reviewer.first_name} {selectedLeaveRequest.reviewer.last_name}
+                              </p>
+                              {selectedLeaveRequest.reviewed_at && (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                  {new Date(selectedLeaveRequest.reviewed_at).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {selectedLeaveRequest.reason && (
+                          <div className="mt-4 bg-slate-900/50 rounded-xl p-3 border border-slate-700/50">
+                            <span className={`text-xs uppercase block mb-1.5 font-semibold tracking-wider ${
+                              selectedLeaveRequest.status === 'approved' ? 'text-emerald-400' :
+                              selectedLeaveRequest.status === 'rejected' ? 'text-red-400' :
+                              'text-amber-400'
+                            }`}>Reason</span>
+                            <p className="text-sm text-slate-300 leading-relaxed">{selectedLeaveRequest.reason}</p>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Schedule Section */}
-              {isEditing ? (
-                <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-sm space-y-4">
-                  <div className="flex items-center justify-between mb-2 pb-3 border-b border-slate-700">
-                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Edit Schedule</span>
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3 p-3 bg-slate-900/50 rounded-lg border border-slate-600">
-                      <input
-                        type="checkbox"
-                        id="is_rest_day"
-                        checked={editForm.is_rest_day}
-                        onChange={(e) => setEditForm({ ...editForm, is_rest_day: e.target.checked })}
-                        className="w-4 h-4 text-orange-500 bg-slate-700 border-slate-600 rounded focus:ring-orange-500"
-                      />
-                      <label htmlFor="is_rest_day" className="text-sm font-medium text-slate-300">
-                        Mark as Rest Day
-                      </label>
-                    </div>
-
-                    {!editForm.is_rest_day && (
-                      <>
-                        <div>
-                          <label className="text-xs text-slate-400 uppercase block mb-2 font-semibold">
-                            Start Time
-                          </label>
-                          <input
-                            type="time"
-                            value={editForm.shift_start}
-                            onChange={(e) => setEditForm({ ...editForm, shift_start: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="text-xs text-slate-400 uppercase block mb-2 font-semibold">
-                            End Time
-                          </label>
-                          <input
-                            type="time"
-                            value={editForm.shift_end}
-                            onChange={(e) => setEditForm({ ...editForm, shift_end: e.target.value })}
-                            className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
-                            style={{ colorScheme: 'dark' }}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                      >
-                        <Save className="w-4 h-4" />
-                        {isSaving ? 'Saving...' : 'Save'}
-                      </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        disabled={isSaving}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      {selectedSchedule && (
-                        <button
-                          onClick={handleDelete}
-                          disabled={isSaving}
-                          className="p-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                          title="Delete schedule"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
                     </div>
                   </div>
-                </div>
-              ) : selectedSchedule ? (
-                selectedSchedule.is_rest_day ? (
-                  <div className="bg-orange-500/10 border border-orange-500/20 rounded-xl p-4 text-center">
-                    <Coffee className="w-12 h-12 text-orange-500 mx-auto mb-3" />
-                    <h4 className="text-lg font-bold text-orange-400 mb-1">Rest Day</h4>
-                    <p className="text-sm text-muted-foreground">No scheduled work for this day</p>
-                  </div>
-                ) : (
-                  <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 shadow-sm">
-                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-700">
-                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Shift Details</span>
-                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                )}
+
+                {/* Schedule Section */}
+                {isEditing ? (
+                  <div className="md:col-span-2 bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/30 rounded-2xl p-5 shadow-lg shadow-blue-900/10">
+                    <div className="flex items-center justify-between mb-5">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                          <Edit2 className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <h4 className="text-lg font-bold text-blue-300">Edit Schedule</h4>
+                      </div>
                     </div>
 
                     <div className="space-y-4">
-                      <div>
-                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">Start Time</span>
-                        <div className="flex items-center gap-2 font-mono text-lg text-white">
-                          <Clock className="w-4 h-4 text-white" />
-                          {formatTime(selectedSchedule.shift_start)}
-                        </div>
+                      <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            id="is_rest_day"
+                            checked={editForm.is_rest_day}
+                            onChange={(e) => setEditForm({ ...editForm, is_rest_day: e.target.checked })}
+                            className="w-5 h-5 text-orange-500 bg-slate-800 border-slate-600 rounded focus:ring-2 focus:ring-orange-500"
+                          />
+                          <div className="flex items-center gap-2">
+                            <Coffee className="w-5 h-5 text-orange-400" />
+                            <span className="text-sm font-medium text-slate-200">Mark as Rest Day</span>
+                          </div>
+                        </label>
                       </div>
 
-                      <div>
-                        <span className="text-xs text-slate-400 uppercase block mb-1 font-semibold">End Time</span>
-                        <div className="flex items-center gap-2 font-mono text-lg text-white">
-                          <Clock className="w-4 h-4 text-white" />
-                          {formatTime(selectedSchedule.shift_end)}
+                      {!editForm.is_rest_day && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50">
+                            <label className="text-xs text-blue-400 uppercase block mb-2 font-semibold tracking-wider flex items-center gap-2">
+                              <Clock className="w-3.5 h-3.5" />
+                              Start Time
+                            </label>
+                            <input
+                              type="time"
+                              value={editForm.shift_start}
+                              onChange={(e) => setEditForm({ ...editForm, shift_start: e.target.value })}
+                              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [color-scheme:dark]"
+                              style={{ colorScheme: 'dark' }}
+                            />
+                          </div>
+
+                          <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700/50">
+                            <label className="text-xs text-blue-400 uppercase block mb-2 font-semibold tracking-wider flex items-center gap-2">
+                              <Clock className="w-3.5 h-3.5" />
+                              End Time
+                            </label>
+                            <input
+                              type="time"
+                              value={editForm.shift_end}
+                              onChange={(e) => setEditForm({ ...editForm, shift_end: e.target.value })}
+                              className="w-full px-4 py-2.5 bg-slate-800 border border-slate-600 rounded-xl text-white font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [color-scheme:dark]"
+                              style={{ colorScheme: 'dark' }}
+                            />
+                          </div>
                         </div>
+                      )}
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={handleSave}
+                          disabled={isSaving}
+                          className="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-800 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-900/30"
+                        >
+                          <Save className="w-5 h-5" />
+                          {isSaving ? 'Saving...' : 'Save Changes'}
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          disabled={isSaving}
+                          className="px-5 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:cursor-not-allowed text-white rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                        >
+                          Cancel
+                        </button>
+                        {selectedSchedule && (
+                          <button
+                            onClick={handleDelete}
+                            disabled={isSaving}
+                            className="px-4 py-3 bg-red-600 hover:bg-red-500 disabled:bg-red-800 disabled:cursor-not-allowed text-white rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-red-900/30"
+                            title="Delete schedule"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
-                )
-              ) : !selectedLeaveRequest && (
-                <div className="text-center py-10 text-slate-500 flex flex-col items-center">
-                  <CalendarIcon className="w-10 h-10 mb-3 opacity-30" />
-                  <p className="text-sm">No schedule found for this date</p>
-                  {canEditSchedules && (
-                    <button
-                      onClick={() => handleEdit(null, selectedDate)}
-                      className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                      Add Schedule
-                    </button>
-                  )}
-                </div>
-              )}
+                ) : selectedSchedule ? (
+                  selectedSchedule.is_rest_day ? (
+                    <div className="md:col-span-2 bg-gradient-to-br from-orange-500/10 via-orange-500/5 to-transparent border border-orange-500/30 rounded-2xl p-8 text-center shadow-lg shadow-orange-900/10">
+                      <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-orange-500/20 border border-orange-500/30 mb-5">
+                        <Coffee className="w-10 h-10 text-orange-400" />
+                      </div>
+                      <h4 className="text-2xl font-bold text-orange-300 mb-2">Rest Day</h4>
+                      <p className="text-slate-400">No scheduled work for this day</p>
+                    </div>
+                  ) : (
+                    <div className="md:col-span-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="bg-gradient-to-br from-blue-500/10 via-blue-500/5 to-transparent border border-blue-500/30 rounded-2xl p-5 shadow-lg shadow-blue-900/10">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center">
+                              <Clock className="w-6 h-6 text-blue-400" />
+                            </div>
+                            <div>
+                              <span className="text-xs text-blue-400 uppercase block font-semibold tracking-wider">Start Time</span>
+                              <div className="font-mono text-2xl font-bold text-white mt-1">
+                                {formatTime(selectedSchedule.shift_start)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-purple-500/10 via-purple-500/5 to-transparent border border-purple-500/30 rounded-2xl p-5 shadow-lg shadow-purple-900/10">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-12 h-12 rounded-xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center">
+                              <Clock className="w-6 h-6 text-purple-400" />
+                            </div>
+                            <div>
+                              <span className="text-xs text-purple-400 uppercase block font-semibold tracking-wider">End Time</span>
+                              <div className="font-mono text-2xl font-bold text-white mt-1">
+                                {formatTime(selectedSchedule.shift_end)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ) : !selectedHoliday && !selectedLeaveRequest && (
+                  <div className="md:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-2xl p-10 text-center">
+                    <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-slate-700/50 border border-slate-600/50 mb-5">
+                      <CalendarIcon className="w-10 h-10 text-slate-500" />
+                    </div>
+                    <h4 className="text-xl font-bold text-slate-400 mb-2">No Schedule Found</h4>
+                    <p className="text-slate-500 mb-6">There is no schedule assigned for this date</p>
+                    {canEditSchedules && !selectedHoliday && (
+                      <button
+                        onClick={() => handleEdit(null, selectedDate)}
+                        className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-900/30"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                        Add Schedule
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>,
