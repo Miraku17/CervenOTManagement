@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Store as StoreIcon, MapPin, Phone, User, ArrowRight, FileDown, Upload, Building2, CheckCircle, XCircle } from 'lucide-react';
+import { Plus, Search, Store as StoreIcon, MapPin, Phone, User, ArrowRight, FileDown, Upload, Building2, CheckCircle, XCircle, FileSpreadsheet } from 'lucide-react';
 import { Store } from '@/types';
 import StoreModal from '@/components/ticketing/StoreModal';
 import StoreDetailModal from '@/components/ticketing/StoreDetailModal';
@@ -59,6 +59,27 @@ export default function StoresPage() {
       console.error('Error fetching stores:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/stores/download-template');
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'store_import_template.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      alert('Failed to download template. Please try again.');
     }
   };
 
@@ -151,6 +172,13 @@ export default function StoresPage() {
                 >
                   <Plus size={20} />
                   <span>Add Store</span>
+                </button>
+                <button
+                  onClick={handleDownloadTemplate}
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-xl transition-colors shadow-lg shadow-purple-900/20"
+                >
+                  <FileSpreadsheet size={20} />
+                  <span>Download Template</span>
                 </button>
                 <button
                   onClick={() => setIsImportModalOpen(true)}
