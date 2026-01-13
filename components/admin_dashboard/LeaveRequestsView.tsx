@@ -177,11 +177,11 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         return reqDate >= start && reqDate <= end;
       });
 
-      // Sort by employee name
+      // Sort by employee surname (last name), then by first name
       const sortedRequests = [...filteredByDate].sort((a, b) => {
-        const nameA = `${a.employee.first_name} ${a.employee.last_name}`;
-        const nameB = `${b.employee.first_name} ${b.employee.last_name}`;
-        return nameA.localeCompare(nameB);
+        const lastNameCompare = a.employee.last_name.localeCompare(b.employee.last_name);
+        if (lastNameCompare !== 0) return lastNameCompare;
+        return a.employee.first_name.localeCompare(b.employee.first_name);
       });
 
       // Prepare data for Excel
