@@ -91,7 +91,7 @@ export default function StoreInventoryPage() {
   const isLoadingAccess = authLoading || permissionsLoading;
 
   // Filter states
-  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
 
@@ -113,7 +113,7 @@ export default function StoreInventoryPage() {
     page: currentPage,
     pageSize,
     searchTerm: debouncedSearchTerm,
-    selectedDevice: selectedDevice || '',
+    selectedCategory: selectedCategory || '',
     selectedStore: selectedStore || '',
     selectedBrand: selectedBrand || '',
     showAll,
@@ -138,7 +138,7 @@ export default function StoreInventoryPage() {
 
   // Dropdown states
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
+  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
   // Edit/Delete states
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -186,7 +186,7 @@ export default function StoreInventoryPage() {
   useEffect(() => {
     setCurrentPage(1);
     setShowAll(false);
-  }, [debouncedSearchTerm, selectedDevice, selectedStore, selectedBrand]);
+  }, [debouncedSearchTerm, selectedCategory, selectedStore, selectedBrand]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -195,7 +195,7 @@ export default function StoreInventoryPage() {
         setShowFilterDropdown(false);
       }
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-        setShowDeviceDropdown(false);
+        setShowCategoryDropdown(false);
       }
       if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
         setIsActionsDropdownOpen(false);
@@ -554,13 +554,13 @@ export default function StoreInventoryPage() {
 
   // Clear all filters
   const clearAllFilters = () => {
-    setSelectedDevice(null);
+    setSelectedCategory(null);
     setSelectedStore(null);
     setSelectedBrand(null);
   };
 
   // Check if any filters are active
-  const hasActiveFilters = selectedDevice || selectedStore || selectedBrand;
+  const hasActiveFilters = selectedCategory || selectedStore || selectedBrand;
 
   return (
     <div className="space-y-6">
@@ -760,23 +760,23 @@ export default function StoreInventoryPage() {
             {/* Device Button with Dropdown */}
             <div ref={categoryRef} className="relative">
               <button
-                onClick={() => setShowDeviceDropdown(!showDeviceDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedDevice ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Box size={18} />
-                <span>{selectedDevice || 'Device'}</span>
-                <ChevronDown size={16} className={`transition-transform ${showDeviceDropdown ? 'rotate-180' : ''}`} />
+                <span>{selectedCategory || 'Device'}</span>
+                <ChevronDown size={16} className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Device Dropdown */}
-              {showDeviceDropdown && (
+              {showCategoryDropdown && (
                 <div className="absolute top-full mt-2 right-0 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
                   <button
                     onClick={() => {
-                      setSelectedDevice(null);
-                      setShowDeviceDropdown(false);
+                      setSelectedCategory(null);
+                      setShowCategoryDropdown(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedDevice
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedCategory
                         ? 'bg-blue-500/10 text-blue-400 font-medium'
                         : 'text-slate-300 hover:bg-slate-800'
                     }`}
@@ -787,10 +787,10 @@ export default function StoreInventoryPage() {
                     <button
                       key={category}
                       onClick={() => {
-                        setSelectedDevice(category);
-                        setShowDeviceDropdown(false);
+                        setSelectedCategory(category);
+                        setShowCategoryDropdown(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedDevice === category
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedCategory === category
                           ? 'bg-blue-500/10 text-blue-400 font-medium'
                           : 'text-slate-300 hover:bg-slate-800'
                       }`}
