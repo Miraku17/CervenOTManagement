@@ -7,7 +7,7 @@ import { userHasPermission } from '@/lib/permissions';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '50mb', // Increased to support larger files (1000+ rows)
     },
   },
 };
@@ -101,23 +101,34 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     let importedCount = 0;
     let skippedCount = 0;
+    let updatedCount = 0;
     const errors: string[] = [];
+    const BATCH_SIZE = 50; // Process 50 rows at a time for better performance
 
-    // Process each row
-    for (let i = 0; i < rawData.length; i++) {
-      const row = rawData[i];
-      const rowNumber = i + 2; // +2 because Excel is 1-indexed and first row is header
+    console.log(`Starting import of ${rawData.length} rows in batches of ${BATCH_SIZE}`);
 
-      // Skip rows without store code
-      const storeCode = row['Store Code']?.toString().trim();
-      if (!storeCode) {
-        skippedCount++;
-        errors.push(`Row ${rowNumber}: Skipped - Missing Store Code (required field)`);
-        console.log(`Row ${rowNumber}: Skipped - No store code`);
-        continue;
-      }
+    // Process in batches for better performance with large datasets
+    for (let batchStart = 0; batchStart < rawData.length; batchStart += BATCH_SIZE) {
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, rawData.length);
+      const batch = rawData.slice(batchStart, batchEnd);
 
-      try {
+      console.log(`Processing batch: rows ${batchStart + 2} to ${batchEnd + 1}`);
+
+      // Process each row in the batch
+      for (let i = 0; i < batch.length; i++) {
+        const row = batch[i];
+        const rowNumber = batchStart + i + 2; // +2 because Excel is 1-indexed and first row is header
+
+        // Skip rows without store code
+        const storeCode = row['Store Code']?.toString().trim();
+        if (!storeCode) {
+          skippedCount++;
+          errors.push(`Row ${rowNumber}: Skipped - Missing Store Code (required field)`);
+          console.log(`Row ${rowNumber}: Skipped - No store code`);
+          continue;
+        }
+
+        try {
         // Map Excel columns to database columns
         const storeData = {
           store_code: storeCode,
@@ -154,6 +165,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             throw new Error(`Failed to update store: ${updateError.message}`);
           }
           storeId = updatedStore.id;
+          updatedCount++;
 
           // Delete existing managers for this store
           const { error: deleteManagersError } = await supabase
@@ -205,21 +217,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           }
         }
 
-        importedCount++;
-        console.log(`Row ${rowNumber}: Successfully imported store ${storeCode}`);
+          importedCount++;
+          console.log(`Row ${rowNumber}: Successfully imported store ${storeCode}`);
 
-      } catch (error: any) {
-        console.error(`Row ${rowNumber}: Error processing store ${storeCode}:`, error);
-        errors.push(`Row ${rowNumber} (${storeCode}): ${error.message}`);
+        } catch (error: any) {
+          console.error(`Row ${rowNumber}: Error processing store ${storeCode}:`, error);
+          errors.push(`Row ${rowNumber} (${storeCode}): ${error.message}`);
+          skippedCount++;
+        }
       }
+
+      // Log batch completion
+      console.log(`Completed batch: ${batchEnd - batchStart} rows processed`);
     }
 
+    console.log(`Import completed: ${importedCount} total, ${updatedCount} updated, ${skippedCount} skipped/failed`);
+
     return res.status(200).json({
-      message: 'Import completed',
+      message: 'Import completed successfully',
       imported: importedCount,
+      updated: updatedCount,
+      created: importedCount - updatedCount,
       skipped: skippedCount,
       total: rawData.length,
-      errors: errors.length > 0 ? errors : undefined,
+      errors: errors.length > 0 ? errors.slice(0, 100) : undefined, // Limit to first 100 errors
+      hasMoreErrors: errors.length > 100,
     });
 
   } catch (error: any) {
@@ -228,29 +250,62 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Provide more specific error messages based on error type
     let errorMessage = 'Failed to import stores';
     let errorDetails = error.message;
+    let errorCode = 'UNKNOWN_ERROR';
 
     if (error.message?.includes('base64')) {
       errorMessage = 'Invalid file encoding';
       errorDetails = 'The file could not be processed. Please ensure it is a valid Excel file (.xlsx or .xls).';
+      errorCode = 'INVALID_ENCODING';
     } else if (error.message?.includes('ENOENT') || error.message?.includes('no such file')) {
       errorMessage = 'File not found';
       errorDetails = 'The file could not be accessed. Please try uploading again.';
-    } else if (error.message?.includes('file is too large')) {
+      errorCode = 'FILE_NOT_FOUND';
+    } else if (error.message?.includes('file is too large') || error.message?.includes('request entity too large')) {
       errorMessage = 'File size limit exceeded';
-      errorDetails = 'The file is too large. Maximum file size is 10MB.';
-    } else if (error.message?.includes('timeout')) {
+      errorDetails = 'The file is too large. Maximum file size is 50MB. For files larger than this, please split them into smaller files or contact support.';
+      errorCode = 'FILE_TOO_LARGE';
+    } else if (error.message?.includes('timeout') || error.code === 'ETIMEDOUT') {
       errorMessage = 'Import timeout';
-      errorDetails = 'The import took too long to process. Please try with a smaller file or contact support.';
+      errorDetails = 'The import took too long to process. This usually happens with very large files. Try splitting your file into smaller batches (500-1000 rows each).';
+      errorCode = 'TIMEOUT';
     } else if (error.message?.includes('permission') || error.message?.includes('unauthorized')) {
       errorMessage = 'Permission denied';
-      errorDetails = 'You do not have permission to perform this operation.';
+      errorDetails = 'You do not have permission to perform this operation. Please contact your administrator.';
+      errorCode = 'PERMISSION_DENIED';
+    } else if (error.message?.includes('duplicate') || error.code === '23505') {
+      errorMessage = 'Duplicate data detected';
+      errorDetails = 'One or more stores have duplicate store codes. Each store code must be unique.';
+      errorCode = 'DUPLICATE_DATA';
+    } else if (error.message?.includes('connection') || error.message?.includes('ECONNREFUSED')) {
+      errorMessage = 'Database connection error';
+      errorDetails = 'Could not connect to the database. Please try again in a moment or contact support if the problem persists.';
+      errorCode = 'DB_CONNECTION_ERROR';
+    } else if (error.message?.includes('memory') || error.message?.includes('heap')) {
+      errorMessage = 'File too complex';
+      errorDetails = 'The file is too large or complex to process. Please try splitting it into smaller files (recommended: 1000 rows per file).';
+      errorCode = 'MEMORY_ERROR';
     }
 
     return res.status(500).json({
       error: errorMessage,
       details: errorDetails,
+      code: errorCode,
+      suggestion: getSuggestionForError(errorCode),
     });
   }
+}
+
+function getSuggestionForError(errorCode: string): string {
+  const suggestions: Record<string, string> = {
+    'FILE_TOO_LARGE': 'Split your Excel file into multiple smaller files (500-1000 rows each) and import them separately.',
+    'TIMEOUT': 'Try importing fewer rows at a time. We recommend batches of 500-1000 rows for optimal performance.',
+    'MEMORY_ERROR': 'Your file may have too many rows or complex formulas. Export it as a simple .xlsx file with values only (no formulas).',
+    'DUPLICATE_DATA': 'Check your Excel file for duplicate Store Code values. Use Excel\'s "Remove Duplicates" feature or filter to find them.',
+    'DB_CONNECTION_ERROR': 'Wait a moment and try again. If the problem continues, please contact technical support.',
+    'INVALID_ENCODING': 'Save your file as a new .xlsx file using "Save As" in Excel and try again.',
+  };
+
+  return suggestions[errorCode] || 'Please check your file format and try again. Contact support if the problem persists.';
 }
 
 export default withAuth(handler);
