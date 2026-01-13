@@ -513,8 +513,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   // Permission checks using the usePermissions hook
   const canEdit = hasPermission('manage_tickets'); // All users with manage_tickets can edit
-  // Check if user is Operations Manager (case-insensitive)
-  const canDelete = userPosition?.toLowerCase() === 'operations manager';
+  const canDelete = hasPermission('delete_tickets');
 
   // Debug logging
   console.log('TicketDetailModal - Render:', {
