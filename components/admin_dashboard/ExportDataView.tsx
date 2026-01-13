@@ -105,8 +105,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       }
     }
 
-    // Get unique employees sorted by name
-    const employeeMap = new Map<string, { name: string; employeeId: string; userId: string }>();
+    // Get unique employees sorted by surname
+    const employeeMap = new Map<string, { name: string; firstName: string; lastName: string; employeeId: string; userId: string }>();
     for (const record of data) {
       const userId = record.user_id;
       if (!employeeMap.has(userId)) {
@@ -114,13 +114,16 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
         const lastName = record.profiles?.last_name || '';
         const fullName = `${firstName} ${lastName}`.trim();
         const employeeId = record.profiles?.employee_id || 'NA';
-        employeeMap.set(userId, { name: fullName, employeeId, userId });
+        employeeMap.set(userId, { name: fullName, firstName, lastName, employeeId, userId });
       }
     }
 
-    const sortedEmployees = Array.from(employeeMap.values()).sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    const sortedEmployees = Array.from(employeeMap.values()).sort((a, b) => {
+      // Sort by last name first, then by first name if last names are the same
+      const lastNameCompare = a.lastName.localeCompare(b.lastName);
+      if (lastNameCompare !== 0) return lastNameCompare;
+      return a.firstName.localeCompare(b.firstName);
+    });
 
     // Build the daily attendance report
     const reportData: any[][] = [];
@@ -337,13 +340,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     // Debug logging
     console.log('Overtime V2 records received:', overtimeV2Data.length);
 
-    // Sort by date and employee name
+    // Sort by date first, then by surname (last name), then by first name
     const sortedData = [...overtimeV2Data].sort((a, b) => {
       const dateCompare = a.overtime_date.localeCompare(b.overtime_date);
       if (dateCompare !== 0) return dateCompare;
-      const nameA = `${a.profiles?.first_name || ''} ${a.profiles?.last_name || ''}`;
-      const nameB = `${b.profiles?.first_name || ''} ${b.profiles?.last_name || ''}`;
-      return nameA.localeCompare(nameB);
+
+      const lastNameA = a.profiles?.last_name || '';
+      const lastNameB = b.profiles?.last_name || '';
+      const lastNameCompare = lastNameA.localeCompare(lastNameB);
+      if (lastNameCompare !== 0) return lastNameCompare;
+
+      const firstNameA = a.profiles?.first_name || '';
+      const firstNameB = b.profiles?.first_name || '';
+      return firstNameA.localeCompare(firstNameB);
     });
 
     // Add overtime records

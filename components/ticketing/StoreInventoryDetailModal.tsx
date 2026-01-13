@@ -149,7 +149,7 @@ const StoreInventoryDetailModal: React.FC<StoreInventoryDetailModalProps> = ({ i
           </DetailSection>
 
           <DetailSection title="Product Information" icon={Package}>
-            <LabelValue label="Category" value={item.categories?.name} />
+            <LabelValue label="Device" value={item.categories?.name} />
             <LabelValue label="Brand" value={item.brands?.name} />
             <LabelValue label="Model" value={item.models?.name} />
             <LabelValue label="Serial Number" value={item.serial_number} fullWidth />

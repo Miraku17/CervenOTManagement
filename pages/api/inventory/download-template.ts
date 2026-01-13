@@ -21,7 +21,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Store Name': 'Example Store',
         'Store Code': 'ST001',
         'Station Name': 'Station A',
-        'Category': 'Desktop',
+        'Device': 'Desktop',
         'Brand': 'Dell',
         'Model': 'OptiPlex 7090',
         'Serial Number': 'SN123456789',
@@ -33,7 +33,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Store Name': '',
         'Store Code': '',
         'Station Name': '',
-        'Category': '',
+        'Device': '',
         'Brand': '',
         'Model': '',
         'Serial Number': '',
@@ -52,7 +52,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 20 }, // Store Name
       { wch: 12 }, // Store Code
       { wch: 15 }, // Station Name
-      { wch: 15 }, // Category
+      { wch: 15 }, // Device
       { wch: 15 }, // Brand
       { wch: 20 }, // Model
       { wch: 20 }, // Serial Number
@@ -78,7 +78,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Section': 'Store Name (Required)', 'Information': 'Full name of the store. Examples: Main Branch Store, North Plaza Branch' },
       { 'Section': 'Store Code (Required)', 'Information': 'Unique store identifier code. Examples: ST001, BRANCH-01, NP-STORE' },
       { 'Section': 'Station Name (Required)', 'Information': 'Name of the station/workstation. Examples: Station A, Counter 1, POS Terminal 3' },
-      { 'Section': 'Category (Required)', 'Information': 'Type of equipment. Examples: Desktop, Laptop, Monitor, Printer, POS Terminal' },
+      { 'Section': 'Device (Required)', 'Information': 'Type of equipment. Examples: Desktop, Laptop, Monitor, Printer, POS Terminal' },
       { 'Section': 'Brand (Required)', 'Information': 'Manufacturer name. Examples: Dell, HP, Lenovo, Canon, Epson' },
       { 'Section': 'Model (Required)', 'Information': 'Model number or name. Examples: OptiPlex 7090, ThinkPad X1, LaserJet Pro' },
       { 'Section': 'Serial Number (Required)', 'Information': 'Unique serial number from the device. Can be "NO DEVICE" if no device assigned yet.' },
@@ -97,7 +97,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Section': 'Temporary', 'Information': 'Equipment temporarily placed at this store location' },
       { 'Section': '', 'Information': '' },
       { 'Section': 'COMMON MISTAKES TO AVOID', 'Information': '' },
-      { 'Section': 'X Do not leave required fields empty', 'Information': 'Store Name, Store Code, Station Name, Category, Brand, Model, Serial Number, and Status are required' },
+      { 'Section': 'X Do not leave required fields empty', 'Information': 'Store Name, Store Code, Station Name, Device, Brand, Model, Serial Number, and Status are required' },
       { 'Section': 'X Do not use wrong date format', 'Information': 'Use MM/DD/YYYY (like 12/31/2025), NOT YYYY-MM-DD or other formats' },
       { 'Section': 'X Do not use wrong status values', 'Information': 'Only use: Permanent or Temporary (not Available, In Use, etc.)' },
       { 'Section': 'X Do not mix up Status field', 'Information': 'Store Inventory uses Permanent/Temporary. Asset Inventory uses Available/In Use/etc.' },

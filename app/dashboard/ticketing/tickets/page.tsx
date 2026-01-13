@@ -187,7 +187,7 @@ export default function TicketsPage() {
 
   // Permission checks
   const canCreateTicket = hasPermission('manage_tickets') && userPosition !== 'Field Engineer';
-  const canDeleteTicket = hasPermission('manage_tickets') && userPosition === 'Operations Manager';
+  const canDeleteTicket = hasPermission('delete_tickets');
 
   // Toast helper function
   const showToast = (type: 'success' | 'error' | 'warning' | 'info', message: string, description?: string, details?: string[]) => {
@@ -493,12 +493,16 @@ export default function TicketsPage() {
   };
 
   // Filtering is now done server-side, just sort client-side
-  const filteredTickets = (data?.tickets || [])
-    .sort((a, b) => {
-      const dateA = new Date(`${a.date_reported}T${a.time_reported}`);
-      const dateB = new Date(`${b.date_reported}T${b.time_reported}`);
-      return sortOrder === 'asc' ? dateA.getTime() - dateB.getTime() : dateB.getTime() - dateA.getTime();
+  const filteredTickets = React.useMemo(() => {
+    if (!data?.tickets) return [];
+
+    const tickets = [...data.tickets];
+    return tickets.sort((a, b) => {
+      const dateA = new Date(a.date_reported).getTime();
+      const dateB = new Date(b.date_reported).getTime();
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
     });
+  }, [data?.tickets, sortOrder]);
 
   const getStatusColor = (status: string) => {
     switch ((status || '').toLowerCase().replace(/_/g, ' ')) {
@@ -686,10 +690,11 @@ export default function TicketsPage() {
           <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
             <button
               onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-400 hover:text-white transition-colors mr-2"
+              className="flex items-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900 transition-colors mr-2"
+              title={`Sort by ${sortOrder === 'asc' ? 'newest' : 'oldest'} first`}
             >
               <ArrowUpDown size={16} />
-              <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest' : 'Newest'}</span>
+              <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
             </button>
             {['all', 'open', 'in progress', 'on hold', 'closed'].map((status) => (
               <button
