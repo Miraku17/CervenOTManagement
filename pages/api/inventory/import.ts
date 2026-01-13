@@ -11,7 +11,7 @@ export const config = {
       sizeLimit: '20mb',
     },
   },
-  maxDuration: 3600, // 60 minutes timeout for large imports
+  maxDuration: 300, // 5 minutes timeout (Vercel Hobby plan limit)
 };
 
 interface ImportRow {
@@ -186,8 +186,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
                 row['Status'];
       });
 
-    // Log warning for large imports
+    // Check row count limits
+    const MAX_ROWS = 2000;
     const WARNING_THRESHOLD = 1000;
+
+    if (nonEmptyData.length > MAX_ROWS) {
+      return res.status(400).json({
+        error: `File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import.`,
+        details: `Please split your file into smaller batches of ${MAX_ROWS} rows or less to avoid timeout issues. Process times are limited to 5 minutes on this plan.`,
+        rowCount: nonEmptyData.length,
+        maxAllowed: MAX_ROWS,
+      });
+    }
 
     if (nonEmptyData.length > WARNING_THRESHOLD) {
       console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take several minutes to complete.`);
