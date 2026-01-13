@@ -381,7 +381,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       return;
     }
     if (!category) {
-      showToast('error', 'Please enter or select a category');
+      showToast('error', 'Please enter or select a device');
       return;
     }
     if (!brand) {
@@ -657,12 +657,12 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
           <div className="border-t border-slate-700 pt-4 mt-4">
             <h3 className="text-lg font-semibold text-white mb-4">Product Details</h3>
 
-            {/* Category, Brand, Model Row */}
+            {/* Device, Brand, Model Row */}
             <div className="grid grid-cols-3 gap-4">
-              {/* Category Input with Dropdown */}
+              {/* Device Input with Dropdown */}
               <div ref={categoryRef} className="relative">
                 <label htmlFor="categorySearch" className="block text-sm font-medium text-slate-300 mb-1">
-                  Category <span className="text-red-500">*</span>
+                  Device <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <input
@@ -679,7 +679,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                       setTimeout(() => setShowCategoryDropdown(false), 200);
                     }}
                     className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter or search category..."
+                    placeholder="Enter or search device..."
                     required
                   />
                   {selectedCategoryId && (
@@ -695,7 +695,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
                 </div>
 
-                {/* Category Dropdown */}
+                {/* Device Dropdown */}
                 {showCategoryDropdown && (
                   <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
                     {filteredCategories.length > 0 ? (

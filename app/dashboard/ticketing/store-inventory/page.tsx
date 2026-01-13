@@ -91,7 +91,7 @@ export default function StoreInventoryPage() {
   const isLoadingAccess = authLoading || permissionsLoading;
 
   // Filter states
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [selectedStore, setSelectedStore] = useState<string | null>(null);
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
 
@@ -113,7 +113,7 @@ export default function StoreInventoryPage() {
     page: currentPage,
     pageSize,
     searchTerm: debouncedSearchTerm,
-    selectedCategory: selectedCategory || '',
+    selectedDevice: selectedDevice || '',
     selectedStore: selectedStore || '',
     selectedBrand: selectedBrand || '',
     showAll,
@@ -138,7 +138,7 @@ export default function StoreInventoryPage() {
 
   // Dropdown states
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
-  const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showDeviceDropdown, setShowDeviceDropdown] = useState(false);
 
   // Edit/Delete states
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -186,7 +186,7 @@ export default function StoreInventoryPage() {
   useEffect(() => {
     setCurrentPage(1);
     setShowAll(false);
-  }, [debouncedSearchTerm, selectedCategory, selectedStore, selectedBrand]);
+  }, [debouncedSearchTerm, selectedDevice, selectedStore, selectedBrand]);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -195,7 +195,7 @@ export default function StoreInventoryPage() {
         setShowFilterDropdown(false);
       }
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
-        setShowCategoryDropdown(false);
+        setShowDeviceDropdown(false);
       }
       if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
         setIsActionsDropdownOpen(false);
@@ -496,7 +496,7 @@ export default function StoreInventoryPage() {
 
     // Prepare data for Excel
     const excelData = sortedItems.map((item) => ({
-      'Category': item.categories?.name || 'N/A',
+      'Device': item.categories?.name || 'N/A',
       'Brand': item.brands?.name || 'N/A',
       'Model': item.models?.name || 'N/A',
       'Serial Number': item.serial_number || 'N/A',
@@ -515,7 +515,7 @@ export default function StoreInventoryPage() {
 
     // Set column widths
     worksheet['!cols'] = [
-      { wch: 20 }, // Category
+      { wch: 20 }, // Device
       { wch: 20 }, // Brand
       { wch: 25 }, // Model
       { wch: 25 }, // Serial Number
@@ -554,13 +554,13 @@ export default function StoreInventoryPage() {
 
   // Clear all filters
   const clearAllFilters = () => {
-    setSelectedCategory(null);
+    setSelectedDevice(null);
     setSelectedStore(null);
     setSelectedBrand(null);
   };
 
   // Check if any filters are active
-  const hasActiveFilters = selectedCategory || selectedStore || selectedBrand;
+  const hasActiveFilters = selectedDevice || selectedStore || selectedBrand;
 
   return (
     <div className="space-y-6">
@@ -677,7 +677,7 @@ export default function StoreInventoryPage() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
             <input
             type="text"
-            placeholder="Search by serial number, category, brand, model, or store..."
+            placeholder="Search by serial number, device, brand, model, or store..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-slate-950 border border-slate-800 text-slate-200 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
@@ -757,40 +757,40 @@ export default function StoreInventoryPage() {
               )}
             </div>
 
-            {/* Category Button with Dropdown */}
+            {/* Device Button with Dropdown */}
             <div ref={categoryRef} className="relative">
               <button
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                onClick={() => setShowDeviceDropdown(!showDeviceDropdown)}
+                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedDevice ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Box size={18} />
-                <span>{selectedCategory || 'Category'}</span>
-                <ChevronDown size={16} className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                <span>{selectedDevice || 'Device'}</span>
+                <ChevronDown size={16} className={`transition-transform ${showDeviceDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Category Dropdown */}
-              {showCategoryDropdown && (
+              {/* Device Dropdown */}
+              {showDeviceDropdown && (
                 <div className="absolute top-full mt-2 right-0 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
                   <button
                     onClick={() => {
-                      setSelectedCategory(null);
-                      setShowCategoryDropdown(false);
+                      setSelectedDevice(null);
+                      setShowDeviceDropdown(false);
                     }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedCategory
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedDevice
                         ? 'bg-blue-500/10 text-blue-400 font-medium'
                         : 'text-slate-300 hover:bg-slate-800'
                     }`}
                   >
-                    All Categories
+                    All Devices
                   </button>
                   {filterOptions.categories.map((category) => (
                     <button
                       key={category}
                       onClick={() => {
-                        setSelectedCategory(category);
-                        setShowCategoryDropdown(false);
+                        setSelectedDevice(category);
+                        setShowDeviceDropdown(false);
                       }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedCategory === category
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedDevice === category
                           ? 'bg-blue-500/10 text-blue-400 font-medium'
                           : 'text-slate-300 hover:bg-slate-800'
                       }`}
@@ -826,7 +826,7 @@ export default function StoreInventoryPage() {
            <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl">
               <div className="flex items-start justify-between">
                   <div>
-                      <p className="text-slate-400 text-sm mb-1">Categories</p>
+                      <p className="text-slate-400 text-sm mb-1">Devices</p>
                       <h3 className="text-2xl font-bold text-white">
                         {statsLoading ? (
                           <Loader2 className="w-6 h-6 animate-spin" />
@@ -867,7 +867,7 @@ export default function StoreInventoryPage() {
                     <TableRow>
                         <TableHead>Item Details</TableHead>
                         <TableHead>Serial Number</TableHead>
-                        <TableHead>Category</TableHead>
+                        <TableHead>Device</TableHead>
                         <TableHead>Brand</TableHead>
                         <TableHead>Model</TableHead>
                         <TableHead>Store</TableHead>
@@ -1094,7 +1094,7 @@ export default function StoreInventoryPage() {
                   <AlertCircle size={18} className="text-blue-400 shrink-0 mt-0.5" />
                   <div className="text-sm text-blue-200">
                     <p className="font-medium mb-1">Required Columns:</p>
-                    <p className="text-blue-300/80">Store Name, Store Code, Station Name, Category, Brand, Model, Serial Number, Status (Permanent/Temporary)</p>
+                    <p className="text-blue-300/80">Store Name, Store Code, Station Name, Device, Brand, Model, Serial Number, Status (Permanent/Temporary)</p>
                   </div>
                 </div>
               </div>

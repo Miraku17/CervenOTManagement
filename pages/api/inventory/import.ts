@@ -18,7 +18,7 @@ interface ImportRow {
   'Store Name': string;
   'Store Code': string;
   'Station Name': string;
-  'Category': string;
+  'Device': string;
   'Brand': string;
   'Model': string;
   'Serial Number': string;
@@ -165,7 +165,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Validate required columns exist
-    const requiredColumns = ['Store Name', 'Store Code', 'Station Name', 'Category', 'Brand', 'Model', 'Serial Number', 'Status'];
+    const requiredColumns = ['Store Name', 'Store Code', 'Station Name', 'Device', 'Brand', 'Model', 'Serial Number', 'Status'];
     const firstRow = data[0];
     const availableColumns = Object.keys(firstRow);
     const missingColumns = requiredColumns.filter(col => !availableColumns.includes(col));
@@ -182,7 +182,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .map((row, index) => ({ row, originalIndex: index }))
       .filter(({ row }) => {
          return row['Store Name'] || row['Store Code'] || row['Station Name'] ||
-                row['Category'] || row['Brand'] || row['Model'] || row['Serial Number'] ||
+                row['Device'] || row['Brand'] || row['Model'] || row['Serial Number'] ||
                 row['Status'];
       });
 
@@ -251,7 +251,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (!row['Store Name']) missingFields.push('Store Name');
         if (!row['Store Code']) missingFields.push('Store Code');
         if (!row['Station Name']) missingFields.push('Station Name');
-        if (!row['Category']) missingFields.push('Category');
+        if (!row['Device']) missingFields.push('Device');
         if (!row['Brand']) missingFields.push('Brand');
         if (!row['Model']) missingFields.push('Model');
         if (!row['Serial Number']) missingFields.push('Serial Number');
@@ -372,10 +372,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         // Get or create category, brand, model (with caching)
-        const categoryKey = row['Category'].toString().trim().toUpperCase();
+        const categoryKey = row['Device'].toString().trim().toUpperCase();
         let categoryId: string | null | undefined = categoryCache.get(categoryKey);
         if (!categoryId) {
-          categoryId = await getOrCreateRecord('categories', 'name', row['Category'].toString());
+          categoryId = await getOrCreateRecord('categories', 'name', row['Device'].toString());
           if (categoryId) categoryCache.set(categoryKey, categoryId);
         }
 
@@ -394,7 +394,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         }
 
         if (!categoryId || !brandId || !modelId) {
-          throw new Error('Unable to process Category, Brand, or Model - Please check that these fields contain valid text values');
+          throw new Error('Unable to process Device, Brand, or Model - Please check that these fields contain valid text values');
         }
 
         // Normalize serial number
