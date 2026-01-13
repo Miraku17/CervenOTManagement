@@ -8,10 +8,10 @@ import * as XLSX from 'xlsx';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '20mb',
     },
   },
-  maxDuration: 300, // 5 minutes timeout for large imports
+  maxDuration: 300, // 5 minutes timeout (Vercel Hobby plan limit)
 };
 
 interface ImportRow {
@@ -187,19 +187,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
 
     // Check row count limits
-    const MAX_ROWS = 1000;
-    const WARNING_THRESHOLD = 500;
+    const MAX_ROWS = 1500;
+    const WARNING_THRESHOLD = 1000;
 
     if (nonEmptyData.length > MAX_ROWS) {
       return res.status(400).json({
-        error: `File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import. Please split your file into smaller batches.`,
+        error: `File contains ${nonEmptyData.length} rows. Maximum allowed is ${MAX_ROWS} rows per import.`,
+        details: `Please split your file into smaller batches of ${MAX_ROWS} rows or less to avoid timeout issues. Process times are limited to 5 minutes on this plan.`,
         rowCount: nonEmptyData.length,
         maxAllowed: MAX_ROWS,
       });
     }
 
     if (nonEmptyData.length > WARNING_THRESHOLD) {
-      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take 30-60 seconds to complete.`);
+      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take several minutes to complete.`);
     }
 
     // Create import log entry
@@ -235,15 +236,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     console.log(`Starting import of ${nonEmptyData.length} rows...`);
 
-    // Process each row
-    for (let i = 0; i < nonEmptyData.length; i++) {
-      const { row, originalIndex } = nonEmptyData[i];
-      const rowNumber = originalIndex + 2; // Excel row number (header is row 1)
+    // Batch configuration
+    const BATCH_SIZE = 100;
+    const totalBatches = Math.ceil(nonEmptyData.length / BATCH_SIZE);
 
-      // Log progress every 50 rows
-      if (i > 0 && i % 50 === 0) {
-        console.log(`Progress: ${i}/${nonEmptyData.length} rows processed...`);
-      }
+    // Process rows in batches
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+      const batchStart = batchIndex * BATCH_SIZE;
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, nonEmptyData.length);
+      const batch = nonEmptyData.slice(batchStart, batchEnd);
+
+      console.log(`Processing batch ${batchIndex + 1}/${totalBatches} (rows ${batchStart + 1}-${batchEnd})...`);
+
+      // Process each row in the batch
+      for (let i = 0; i < batch.length; i++) {
+        const { row, originalIndex } = batch[i];
+        const rowNumber = originalIndex + 2; // Excel row number (header is row 1)
+        const globalIndex = batchStart + i;
 
       try {
         // Validate required fields with specific messages
@@ -428,6 +437,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           data: row,
         });
       }
+    }
+
+      // Update import log after each batch
+      if (importLog) {
+        await supabaseAdmin
+          .from('import_logs')
+          .update({
+            success_count: result.success,
+            failed_count: result.failed,
+            status: 'in_progress',
+          })
+          .eq('id', importLog.id);
+      }
+
+      console.log(`Batch ${batchIndex + 1}/${totalBatches} completed: ${result.success} successful, ${result.failed} failed so far`);
     }
 
     console.log(`Import completed: ${result.success} successful, ${result.failed} failed`);
