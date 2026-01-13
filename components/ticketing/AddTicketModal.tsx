@@ -33,6 +33,16 @@ interface KBArticle {
   kb_code: string;
 }
 
+interface RequestType {
+  id: string;
+  name: string;
+}
+
+interface ProblemCategory {
+  id: string;
+  name: string;
+}
+
 interface InventoryItem {
   id: string;
   serial_number: string | null;
@@ -86,6 +96,18 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [kbArticles, setKbArticles] = useState<KBArticle[]>([]);
   const [selectedKbArticle, setSelectedKbArticle] = useState<KBArticle | null>(null);
 
+  // Request Types state
+  const [requestTypes, setRequestTypes] = useState<RequestType[]>([]);
+  const [requestTypeSearchTerm, setRequestTypeSearchTerm] = useState('');
+  const [showRequestTypeDropdown, setShowRequestTypeDropdown] = useState(false);
+  const [isLoadingRequestTypes, setIsLoadingRequestTypes] = useState(false);
+
+  // Problem Categories state
+  const [problemCategories, setProblemCategories] = useState<ProblemCategory[]>([]);
+  const [problemCategorySearchTerm, setProblemCategorySearchTerm] = useState('');
+  const [showProblemCategoryDropdown, setShowProblemCategoryDropdown] = useState(false);
+  const [isLoadingProblemCategories, setIsLoadingProblemCategories] = useState(false);
+
   // Inventory state
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
   const [selectedInventoryItem, setSelectedInventoryItem] = useState<InventoryItem | null>(null);
@@ -106,6 +128,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const employeeDropdownRef = useRef<HTMLDivElement>(null);
   const deviceDropdownRef = useRef<HTMLDivElement>(null);
+  const requestTypeDropdownRef = useRef<HTMLDivElement>(null);
+  const problemCategoryDropdownRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     store_id: '',
@@ -153,6 +177,34 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         const kbData = await kbResponse.json();
         if (kbResponse.ok) {
           setKbArticles(kbData.articles || []);
+        }
+
+        // Fetch request types
+        setIsLoadingRequestTypes(true);
+        try {
+          const requestTypesResponse = await fetch('/api/request-types/get');
+          const requestTypesData = await requestTypesResponse.json();
+          if (requestTypesResponse.ok) {
+            setRequestTypes(requestTypesData.requestTypes || []);
+          }
+        } catch (err) {
+          console.error('Error fetching request types:', err);
+        } finally {
+          setIsLoadingRequestTypes(false);
+        }
+
+        // Fetch problem categories
+        setIsLoadingProblemCategories(true);
+        try {
+          const problemCategoriesResponse = await fetch('/api/problem-categories/get');
+          const problemCategoriesData = await problemCategoriesResponse.json();
+          if (problemCategoriesResponse.ok) {
+            setProblemCategories(problemCategoriesData.problemCategories || []);
+          }
+        } catch (err) {
+          console.error('Error fetching problem categories:', err);
+        } finally {
+          setIsLoadingProblemCategories(false);
         }
       } catch (err) {
         console.error('Error fetching data:', err);
@@ -329,6 +381,14 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     return searchableName.includes(deviceSearchTerm.toLowerCase());
   });
 
+  const filteredRequestTypes = requestTypes.filter(type =>
+    type.name.toLowerCase().includes(requestTypeSearchTerm.toLowerCase())
+  );
+
+  const filteredProblemCategories = problemCategories.filter(category =>
+    category.name.toLowerCase().includes(problemCategorySearchTerm.toLowerCase())
+  );
+
   const handleEmployeeSelect = (employee: Employee) => {
     setSelectedEmployee(employee);
     setEmployeeSearchTerm(employee.fullName);
@@ -442,16 +502,22 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       if (deviceDropdownRef.current && !deviceDropdownRef.current.contains(event.target as Node)) {
         setShowDeviceDropdown(false);
       }
+      if (requestTypeDropdownRef.current && !requestTypeDropdownRef.current.contains(event.target as Node)) {
+        setShowRequestTypeDropdown(false);
+      }
+      if (problemCategoryDropdownRef.current && !problemCategoryDropdownRef.current.contains(event.target as Node)) {
+        setShowProblemCategoryDropdown(false);
+      }
     };
 
-    if (showStoreDropdown || showEmployeeDropdown || showDeviceDropdown) {
+    if (showStoreDropdown || showEmployeeDropdown || showDeviceDropdown || showRequestTypeDropdown || showProblemCategoryDropdown) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showStoreDropdown, showEmployeeDropdown, showDeviceDropdown]);
+  }, [showStoreDropdown, showEmployeeDropdown, showDeviceDropdown, showRequestTypeDropdown, showProblemCategoryDropdown]);
 
   // Severity options
   const severityOptions = [
@@ -585,6 +651,10 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
       setShowDeviceDropdown(false);
       setIsLoadingDevices(false);
       setSelectedKbArticle(null);
+      setRequestTypeSearchTerm('');
+      setShowRequestTypeDropdown(false);
+      setProblemCategorySearchTerm('');
+      setShowProblemCategoryDropdown(false);
 
       // Clean up image previews
       imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -953,32 +1023,112 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              {/* Request Type - Searchable Dropdown */}
+              <div ref={requestTypeDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">
                   Request Type <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.request_type}
-                  onChange={(e) => setFormData({ ...formData, request_type: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. Hardware Issue, Software Issue, Network Issue"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={requestTypeSearchTerm}
+                    onChange={(e) => {
+                      setRequestTypeSearchTerm(e.target.value);
+                      setFormData({ ...formData, request_type: e.target.value });
+                      setShowRequestTypeDropdown(true);
+                    }}
+                    onFocus={() => setShowRequestTypeDropdown(true)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    placeholder={isLoadingRequestTypes ? "Loading..." : "Type or select from dropdown..."}
+                    disabled={isLoadingRequestTypes}
+                  />
+                  {isLoadingRequestTypes ? (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={20} />
+                  ) : (
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                  )}
+                </div>
+
+                {/* Request Type Dropdown Menu */}
+                {showRequestTypeDropdown && !isLoadingRequestTypes && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredRequestTypes.length > 0 ? (
+                      filteredRequestTypes.map((type) => (
+                        <button
+                          key={type.id}
+                          type="button"
+                          onClick={() => {
+                            setRequestTypeSearchTerm(type.name);
+                            setFormData({ ...formData, request_type: type.name });
+                            setShowRequestTypeDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
+                        >
+                          <div className="text-sm font-medium text-white">{type.name}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        {requestTypeSearchTerm ? `No matching types. Press Enter to use "${requestTypeSearchTerm}"` : 'No request types available'}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div>
+              {/* Problem Category - Searchable Dropdown */}
+              <div ref={problemCategoryDropdownRef} className="relative">
                 <label className="block text-sm font-medium text-slate-400 mb-1">
                   Problem Category <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.problem_category}
-                  onChange={(e) => setFormData({ ...formData, problem_category: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  placeholder="e.g. Software, Hardware, Network"
-                />
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={problemCategorySearchTerm}
+                    onChange={(e) => {
+                      setProblemCategorySearchTerm(e.target.value);
+                      setFormData({ ...formData, problem_category: e.target.value });
+                      setShowProblemCategoryDropdown(true);
+                    }}
+                    onFocus={() => setShowProblemCategoryDropdown(true)}
+                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                    placeholder={isLoadingProblemCategories ? "Loading..." : "Type or select from dropdown..."}
+                    disabled={isLoadingProblemCategories}
+                  />
+                  {isLoadingProblemCategories ? (
+                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={20} />
+                  ) : (
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
+                  )}
+                </div>
+
+                {/* Problem Category Dropdown Menu */}
+                {showProblemCategoryDropdown && !isLoadingProblemCategories && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                    {filteredProblemCategories.length > 0 ? (
+                      filteredProblemCategories.map((category) => (
+                        <button
+                          key={category.id}
+                          type="button"
+                          onClick={() => {
+                            setProblemCategorySearchTerm(category.name);
+                            setFormData({ ...formData, problem_category: category.name });
+                            setShowProblemCategoryDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
+                        >
+                          <div className="text-sm font-medium text-white">{category.name}</div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        {problemCategorySearchTerm ? `No matching categories. Press Enter to use "${problemCategorySearchTerm}"` : 'No problem categories available'}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
