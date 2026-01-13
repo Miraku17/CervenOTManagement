@@ -8,10 +8,10 @@ import * as XLSX from 'xlsx';
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',
+      sizeLimit: '20mb',
     },
   },
-  maxDuration: 300, // 5 minutes timeout for large imports
+  maxDuration: 3600, // 60 minutes timeout for large imports
 };
 
 interface ImportRow {
@@ -187,8 +187,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
 
     // Check row count limits
-    const MAX_ROWS = 1000;
-    const WARNING_THRESHOLD = 500;
+    const MAX_ROWS = 3000;
+    const WARNING_THRESHOLD = 1000;
 
     if (nonEmptyData.length > MAX_ROWS) {
       return res.status(400).json({
@@ -199,7 +199,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     if (nonEmptyData.length > WARNING_THRESHOLD) {
-      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take 30-60 seconds to complete.`);
+      console.warn(`Large import detected: ${nonEmptyData.length} rows. This may take 1-5 minutes to complete.`);
     }
 
     // Create import log entry
