@@ -130,7 +130,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       );
 
     // Check row count limits
-    const MAX_ROWS = 2000;
+    const MAX_ROWS = 1500;
     const WARNING_THRESHOLD = 1000;
 
     if (nonEmptyData.length > MAX_ROWS) {
