@@ -298,6 +298,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get or create request type ID
     const getOrCreateRequestType = async (name: string): Promise<string | null> => {
         if (!name || !name.trim()) return null;
+        if (!supabaseAdmin) return null;
 
         const nameKey = name.trim().toUpperCase();
 
@@ -339,6 +340,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Get or create problem category ID
     const getOrCreateProblemCategory = async (name: string): Promise<string | null> => {
         if (!name || !name.trim()) return null;
+        if (!supabaseAdmin) return null;
 
         const nameKey = name.trim().toUpperCase();
 
