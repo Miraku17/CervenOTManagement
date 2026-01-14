@@ -316,7 +316,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch holidays for the date range
     const { data: holidaysData } = await supabase
       .from('holidays')
-      .select('date, name, type')
+      .select('date, name, holiday_type')
       .gte('date', startDate as string)
       .lte('date', endDate as string)
       .is('deleted_at', null);

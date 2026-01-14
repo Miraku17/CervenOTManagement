@@ -42,6 +42,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
   );
 
   const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[], holidays?: any[]) => {
+    console.log('Holidays received in convertToExcel:', holidays);
     if (!data || data.length === 0) return null;
 
     // Get unique dates and sort them
@@ -192,14 +193,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
         let timeOut = '';
 
         if (holiday) {
-          const typeStr = (holiday.type || '').toLowerCase();
-          let holidayType = 'Holiday';
-          if (typeStr.includes('regular')) {
-            holidayType = 'Regular Holiday';
-          } else if (typeStr.includes('special')) {
-            holidayType = 'Special Holiday';
-          }
-          holidayStatus = `${holidayType} - ${holiday.name}`;
+          holidayStatus = `${holiday.holiday_type} - ${holiday.name}`.toUpperCase();
         }
 
         if (isRestDay) {
@@ -254,8 +248,14 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
           currentRow++;
         } else {
           // No attendance for this date
-          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, '', '', '', '', holidayStatus]);
-          rowStyles.push({ row: currentRow, type: 'data' });
+          if (holiday) {
+            remarks = `${holiday.holiday_type} - ${holiday.name}`.toUpperCase();
+            reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+            rowStyles.push({ row: currentRow, type: 'holiday' });
+          } else {
+            reportData.push([employee.name, formattedDate, '', '', shiftSchedule, '', '', '', '', holidayStatus]);
+            rowStyles.push({ row: currentRow, type: 'data' });
+          }
           currentRow++;
         }
       }
