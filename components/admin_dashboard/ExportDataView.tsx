@@ -41,21 +41,27 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     employee.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[]) => {
+  const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[], holidays?: any[]) => {
     if (!data || data.length === 0) return null;
 
     // Get unique dates and sort them
     const allDates = Array.from(new Set(data.map(row => row.date))).sort();
     if (allDates.length === 0) return null;
 
-    const startDate = allDates[0];
-    const endDate = allDates[allDates.length - 1];
+    // Get the start and end dates, but expand to full months
+    const firstDate = new Date(allDates[0]);
+    const lastDate = new Date(allDates[allDates.length - 1]);
 
-    // Generate all dates in range
+    // Get first day of start month
+    const startDate = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+
+    // Get last day of end month
+    const endDate = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 0);
+
+    // Generate all dates in range (including dates with no attendance)
     const dateRange: string[] = [];
     let currentDate = new Date(startDate);
-    const end = new Date(endDate);
-    while (currentDate <= end) {
+    while (currentDate <= endDate) {
       dateRange.push(currentDate.toISOString().split('T')[0]);
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -74,14 +80,13 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       userAttendance.get(record.date)!.push(record);
     }
 
-    // Create leave map (user_id -> dates that are leaves)
+    // Create leave map
     const leaveMap = new Map<string, Set<string>>();
     if (leaveRequests) {
       for (const leave of leaveRequests) {
         if (!leaveMap.has(leave.employee_id)) {
           leaveMap.set(leave.employee_id, new Set());
         }
-        // Add all dates in the leave range
         let leaveDate = new Date(leave.start_date);
         const leaveEnd = new Date(leave.end_date);
         while (leaveDate <= leaveEnd) {
@@ -92,16 +97,22 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       }
     }
 
-    // Create rest day map (user_id -> dates that are rest days)
-    const restDayMap = new Map<string, Set<string>>();
+    // Create schedule map (user_id -> date -> schedule info)
+    const scheduleMap = new Map<string, Map<string, any>>();
     if (schedules) {
       for (const schedule of schedules) {
-        if (schedule.is_rest_day) {
-          if (!restDayMap.has(schedule.employee_id)) {
-            restDayMap.set(schedule.employee_id, new Set());
-          }
-          restDayMap.get(schedule.employee_id)!.add(schedule.date);
+        if (!scheduleMap.has(schedule.employee_id)) {
+          scheduleMap.set(schedule.employee_id, new Map());
         }
+        scheduleMap.get(schedule.employee_id)!.set(schedule.date, schedule);
+      }
+    }
+
+    // Create holiday map (date -> holiday info)
+    const holidayMap = new Map<string, any>();
+    if (holidays) {
+      for (const holiday of holidays) {
+        holidayMap.set(holiday.date, holiday);
       }
     }
 
@@ -119,90 +130,141 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     }
 
     const sortedEmployees = Array.from(employeeMap.values()).sort((a, b) => {
-      // Sort by last name first, then by first name if last names are the same
       const lastNameCompare = a.lastName.localeCompare(b.lastName);
       if (lastNameCompare !== 0) return lastNameCompare;
       return a.firstName.localeCompare(b.firstName);
     });
 
-    // Build the daily attendance report
+    // Build the report
     const reportData: any[][] = [];
-    const rowStyles: { row: number; type: 'title' | 'header' | 'data' | 'leave' | 'restday' | 'total' }[] = [];
+    const rowStyles: { row: number; type: 'title' | 'header' | 'data' | 'leave' | 'restday' | 'total' | 'holiday' }[] = [];
 
     // Title row
-    reportData.push(['Print Attendance Report - Daily Attendance (New Attendance System)']);
+    reportData.push(['Print Attendance Report - Daily Attendance']);
     rowStyles.push({ row: 0, type: 'title' });
     reportData.push([]); // Empty row
 
     let currentRow = 2;
 
     for (const employee of sortedEmployees) {
-      // Add header row for each employee section
-      reportData.push(['Date', 'Employee Name', 'Employee ID', 'Time In', 'Time Out', 'Total Hours', 'Session Status']);
+      // Add header row
+      reportData.push(['EMPLOYEE NAME', 'TIME STAMP', 'TIME IN', 'TIME OUT', 'SHIFT SCHEDULE', 'REMARKS', 'NO. OF LATE HH:MM', 'TOTAL LATE MINUTES', 'NO. OF DAYS', 'HOLIDAY STATUS']);
       rowStyles.push({ row: currentRow, type: 'header' });
       currentRow++;
 
       const userAttendance = attendanceMap.get(employee.userId) || new Map();
       const userLeaves = leaveMap.get(employee.userId) || new Set();
-      const userRestDays = restDayMap.get(employee.userId) || new Set();
+      const userSchedules = scheduleMap.get(employee.userId) || new Map();
 
-      let completedDays = 0;
+      let totalLateMinutes = 0;
+      let totalLateDays = 0;
 
       // Process each date in the range
       for (const date of dateRange) {
-        if (userLeaves.has(date)) {
-          // Leave day
-          reportData.push([date, '', '', '', '', '', 'LEAVE']);
-          rowStyles.push({ row: currentRow, type: 'leave' });
-          currentRow++;
-        } else if (userRestDays.has(date)) {
-          // Rest day
-          reportData.push([date, '', '', '', '', '', 'REST DAY']);
+        const schedule = userSchedules.get(date);
+        const isRestDay = schedule?.is_rest_day || false;
+        const holiday = holidayMap.get(date);
+        const isLeave = userLeaves.has(date);
+
+        // Format shift schedule
+        let shiftSchedule = '';
+        if (schedule && schedule.shift_start && schedule.shift_end) {
+          const formatTime = (time: string) => {
+            const [hours, minutes] = time.split(':');
+            const hour = parseInt(hours, 10);
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour % 12 || 12;
+            return `${displayHour}:${minutes} ${ampm}`;
+          };
+          shiftSchedule = `${formatTime(schedule.shift_start)} TO ${formatTime(schedule.shift_end)}`;
+        }
+
+        // Format date
+        const dateObj = new Date(date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+        let remarks = 'DAILY DUTY';
+        let holidayStatus = '';
+        let lateHHMM = '';
+        let lateMinutes = 0;
+        let lateDays = 0;
+        let timeIn = '';
+        let timeOut = '';
+
+        if (holiday) {
+          const typeStr = (holiday.type || '').toLowerCase();
+          let holidayType = 'Holiday';
+          if (typeStr.includes('regular')) {
+            holidayType = 'Regular Holiday';
+          } else if (typeStr.includes('special')) {
+            holidayType = 'Special Holiday';
+          }
+          holidayStatus = `${holidayType} - ${holiday.name}`;
+        }
+
+        if (isRestDay) {
+          remarks = 'REST DAY';
+          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
           rowStyles.push({ row: currentRow, type: 'restday' });
           currentRow++;
+        } else if (isLeave) {
+          remarks = 'LEAVE';
+          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+          rowStyles.push({ row: currentRow, type: 'leave' });
+          currentRow++;
         } else if (userAttendance.has(date)) {
-          // Attendance records for this date
+          // Has attendance
           const records = userAttendance.get(date)!;
-          for (const record of records) {
-            const timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : '';
-            const timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }) : '';
-            const status = record.time_out ? 'Completed' : 'Active';
+          const record = records[0]; // Take first record for the day
 
-            // Calculate total hours from time_in and time_out
-            let totalHours = '';
-            if (record.time_in && record.time_out) {
-              const timeInDate = new Date(record.time_in);
-              const timeOutDate = new Date(record.time_out);
-              const diffMs = timeOutDate.getTime() - timeInDate.getTime();
-              const hours = diffMs / (1000 * 60 * 60);
-              totalHours = hours.toFixed(2);
-            }
+          timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+          timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
 
-            reportData.push([
-              date,
-              employee.name,
-              employee.employeeId,
-              timeIn,
-              timeOut,
-              totalHours,
-              status
-            ]);
-            rowStyles.push({ row: currentRow, type: 'data' });
-            currentRow++;
+          // Calculate lateness
+          if (record.time_in && schedule && schedule.shift_start) {
+            const timeInDate = new Date(record.time_in);
+            const scheduledStart = new Date(date + 'T' + schedule.shift_start);
+            const diffMs = timeInDate.getTime() - scheduledStart.getTime();
+            const diffMinutes = Math.floor(diffMs / (1000 * 60));
 
-            if (status === 'Completed') {
-              completedDays++;
+            if (diffMinutes > 0) {
+              lateMinutes = diffMinutes;
+              totalLateMinutes += diffMinutes;
+              totalLateDays++;
+              lateDays = 1;
+
+              const hours = Math.floor(diffMinutes / 60);
+              const mins = diffMinutes % 60;
+              lateHHMM = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
             }
           }
+
+          if (!record.time_out) {
+            remarks = 'ACTIVE';
+          } else if (timeIn && schedule && schedule.shift_start) {
+            const timeInDate = new Date(record.time_in);
+            const scheduledStart = new Date(date + 'T' + schedule.shift_start);
+            if (timeInDate < scheduledStart) {
+              remarks = 'EARLY IN';
+            }
+          }
+
+          reportData.push([employee.name, formattedDate, timeIn, timeOut, shiftSchedule, remarks, lateHHMM, lateMinutes || '', lateDays || '', holidayStatus]);
+          rowStyles.push({ row: currentRow, type: 'data' });
+          currentRow++;
+        } else {
+          // No attendance for this date
+          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, '', '', '', '', holidayStatus]);
+          rowStyles.push({ row: currentRow, type: 'data' });
+          currentRow++;
         }
-        // If no attendance, leave, or rest day, skip the date (no row)
       }
 
       // Add total row
-      reportData.push(['Total', completedDays.toString(), '', '', '', '', '']);
+      reportData.push([`${employee.name} Total`, '', '', '', '', '', '', totalLateMinutes, totalLateDays, '']);
       rowStyles.push({ row: currentRow, type: 'total' });
       currentRow++;
-      reportData.push([]); // Empty row before next employee
+      reportData.push([]); // Empty row
       currentRow++;
     }
 
@@ -210,21 +272,22 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     const workbook = XLSX.utils.book_new();
     const worksheet = XLSX.utils.aoa_to_sheet(reportData);
 
-    // Apply styling
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-
     // Set column widths
     worksheet['!cols'] = [
-      { wch: 12 },  // Date
       { wch: 25 },  // Employee Name
-      { wch: 12 },  // Employee ID
+      { wch: 35 },  // Time Stamp
       { wch: 12 },  // Time In
       { wch: 12 },  // Time Out
-      { wch: 12 },  // Total Hours
-      { wch: 15 }   // Session Status
+      { wch: 25 },  // Shift Schedule
+      { wch: 15 },  // Remarks
+      { wch: 18 },  // NO. OF LATE HH:MM
+      { wch: 20 },  // TOTAL LATE MINUTES
+      { wch: 15 },  // NO. OF DAYS
+      { wch: 20 }   // HOLIDAY STATUS
     ];
 
     // Apply cell styles
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
     for (let R = range.s.r; R <= range.e.r; ++R) {
       const rowStyle = rowStyles.find(rs => rs.row === R);
 
@@ -233,23 +296,20 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
         if (!worksheet[cellAddress]) continue;
 
         const cell = worksheet[cellAddress];
-
-        // Initialize cell style
         if (!cell.s) cell.s = {};
 
-        // Apply styles based on row type
         if (rowStyle) {
           switch (rowStyle.type) {
             case 'title':
               cell.s = {
-                fill: { fgColor: { rgb: "000000" } },
+                fill: { fgColor: { rgb: "808080" } },
                 font: { bold: true, color: { rgb: "FFFFFF" }, sz: 14 },
-                alignment: { horizontal: "left", vertical: "center" }
+                alignment: { horizontal: "center", vertical: "center" }
               };
               break;
             case 'header':
               cell.s = {
-                fill: { fgColor: { rgb: "4472C4" } },
+                fill: { fgColor: { rgb: "808080" } },
                 font: { bold: true, color: { rgb: "FFFFFF" } },
                 alignment: { horizontal: "center", vertical: "center" },
                 border: {
@@ -261,9 +321,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
               };
               break;
             case 'data':
-              const isEvenRow = R % 2 === 0;
               cell.s = {
-                fill: { fgColor: { rgb: isEvenRow ? "D9E2F3" : "FFFFFF" } },
+                fill: { fgColor: { rgb: "FFFFFF" } },
                 alignment: { horizontal: "left", vertical: "center" },
                 border: {
                   top: { style: "thin", color: { rgb: "000000" } },
@@ -278,6 +337,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
               cell.s = {
                 fill: { fgColor: { rgb: "FFFF00" } },
                 font: { bold: true },
+                alignment: { horizontal: "center", vertical: "center" },
+                border: {
+                  top: { style: "thin", color: { rgb: "000000" } },
+                  bottom: { style: "thin", color: { rgb: "000000" } },
+                  left: { style: "thin", color: { rgb: "000000" } },
+                  right: { style: "thin", color: { rgb: "000000" } }
+                }
+              };
+              break;
+            case 'holiday':
+              cell.s = {
+                fill: { fgColor: { rgb: "FFFF00" } },
+                font: { bold: true, color: { rgb: "FF0000" } },
                 alignment: { horizontal: "center", vertical: "center" },
                 border: {
                   top: { style: "thin", color: { rgb: "000000" } },
@@ -470,7 +542,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       // Use appropriate conversion function based on export type
       const workbook = exportType === 'overtime'
         ? convertOvertimeToExcel(result.overtimeV2)
-        : convertToExcel(result.data, result.leaveRequests, result.schedules);
+        : convertToExcel(result.data, result.leaveRequests, result.schedules, result.holidays);
 
       if (!workbook) {
         alert('Failed to generate Excel file.');
