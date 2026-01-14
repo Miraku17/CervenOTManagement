@@ -34,7 +34,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Request Type',
         'Device',
         'Problem Category',
-        'Severity',
+        'Sev',
         'Request Detail',
         'Reported By (Employee ID)',
         'Assigned To (Employee ID)',
@@ -83,7 +83,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 15 }, // Request Type
       { wch: 35 }, // Device
       { wch: 25 }, // Problem Category
-      { wch: 10 }, // Severity
+      { wch: 10 }, // Sev
       { wch: 50 }, // Request Detail
       { wch: 25 }, // Reported By (Employee ID)
       { wch: 25 }, // Assigned To (Employee ID)
@@ -108,10 +108,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ['   IMPORTANT: If this matches a device in your store inventory, the station will be taken from the device'],
       ['   IMPORTANT: Format must exactly match: Category Brand Model Serial (space-separated)'],
       ['8. Problem Category - Category of the problem (e.g., Device Malfunction, Installation, Network Issue)'],
-      ['9. Severity - Must be one of: sev1, sev2, or sev3'],
-      ['   - sev1: Low priority'],
-      ['   - sev2: Medium priority'],
-      ['   - sev3: High priority / Critical'],
+      ['9. Sev - Must be one of: sev1, sev2, sev3, or sev4'],
+      ['   - sev1: Critical / Highest priority'],
+      ['   - sev2: High priority'],
+      ['   - sev3: Medium priority'],
+      ['   - sev4: Low priority'],
       ['10. Request Detail - Description of the issue'],
       ['11. Reported By (Employee ID) - Employee ID of the person reporting the issue (e.g., EMP001, EMP123)'],
       ['    IMPORTANT: Must match an existing employee ID in your system'],
@@ -132,7 +133,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ['- If Device is found in inventory, its station will override the Station Name column'],
       ['- Dates must be in MM/DD/YYYY format'],
       ['- Times must be in HH:MM AM/PM format'],
-      ['- Severity must be exactly: sev1, sev2, or sev3 (lowercase)'],
+      ['- Sev must be exactly: sev1, sev2, sev3, or sev4 (lowercase)'],
       ['- Maximum file size: 10MB'],
       ['- Maximum rows per import: 1000'],
       ['- Delete the example rows before importing your data'],

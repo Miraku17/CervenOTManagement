@@ -10,7 +10,7 @@ interface Ticket {
   id: string;
   store_id: string;
   station_id: string;
-  mod_id: string;
+  mod_id?: string | null;
   reported_by: string;
   serviced_by: string;
   rcc_reference_number: string;
@@ -20,9 +20,11 @@ interface Ticket {
   date_responded: string | null;
   time_responded: string | null;
   request_type: string;
+  request_type_id?: string;
   device: string;
   request_detail: string;
   problem_category: string;
+  problem_category_id?: string;
   sev: string;
   action_taken: string | null;
   final_resolution: string | null;
@@ -48,7 +50,9 @@ interface Ticket {
   stations?: { name: string };
   reported_by_user?: { first_name: string; last_name: string };
   serviced_by_user?: { first_name: string; last_name: string };
-  manager_on_duty?: { manager_name: string };
+  request_types?: { id: string; name: string };
+  problem_categories?: { id: string; name: string };
+  store_managers?: { id: string; manager_name: string };
 }
 
 interface TicketDetailModalProps {
@@ -845,7 +849,20 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       case 'on hold':
         return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
       case 'closed':
+      case 'completed':
         return 'bg-green-500/10 text-green-400 border-green-500/20';
+      case 'cancelled':
+        return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'replacement':
+        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+      case 'revisit':
+        return 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20';
+      case 'duplicate':
+        return 'bg-pink-500/10 text-pink-400 border-pink-500/20';
+      case 'misroute':
+        return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+      case 'pending':
+        return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
       default:
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
     }
@@ -884,8 +901,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                   </button>
                   
                   {isStatusDropdownOpen && !isSaving && (
-                    <div className="absolute top-full left-0 mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden ring-1 ring-slate-800 animate-in fade-in zoom-in-95 duration-100">
-                      {['Open', 'In Progress', 'On Hold', 'Closed'].map((status) => (
+                    <div className="absolute top-full left-0 mt-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden ring-1 ring-slate-800 animate-in fade-in zoom-in-95 duration-100 max-h-[400px] overflow-y-auto">
+                      {['Open', 'In Progress', 'On Hold', 'Closed', 'Replacement', 'Revisit', 'Cancelled', 'Completed', 'Duplicate', 'Misroute', 'Pending'].map((status) => (
                         <button
                           key={status}
                           onClick={() => {
@@ -900,7 +917,15 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                              status === 'Open' ? 'bg-blue-500 shadow-blue-500/50' :
                              status === 'In Progress' ? 'bg-yellow-500 shadow-yellow-500/50' :
                              status === 'On Hold' ? 'bg-orange-500 shadow-orange-500/50' :
-                             'bg-green-500 shadow-green-500/50'
+                             status === 'Closed' ? 'bg-green-500 shadow-green-500/50' :
+                             status === 'Completed' ? 'bg-green-500 shadow-green-500/50' :
+                             status === 'Cancelled' ? 'bg-red-500 shadow-red-500/50' :
+                             status === 'Replacement' ? 'bg-purple-500 shadow-purple-500/50' :
+                             status === 'Revisit' ? 'bg-cyan-500 shadow-cyan-500/50' :
+                             status === 'Duplicate' ? 'bg-pink-500 shadow-pink-500/50' :
+                             status === 'Misroute' ? 'bg-amber-500 shadow-amber-500/50' :
+                             status === 'Pending' ? 'bg-indigo-500 shadow-indigo-500/50' :
+                             'bg-slate-500 shadow-slate-500/50'
                           }`} />
                           {status}
                         </button>
@@ -919,7 +944,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               </span>
             </div>
             <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3 flex-wrap">
-              {ticket.request_type}
+              {ticket.request_types?.name || ticket.request_type}
               <span className="text-slate-500 text-base sm:text-lg font-normal">#{ticket.rcc_reference_number}</span>
             </h2>
           </div>
@@ -958,7 +983,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             <LabelValue label="RCC Reference" value={ticket.rcc_reference_number} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Date Reported" value={formatDate(ticket.date_reported)} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Time Reported" value={ticket.time_reported} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
-            <LabelValue label="Problem Category" value={ticket.problem_category} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Problem Category" value={ticket.problem_categories?.name || ticket.problem_category} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Device" value={ticket.device} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Request Detail" value={ticket.request_detail} fullWidth isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
 
@@ -1014,7 +1039,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             <LabelValue label="Store Name" value={ticket.stores?.store_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Store Code" value={ticket.stores?.store_code} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Station" value={ticket.stations?.name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
-            <LabelValue label="Manager on Duty (MOD)" value={ticket.manager_on_duty?.manager_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            <LabelValue label="Manager on Duty (MOD)" value={ticket.store_managers?.manager_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
           </DetailSection>
 
           <DetailSection title="People Involved" icon={User}>
