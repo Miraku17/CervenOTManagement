@@ -298,10 +298,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const { data: leaveData } = await leaveQuery;
 
-    // Fetch working schedules for the date range
+    // Fetch working schedules for the date range (with shift times)
     let scheduleQuery = supabase
       .from('working_schedules')
-      .select('employee_id, date, is_rest_day')
+      .select('employee_id, date, is_rest_day, shift_start, shift_end')
       .gte('date', startDate as string)
       .lte('date', endDate as string);
 
@@ -313,11 +313,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const { data: scheduleData } = await scheduleQuery;
 
+    // Fetch holidays for the date range
+    const { data: holidaysData } = await supabase
+      .from('holidays')
+      .select('date, name, holiday_type')
+      .gte('date', startDate as string)
+      .lte('date', endDate as string)
+      .is('deleted_at', null);
+
     return res.status(200).json({
       data,
       overtimeV2: overtimeV2WithProfiles,
       leaveRequests: leaveData || [],
-      schedules: scheduleData || []
+      schedules: scheduleData || [],
+      holidays: holidaysData || []
     });
 
   } catch (error: any) {

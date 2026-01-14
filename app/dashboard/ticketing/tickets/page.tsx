@@ -20,7 +20,7 @@ interface Ticket {
   id: string;
   store_id: string;
   station_id: string;
-  mod_id: string;
+  mod_id?: string | null;
   reported_by: string;
   serviced_by: string;
   rcc_reference_number: string;
@@ -29,9 +29,11 @@ interface Ticket {
   date_responded: string | null;
   time_responded: string | null;
   request_type: string;
+  request_type_id?: string;
   device: string;
   request_detail: string;
   problem_category: string;
+  problem_category_id?: string;
   sev: string;
   action_taken: string | null;
   final_resolution: string | null;
@@ -57,7 +59,9 @@ interface Ticket {
   stations?: { name: string };
   reported_by_user?: { first_name: string; last_name: string };
   serviced_by_user?: { first_name: string; last_name: string };
-  manager_on_duty?: { manager_name: string };
+  store_managers?: { id: string; manager_name: string };
+  request_types?: { id: string; name: string };
+  problem_categories?: { id: string; name: string };
 }
 
 interface TicketsResponse {
@@ -644,7 +648,7 @@ export default function TicketsPage() {
             </button>
           )}
 
-          {/* <div className="relative" ref={actionsDropdownRef}>
+          <div className="relative" ref={actionsDropdownRef}>
             <button
               onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
               className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700"
@@ -705,7 +709,7 @@ export default function TicketsPage() {
                 </div>
               </div>
             )}
-          </div> */}
+          </div>
         </div>
       </div>
 
@@ -856,7 +860,7 @@ export default function TicketsPage() {
                   {/* Main Info */}
                   <div>
                     <h3 className="text-base font-semibold text-white group-hover:text-blue-400 transition-colors mb-1">
-                      {ticket.request_type} - {ticket.device}
+                      {ticket.request_types?.name || ticket.request_type} - {ticket.device}
                     </h3>
                     <p className="text-sm text-slate-400 line-clamp-1">{ticket.request_detail}</p>
                   </div>

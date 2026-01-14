@@ -51,9 +51,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           time_reported,
           date_responded,
           time_responded,
+          request_type_id,
           request_type,
           device,
           request_detail,
+          problem_category_id,
           problem_category,
           sev,
           action_taken,
@@ -92,6 +94,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           serviced_by_user:serviced_by (
             first_name,
             last_name
+          ),
+          request_types:request_type_id (
+            id,
+            name
+          ),
+          problem_categories:problem_category_id (
+            id,
+            name
+          ),
+          store_managers:mod_id (
+            id,
+            manager_name
           )
         `)
         .range(from, to)
