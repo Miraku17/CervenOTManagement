@@ -58,9 +58,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     // Use the user-selected dates if provided, otherwise fall back to data dates
     // Start date: use exact date selected by user
     const startDate = userStartDate ? parseLocalDate(userStartDate) : parseLocalDate(allDates[0]);
-    // End date: expand to last day of the selected month
-    const userEndDateObj = userEndDate ? parseLocalDate(userEndDate) : parseLocalDate(allDates[allDates.length - 1]);
-    const endDate = new Date(userEndDateObj.getFullYear(), userEndDateObj.getMonth() + 1, 0);
+    // End date: use exact date selected by user
+    const endDate = userEndDate ? parseLocalDate(userEndDate) : parseLocalDate(allDates[allDates.length - 1]);
 
     // Generate all dates in range (including dates with no attendance)
     const dateRange: string[] = [];
