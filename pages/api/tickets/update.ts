@@ -36,7 +36,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch the existing ticket to get current data for SLA calculation
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end')
+      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2')
       .eq('id', id)
       .single();
 
@@ -56,6 +56,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const workEnd = updateData.work_end !== undefined ? updateData.work_end : existingTicket.work_end;
     const pauseStart = updateData.pause_time_start !== undefined ? updateData.pause_time_start : existingTicket.pause_time_start;
     const pauseEnd = updateData.pause_time_end !== undefined ? updateData.pause_time_end : existingTicket.pause_time_end;
+    const pauseStart2 = updateData.pause_time_start_2 !== undefined ? updateData.pause_time_start_2 : existingTicket.pause_time_start_2;
+    const pauseEnd2 = updateData.pause_time_end_2 !== undefined ? updateData.pause_time_end_2 : existingTicket.pause_time_end_2;
 
     if (dateAck && timeAck && dateAttended && workEnd) {
       try {
@@ -84,6 +86,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (pauseEnd && !timePattern.test(pauseEnd)) {
           return res.status(400).json({
             error: 'Invalid time format for Pause End. Expected format: HH:MM (e.g., 13:00)'
+          });
+        }
+
+        // Validate pause 2 time formats if provided
+        if (pauseStart2 && !timePattern.test(pauseStart2)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Pause Start 2. Expected format: HH:MM (e.g., 14:00)'
+          });
+        }
+
+        if (pauseEnd2 && !timePattern.test(pauseEnd2)) {
+          return res.status(400).json({
+            error: 'Invalid time format for Pause End 2. Expected format: HH:MM (e.g., 15:00)'
           });
         }
 
@@ -156,6 +171,43 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           // Validate both pause times are provided together
           return res.status(400).json({
             error: 'Both Pause Start and Pause End must be provided together'
+          });
+        }
+
+        // Subtract pause 2 time if both pause start 2 and end 2 exist
+        if (pauseStart2 && pauseEnd2) {
+          // Parse pause 2 times and calculate duration in hours
+          const [pStart2Hours, pStart2Minutes] = pauseStart2.split(':');
+          const [pEnd2Hours, pEnd2Minutes] = pauseEnd2.split(':');
+
+          // Convert to total minutes for easier calculation
+          let pause2StartMinutes = parseInt(pStart2Hours) * 60 + parseInt(pStart2Minutes);
+          let pause2EndMinutes = parseInt(pEnd2Hours) * 60 + parseInt(pEnd2Minutes);
+
+          // Validate pause 2 end is after pause 2 start (should be same day)
+          if (pause2EndMinutes <= pause2StartMinutes) {
+            return res.status(400).json({
+              error: 'Pause End 2 must be after Pause Start 2. Both times should be on the same day.'
+            });
+          }
+
+          // Calculate pause 2 duration in hours
+          const pause2DurationMinutes = pause2EndMinutes - pause2StartMinutes;
+          const pause2Hours = pause2DurationMinutes / 60;
+
+          // Validate pause 2 duration doesn't exceed remaining work duration
+          if (pause2Hours > diffInHours) {
+            return res.status(400).json({
+              error: 'Pause 2 duration cannot exceed remaining work duration'
+            });
+          }
+
+          // Subtract pause 2 duration from total SLA hours
+          diffInHours = diffInHours - pause2Hours;
+        } else if ((pauseStart2 && !pauseEnd2) || (!pauseStart2 && pauseEnd2)) {
+          // Validate both pause 2 times are provided together
+          return res.status(400).json({
+            error: 'Both Pause Start 2 and Pause End 2 must be provided together'
           });
         }
 

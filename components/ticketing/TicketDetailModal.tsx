@@ -39,6 +39,8 @@ interface Ticket {
   work_start: string | null;
   pause_time_start: string | null;
   pause_time_end: string | null;
+  pause_time_start_2: string | null;
+  pause_time_end_2: string | null;
   work_end: string | null;
   date_resolved: string | null;
   time_resolved: string | null;
@@ -497,6 +499,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         time_responded: formatTimeField(ticket.time_responded),
         pause_time_start: ticket.pause_time_start || '',
         pause_time_end: ticket.pause_time_end || '',
+        pause_time_start_2: ticket.pause_time_start_2 || '',
+        pause_time_end_2: ticket.pause_time_end_2 || '',
         kb_id: ticket.kb_id || '',
       });
     }
@@ -815,6 +819,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         time_responded: ticket.time_responded || '',
         pause_time_start: ticket.pause_time_start || '',
         pause_time_end: ticket.pause_time_end || '',
+        pause_time_start_2: ticket.pause_time_start_2 || '',
+        pause_time_end_2: ticket.pause_time_end_2 || '',
         kb_id: ticket.kb_id || '',
       });
     }
@@ -1115,7 +1121,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
                 if (newData.date_attended !== editData.date_attended) {
                     // Update dependent fields in editData to ensure they are sent to API
                     // even if they weren't explicitly touched in this edit session
-                   ['work_end', 'pause_time_start', 'pause_time_end'].forEach(field => {
+                   ['work_end', 'pause_time_start', 'pause_time_end', 'pause_time_start_2', 'pause_time_end_2'].forEach(field => {
                        const currentVal = (editData[field as keyof Ticket] as string) || (ticket[field as keyof Ticket] as string);
                        if (currentVal) {
                            (newData as any)[field] = currentVal.substring(0, 5);
@@ -1165,6 +1171,24 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
               value={getTimestampTime(ticket.pause_time_end)}
               editable
               editKey="pause_time_end"
+              type="time"
+              dateAttended={ticket.date_attended}
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Pause Start 2"
+              value={getTimestampTime(ticket.pause_time_start_2)}
+              editable
+              editKey="pause_time_start_2"
+              type="time"
+              dateAttended={ticket.date_attended}
+              isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}
+            />
+            <LabelValue
+              label="Pause End 2"
+              value={getTimestampTime(ticket.pause_time_end_2)}
+              editable
+              editKey="pause_time_end_2"
               type="time"
               dateAttended={ticket.date_attended}
               isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving}

@@ -846,6 +846,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             work_start: formatTimestamp(dateAttended, parseTime(row['Work Start'])),
             pause_time_start: formatTimestamp(dateAttended, parseTime(row['Pause Time\n(Start)'])),
             pause_time_end: formatTimestamp(dateAttended, parseTime(row['Pause Time\n(End)'])),
+            pause_time_start_2: formatTimestamp(dateAttended, parseTime(row['Pause Time 2\n(Start)'])),
+            pause_time_end_2: formatTimestamp(dateAttended, parseTime(row['Pause Time 2\n(End)'])),
             work_end: formatTimestamp(dateAttended, parseTime(row['Work End'])),
             date_resolved: parseDate(row['Date Resolved']),
             sla_count_hrs: parseNumeric(row['SLA Count\n(Hrs)']),

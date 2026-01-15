@@ -71,6 +71,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           work_start,
           pause_time_start,
           pause_time_end,
+          pause_time_start_2,
+          pause_time_end_2,
           work_end,
           date_resolved,
           time_resolved,
