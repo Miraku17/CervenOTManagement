@@ -41,7 +41,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     employee.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[], holidays?: any[]) => {
+  const convertToExcel = (data: any[], leaveRequests?: any[], schedules?: any[], holidays?: any[], userStartDate?: string, userEndDate?: string) => {
     console.log('Holidays received in convertToExcel:', holidays);
     if (!data || data.length === 0) return null;
 
@@ -49,21 +49,28 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     const allDates = Array.from(new Set(data.map(row => row.date))).sort();
     if (allDates.length === 0) return null;
 
-    // Get the start and end dates, but expand to full months
-    const firstDate = new Date(allDates[0]);
-    const lastDate = new Date(allDates[allDates.length - 1]);
+    // Helper to parse date string as local date (not UTC)
+    const parseLocalDate = (dateStr: string) => {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      return new Date(year, month - 1, day);
+    };
 
-    // Get first day of start month
-    const startDate = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
-
-    // Get last day of end month
-    const endDate = new Date(lastDate.getFullYear(), lastDate.getMonth() + 1, 0);
+    // Use the user-selected dates if provided, otherwise fall back to data dates
+    // Start date: use exact date selected by user
+    const startDate = userStartDate ? parseLocalDate(userStartDate) : parseLocalDate(allDates[0]);
+    // End date: expand to last day of the selected month
+    const userEndDateObj = userEndDate ? parseLocalDate(userEndDate) : parseLocalDate(allDates[allDates.length - 1]);
+    const endDate = new Date(userEndDateObj.getFullYear(), userEndDateObj.getMonth() + 1, 0);
 
     // Generate all dates in range (including dates with no attendance)
     const dateRange: string[] = [];
     let currentDate = new Date(startDate);
     while (currentDate <= endDate) {
-      dateRange.push(currentDate.toISOString().split('T')[0]);
+      // Use local date formatting to avoid timezone issues
+      const year = currentDate.getFullYear();
+      const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+      const day = String(currentDate.getDate()).padStart(2, '0');
+      dateRange.push(`${year}-${month}-${day}`);
       currentDate.setDate(currentDate.getDate() + 1);
     }
 
@@ -542,7 +549,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       // Use appropriate conversion function based on export type
       const workbook = exportType === 'overtime'
         ? convertOvertimeToExcel(result.overtimeV2)
-        : convertToExcel(result.data, result.leaveRequests, result.schedules, result.holidays);
+        : convertToExcel(result.data, result.leaveRequests, result.schedules, result.holidays, start, end);
 
       if (!workbook) {
         alert('Failed to generate Excel file.');
