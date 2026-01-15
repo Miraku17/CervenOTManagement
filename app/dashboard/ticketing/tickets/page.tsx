@@ -48,6 +48,8 @@ interface Ticket {
   work_start: string | null;
   pause_time_start: string | null;
   pause_time_end: string | null;
+  pause_time_start_2: string | null;
+  pause_time_end_2: string | null;
   work_end: string | null;
   date_resolved: string | null;
   time_resolved: string | null;

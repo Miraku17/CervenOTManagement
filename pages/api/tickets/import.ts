@@ -45,6 +45,8 @@ interface ImportRow {
   'Work Start'?: string;
   'Pause Time\n(Start)'?: string;
   'Pause Time\n(End)'?: string;
+  'Pause Time 2\n(Start)'?: string;
+  'Pause Time 2\n(End)'?: string;
   'Work End'?: string;
   'Date Resolved'?: string;
   'Reported by'?: string;
