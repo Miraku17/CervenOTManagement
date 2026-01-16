@@ -46,6 +46,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Filter parameters
     const categoryFilter = (req.query.category as string) || '';
     const storeFilter = (req.query.store as string) || '';
+    const storeIdFilter = (req.query.store_id as string) || '';
     const brandFilter = (req.query.brand as string) || '';
 
     // Calculate stats from total inventory (always constant, ignores filters)
@@ -108,7 +109,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     let hasMore = true;
 
     while (hasMore) {
-      const { data, error } = await supabaseAdmin
+      let query = supabaseAdmin
         .from('store_inventory')
         .select(`
           id,
@@ -143,8 +144,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           )
         `)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .range(rangeStart, rangeStart + batchSize - 1);
+        .order('created_at', { ascending: false });
+
+      // Filter by store_id directly in query (more efficient)
+      if (storeIdFilter) {
+        query = query.eq('store_id', storeIdFilter);
+      }
+
+      const { data, error } = await query.range(rangeStart, rangeStart + batchSize - 1);
 
       if (error) {
         fetchError = error;

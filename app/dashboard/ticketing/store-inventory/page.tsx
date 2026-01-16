@@ -672,8 +672,9 @@ export default function StoreInventoryPage() {
       />
 
       {/* Filters & Search */}
-      <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-4 bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+        {/* Search Bar - Full width on all screens */}
+        <div className="relative w-full">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5" />
             <input
             type="text"
@@ -683,12 +684,14 @@ export default function StoreInventoryPage() {
             className="w-full bg-slate-950 border border-slate-800 text-slate-200 pl-10 pr-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-slate-500"
             />
         </div>
-        <div className="flex gap-3">
+
+        {/* Filter Buttons - Stack on mobile, row on desktop */}
+        <div className="flex flex-col sm:flex-row gap-3">
             {/* Filter Button with Dropdown */}
-            <div ref={filterRef} className="relative">
+            <div ref={filterRef} className="relative flex-1 sm:flex-none">
               <button
                 onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ hasActiveFilters ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ hasActiveFilters ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Filter size={18} />
                 <span>Filter</span>
@@ -702,7 +705,7 @@ export default function StoreInventoryPage() {
 
               {/* Filter Dropdown */}
               {showFilterDropdown && (
-                <div className="absolute top-full mt-2 right-0 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
                   <div className="p-4 space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-semibold text-white">Filters</h3>
@@ -758,19 +761,19 @@ export default function StoreInventoryPage() {
             </div>
 
             {/* Device Button with Dropdown */}
-            <div ref={categoryRef} className="relative">
+            <div ref={categoryRef} className="relative flex-1 sm:flex-none">
               <button
                 onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className={`flex items-center gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Box size={18} />
-                <span>{selectedCategory || 'Device'}</span>
-                <ChevronDown size={16} className={`transition-transform ${showCategoryDropdown ? 'rotate-180' : ''}`} />
+                <span className="truncate">{selectedCategory || 'Device'}</span>
+                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${showCategoryDropdown ? 'rotate-180' : ''}`} />
               </button>
 
               {/* Device Dropdown */}
               {showCategoryDropdown && (
-                <div className="absolute top-full mt-2 right-0 w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+                <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
                   <button
                     onClick={() => {
                       setSelectedCategory(null);
