@@ -871,7 +871,7 @@ export default function TicketsPage() {
                     <div className="flex items-center gap-2">
                       <Clock size={16} className="text-blue-400 flex-shrink-0" />
                       <span className="text-sm font-medium text-white">
-                        {ticket.time_reported}
+                        {ticket.time_reported?.slice(0, 5)}
                       </span>
                     </div>
                   </div>
