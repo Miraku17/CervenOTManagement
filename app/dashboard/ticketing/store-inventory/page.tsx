@@ -685,8 +685,8 @@ export default function StoreInventoryPage() {
             />
         </div>
 
-        {/* Filter Buttons - Stack on mobile, row on desktop */}
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Filter Buttons - Stack on mobile, row on desktop, aligned right */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
             {/* Filter Button with Dropdown */}
             <div ref={filterRef} className="relative flex-1 sm:flex-none">
               <button

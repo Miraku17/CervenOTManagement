@@ -180,8 +180,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
     if (storeFilter) {
       filteredItems = filteredItems.filter((item: any) => {
-        const storeName = Array.isArray(item.stores) ? item.stores[0]?.store_name : item.stores?.store_name;
-        return storeName === storeFilter;
+        const storeCode = Array.isArray(item.stores) ? item.stores[0]?.store_code : item.stores?.store_code;
+        return storeCode === storeFilter;
       });
     }
     if (brandFilter) {
@@ -269,10 +269,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       new Set(
         allFilteredItems
           .map((item: any) => {
-            const storeName = Array.isArray(item.stores)
-              ? item.stores[0]?.store_name
-              : item.stores?.store_name;
-            return storeName;
+            const storeCode = Array.isArray(item.stores)
+              ? item.stores[0]?.store_code
+              : item.stores?.store_code;
+            return storeCode;
           })
           .filter(Boolean)
       )
