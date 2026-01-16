@@ -539,9 +539,10 @@ export default function TicketsPage() {
 
     const tickets = [...data.tickets];
     return tickets.sort((a, b) => {
-      const dateA = new Date(a.date_reported).getTime();
-      const dateB = new Date(b.date_reported).getTime();
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+      // Combine date and time for accurate sorting
+      const dateTimeA = new Date(`${a.date_reported}T${a.time_reported || '00:00:00'}`).getTime();
+      const dateTimeB = new Date(`${b.date_reported}T${b.time_reported || '00:00:00'}`).getTime();
+      return sortOrder === 'asc' ? dateTimeA - dateTimeB : dateTimeB - dateTimeA;
     });
   }, [data?.tickets, sortOrder]);
 
@@ -871,7 +872,9 @@ export default function TicketsPage() {
                     <div className="flex items-center gap-2">
                       <Clock size={16} className="text-blue-400 flex-shrink-0" />
                       <span className="text-sm font-medium text-white">
-                        {ticket.time_reported?.slice(0, 5)}
+                        {ticket.time_reported
+                          ? format(new Date(`1970-01-01T${ticket.time_reported}`), 'h:mm a')
+                          : '--:--'}
                       </span>
                     </div>
                   </div>
