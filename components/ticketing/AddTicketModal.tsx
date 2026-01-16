@@ -137,9 +137,11 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     mod_id: '',
     rcc_reference_number: '',
     request_type: '',
+    request_type_id: '',
     device: '',
     request_detail: '',
     problem_category: '',
+    problem_category_id: '',
     sev: '',
     serviced_by: '',
     kb_id: '',
@@ -628,9 +630,11 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
         mod_id: '',
         rcc_reference_number: '',
         request_type: '',
+        request_type_id: '',
         device: '',
         request_detail: '',
         problem_category: '',
+        problem_category_id: '',
         sev: '',
         serviced_by: '',
         kb_id: '',
@@ -1035,7 +1039,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     value={requestTypeSearchTerm}
                     onChange={(e) => {
                       setRequestTypeSearchTerm(e.target.value);
-                      setFormData({ ...formData, request_type: e.target.value });
+                      setFormData({ ...formData, request_type: e.target.value, request_type_id: '' });
                       setShowRequestTypeDropdown(true);
                     }}
                     onFocus={() => setShowRequestTypeDropdown(true)}
@@ -1060,7 +1064,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                           type="button"
                           onClick={() => {
                             setRequestTypeSearchTerm(type.name);
-                            setFormData({ ...formData, request_type: type.name });
+                            setFormData({ ...formData, request_type: type.name, request_type_id: type.id });
                             setShowRequestTypeDropdown(false);
                           }}
                           className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"
@@ -1089,7 +1093,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                     value={problemCategorySearchTerm}
                     onChange={(e) => {
                       setProblemCategorySearchTerm(e.target.value);
-                      setFormData({ ...formData, problem_category: e.target.value });
+                      setFormData({ ...formData, problem_category: e.target.value, problem_category_id: '' });
                       setShowProblemCategoryDropdown(true);
                     }}
                     onFocus={() => setShowProblemCategoryDropdown(true)}
@@ -1114,7 +1118,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                           type="button"
                           onClick={() => {
                             setProblemCategorySearchTerm(category.name);
-                            setFormData({ ...formData, problem_category: category.name });
+                            setFormData({ ...formData, problem_category: category.name, problem_category_id: category.id });
                             setShowProblemCategoryDropdown(false);
                           }}
                           className="w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0"

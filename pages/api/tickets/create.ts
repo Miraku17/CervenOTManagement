@@ -23,9 +23,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     rcc_reference_number,
     kb_id,
     request_type,
+    request_type_id,
     device,
     request_detail,
     problem_category,
+    problem_category_id,
     sev,
     date_reported,
     time_reported,
@@ -47,6 +49,63 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const PHILIPPINE_TZ = 'Asia/Manila';
     const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'HH:mm');
 
+    let finalRequestTypeId = request_type_id || null;
+    let finalProblemCategoryId = problem_category_id || null;
+
+    // If no request_type_id provided but request_type text exists, find or create it
+    if (!finalRequestTypeId && request_type) {
+      // Check if it already exists
+      const { data: existingRequestType } = await supabaseAdmin
+        .from('request_types')
+        .select('id')
+        .eq('name', request_type)
+        .single();
+
+      if (existingRequestType) {
+        finalRequestTypeId = existingRequestType.id;
+      } else {
+        // Create new request type
+        const { data: newRequestType, error: rtError } = await supabaseAdmin
+          .from('request_types')
+          .insert([{ name: request_type }])
+          .select('id')
+          .single();
+
+        if (rtError) {
+          console.error('Error creating request type:', rtError);
+        } else if (newRequestType) {
+          finalRequestTypeId = newRequestType.id;
+        }
+      }
+    }
+
+    // If no problem_category_id provided but problem_category text exists, find or create it
+    if (!finalProblemCategoryId && problem_category) {
+      // Check if it already exists
+      const { data: existingProblemCategory } = await supabaseAdmin
+        .from('problem_categories')
+        .select('id')
+        .eq('name', problem_category)
+        .single();
+
+      if (existingProblemCategory) {
+        finalProblemCategoryId = existingProblemCategory.id;
+      } else {
+        // Create new problem category
+        const { data: newProblemCategory, error: pcError } = await supabaseAdmin
+          .from('problem_categories')
+          .insert([{ name: problem_category }])
+          .select('id')
+          .single();
+
+        if (pcError) {
+          console.error('Error creating problem category:', pcError);
+        } else if (newProblemCategory) {
+          finalProblemCategoryId = newProblemCategory.id;
+        }
+      }
+    }
+
     // Create the ticket
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('tickets')
@@ -58,9 +117,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           rcc_reference_number: rcc_reference_number || null,
           kb_id: kb_id || null,
           request_type,
+          request_type_id: finalRequestTypeId,
           device,
           request_detail,
           problem_category,
+          problem_category_id: finalProblemCategoryId,
           sev,
           date_reported: date_reported || new Date().toISOString(),
           time_reported: time_reported || currentTime,
