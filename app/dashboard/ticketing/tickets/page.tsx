@@ -859,6 +859,23 @@ export default function TicketsPage() {
 
                 {/* Body */}
                 <div className="p-4 space-y-3">
+                  {/* Date & Time - Prominent Display */}
+                  <div className="flex items-center gap-3 bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800">
+                    <div className="flex items-center gap-2 flex-1">
+                      <Calendar size={16} className="text-blue-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-white">
+                        {format(new Date(ticket.date_reported), 'MMM d, yyyy')}
+                      </span>
+                    </div>
+                    <div className="w-px h-4 bg-slate-700"></div>
+                    <div className="flex items-center gap-2">
+                      <Clock size={16} className="text-blue-400 flex-shrink-0" />
+                      <span className="text-sm font-medium text-white">
+                        {ticket.time_reported?.slice(0, 5)}
+                      </span>
+                    </div>
+                  </div>
+
                   {/* Main Info */}
                   <div>
                     <h3 className="text-base font-semibold text-white group-hover:text-blue-400 transition-colors mb-1">
@@ -867,15 +884,11 @@ export default function TicketsPage() {
                     <p className="text-sm text-slate-400 line-clamp-1">{ticket.request_detail}</p>
                   </div>
 
-                  {/* Metadata Grid */}
-                  <div className="grid grid-cols-2 gap-3 text-xs">
+                  {/* Metadata */}
+                  <div className="flex flex-col gap-2 text-xs">
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <MapPin size={13} className="text-slate-600 flex-shrink-0" />
                       <span className="truncate">{ticket.stores?.store_name}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Calendar size={13} className="text-slate-600 flex-shrink-0" />
-                      <span>{format(new Date(ticket.date_reported), 'MMM d, yyyy')}</span>
                     </div>
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <User size={13} className="text-slate-600 flex-shrink-0" />
@@ -884,10 +897,6 @@ export default function TicketsPage() {
                           ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
                           : 'Unassigned'}
                       </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <Clock size={13} className="text-slate-600 flex-shrink-0" />
-                      <span>{ticket.time_reported}</span>
                     </div>
                   </div>
                 </div>
