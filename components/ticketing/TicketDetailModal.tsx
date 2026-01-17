@@ -70,6 +70,13 @@ interface KBArticle {
   kb_code: string;
 }
 
+interface Employee {
+  id: string;
+  fullName: string;
+  employee_id: string;
+  email: string;
+}
+
 interface TicketAttachment {
   id: string;
   ticket_id: string;
@@ -338,7 +345,7 @@ const LabelValue = ({
   );
 };
 
-const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticket, onUpdate }) => {
+const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, ticket: ticketProp, onUpdate }) => {
   const { user } = useAuth();
   const { hasPermission } = usePermissions();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -347,9 +354,16 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [isAdmin, setIsAdmin] = useState(false);
   const [userPosition, setUserPosition] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<Ticket>>({});
+  // Local ticket state that gets updated after save
+  const [localTicket, setLocalTicket] = useState<Ticket | null>(null);
+  const ticket = localTicket || ticketProp;
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const [showServicedByDropdown, setShowServicedByDropdown] = useState(false);
+  const [servicedBySearchTerm, setServicedBySearchTerm] = useState('');
+  const servicedByDropdownRef = useRef<HTMLDivElement>(null);
   const [kbArticles, setKbArticles] = useState<KBArticle[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
   const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -369,6 +383,9 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     const handleClickOutside = (event: MouseEvent) => {
       if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
         setIsStatusDropdownOpen(false);
+      }
+      if (servicedByDropdownRef.current && !servicedByDropdownRef.current.contains(event.target as Node)) {
+        setShowServicedByDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -420,6 +437,25 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
     if (isOpen) {
       fetchKBArticles();
+    }
+  }, [isOpen]);
+
+  // Fetch employees when modal opens
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const response = await fetch('/api/employees/get');
+        const data = await response.json();
+        if (response.ok) {
+          setEmployees(data.employees || []);
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+      }
+    };
+
+    if (isOpen) {
+      fetchEmployees();
     }
   }, [isOpen]);
 
@@ -475,6 +511,11 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
     return timeString.substring(0, 5);
   };
 
+  // Reset local ticket when ticketProp changes (new ticket selected)
+  useEffect(() => {
+    setLocalTicket(null);
+  }, [ticketProp?.id]);
+
   // Reset edit data when ticket changes
   useEffect(() => {
     if (ticket) {
@@ -502,7 +543,14 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         pause_time_start_2: ticket.pause_time_start_2 || '',
         pause_time_end_2: ticket.pause_time_end_2 || '',
         kb_id: ticket.kb_id || '',
+        serviced_by: ticket.serviced_by || '',
       });
+      // Set search term to current employee name
+      if (ticket.serviced_by_user) {
+        setServicedBySearchTerm(`${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`);
+      } else {
+        setServicedBySearchTerm('');
+      }
     }
   }, [ticket]);
 
@@ -779,6 +827,15 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       setPendingAttachments([]);
       setPendingPreviewUrls([]);
 
+      // Update local ticket state immediately with new data
+      if (data.ticket) {
+        setLocalTicket(data.ticket);
+        // Update serviced by search term with new employee name
+        if (data.ticket.serviced_by_user) {
+          setServicedBySearchTerm(`${data.ticket.serviced_by_user.first_name} ${data.ticket.serviced_by_user.last_name}`);
+        }
+      }
+
       if (onUpdate && data.ticket) {
         onUpdate(data.ticket);
       }
@@ -822,7 +879,14 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         pause_time_start_2: ticket.pause_time_start_2 || '',
         pause_time_end_2: ticket.pause_time_end_2 || '',
         kb_id: ticket.kb_id || '',
+        serviced_by: ticket.serviced_by || '',
       });
+      // Reset serviced by search term
+      if (ticket.serviced_by_user) {
+        setServicedBySearchTerm(`${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`);
+      } else {
+        setServicedBySearchTerm('');
+      }
     }
 
     // Clear attachment changes
@@ -1050,7 +1114,111 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
           <DetailSection title="People Involved" icon={User}>
             <LabelValue label="Reported By" value={ticket.reported_by_user ? `${ticket.reported_by_user.first_name} ${ticket.reported_by_user.last_name}` : ticket.reported_by} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
-            <LabelValue label="Serviced By" value={ticket.serviced_by_user ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}` : ticket.serviced_by} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+
+            {/* Serviced By - Editable Searchable Dropdown */}
+            <div ref={servicedByDropdownRef} className={isEditMode ? "relative" : ""}>
+              <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">
+                Serviced By
+                {isEditMode && editData.serviced_by && (
+                  <span className="text-slate-400 normal-case ml-2">
+                    (Selected: {employees.find(e => e.id === editData.serviced_by)?.fullName || 'Loading...'})
+                  </span>
+                )}
+              </span>
+              {isEditMode ? (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={isSaving}
+                      value={servicedBySearchTerm}
+                      onChange={(e) => {
+                        setServicedBySearchTerm(e.target.value);
+                        setShowServicedByDropdown(true);
+                      }}
+                      onFocus={() => setShowServicedByDropdown(true)}
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 pr-16 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      placeholder="Search for an employee..."
+                    />
+                    {editData.serviced_by && !isSaving && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditData({ ...editData, serviced_by: '' });
+                          setServicedBySearchTerm('');
+                          setShowServicedByDropdown(false);
+                        }}
+                        className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                        title="Clear selection"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <ChevronDown
+                      size={16}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${showServicedByDropdown ? 'rotate-180' : ''}`}
+                    />
+                  </div>
+
+                  {/* Dropdown Menu */}
+                  {showServicedByDropdown && !isSaving && (
+                    <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                      {employees
+                        .filter(emp =>
+                          emp.fullName.toLowerCase().includes(servicedBySearchTerm.toLowerCase()) ||
+                          emp.employee_id?.toLowerCase().includes(servicedBySearchTerm.toLowerCase()) ||
+                          emp.email.toLowerCase().includes(servicedBySearchTerm.toLowerCase())
+                        ).length > 0 ? (
+                        employees
+                          .filter(emp =>
+                            emp.fullName.toLowerCase().includes(servicedBySearchTerm.toLowerCase()) ||
+                            emp.employee_id?.toLowerCase().includes(servicedBySearchTerm.toLowerCase()) ||
+                            emp.email.toLowerCase().includes(servicedBySearchTerm.toLowerCase())
+                          )
+                          .map((employee) => (
+                            <button
+                              key={employee.id}
+                              type="button"
+                              onClick={() => {
+                                setEditData({ ...editData, serviced_by: employee.id });
+                                setServicedBySearchTerm(employee.fullName);
+                                setShowServicedByDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 ${
+                                editData.serviced_by === employee.id ? 'bg-slate-800/50' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-white">{employee.fullName}</div>
+                                  <div className="text-xs text-slate-400 mt-0.5">
+                                    {employee.employee_id && `ID: ${employee.employee_id} • `}
+                                    {employee.email}
+                                  </div>
+                                </div>
+                                {editData.serviced_by === employee.id && (
+                                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                      ) : (
+                        <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                          No employees found
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-slate-300 font-medium break-words">
+                  {ticket.serviced_by_user
+                    ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
+                    : <span className="text-slate-600 italic">N/A</span>
+                  }
+                </div>
+              )}
+            </div>
           </DetailSection>
 
           <DetailSection title="Resolution & Action" icon={CheckCircle}>

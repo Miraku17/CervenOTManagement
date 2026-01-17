@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
@@ -12,12 +13,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  // Check for restricted positions (even if admin)
-  const userPosition = req.user?.position?.toLowerCase() || '';
-  
-  // Only Operations Manager can delete tickets
-  if (userPosition !== 'operations manager') {
-    return res.status(403).json({ error: 'Forbidden: Only Operations Manager can delete tickets' });
+  const userId = req.user?.id || '';
+
+  // Check if user has delete_tickets permission
+  const hasDeletePermission = await userHasPermission(userId, 'delete_tickets');
+
+  if (!hasDeletePermission) {
+    return res.status(403).json({ error: 'Forbidden: You do not have permission to delete tickets' });
   }
 
   try {
