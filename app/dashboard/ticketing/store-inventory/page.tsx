@@ -337,10 +337,11 @@ export default function StoreInventoryPage() {
 
       setDeleteItem(null);
       showToast('success', 'Inventory item deleted successfully!');
-      // Invalidate queries to refetch data
-      queryClient.invalidateQueries({ queryKey: ['inventory'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['inventory-filter-options'] });
+      // Invalidate and refetch queries to update data
+      await queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      await queryClient.invalidateQueries({ queryKey: ['inventory-stats'] });
+      await queryClient.invalidateQueries({ queryKey: ['inventory-filter-options'] });
+      await queryClient.refetchQueries({ queryKey: ['inventory'] });
       setIsDeleteModalOpen(false); 
     } catch (error: any) {
       console.error('Error deleting item:', error);
