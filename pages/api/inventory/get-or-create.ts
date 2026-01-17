@@ -1,11 +1,48 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
+
+  const userId = req.user?.id || '';
+  const userPosition = req.user?.position?.toLowerCase();
+
+  if (!supabaseAdmin) {
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+
+  // Field Engineers cannot create new lookup values
+  if (userPosition === 'field engineer') {
+    return res.status(403).json({
+      error: 'Forbidden: Field Engineers cannot create new categories, brands, models, or stations'
+    });
+  }
+
+  // Check if user has position-based access (asset or operations manager)
+  const hasPositionAccess = userPosition === 'asset' || userPosition === 'operations manager';
+
+  // Check if user has manage_store_inventory permission
+  const hasManagePermission = await userHasPermission(userId, 'manage_store_inventory');
+
+  // Check if user has edit-only access from store_inventory_edit_access table
+  const { data: editAccess } = await supabaseAdmin
+    .from('store_inventory_edit_access')
+    .select('can_edit')
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  const hasEditAccess = editAccess?.can_edit === true;
+
+  // User must have at least one form of access
+  if (!hasPositionAccess && !hasManagePermission && !hasEditAccess) {
+    return res.status(403).json({
+      error: 'Forbidden: You do not have permission to create new categories, brands, models, or stations'
+    });
   }
 
   const { tableName, value } = req.body;
@@ -21,12 +58,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-
-    if (!supabaseAdmin) {
-      throw new Error('Database connection not available');
-    }
-
-
     // Tables with soft delete support
     const tablesWithSoftDelete = ['categories', 'brands', 'models'];
 
@@ -66,4 +97,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requirePosition: ['asset', 'operations manager'] });
+export default withAuth(handler);
