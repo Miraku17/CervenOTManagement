@@ -6,8 +6,10 @@ import { CalendarView } from '@/components/CalendarView';
 import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 import OvertimeHistory from '@/components/employee_dashboard/OvertimeHistory';
 import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHistory';
+import CashAdvanceHistory from '@/components/employee_dashboard/CashAdvanceHistory';
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import FileOvertimeModal from '@/components/employee_dashboard/FileOvertimeModal';
+import FileCashAdvanceModal from '@/components/employee_dashboard/FileCashAdvanceModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard } from 'lucide-react';
@@ -138,6 +140,7 @@ const EmployeeDashboard: React.FC = () => {
 
   const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
   const [isFileOvertimeModalOpen, setIsFileOvertimeModalOpen] = useState(false);
+  const [isFileCashAdvanceModalOpen, setIsFileCashAdvanceModalOpen] = useState(false);
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -166,6 +169,10 @@ const EmployeeDashboard: React.FC = () => {
   const handleOvertimeSuccess = () => {
     showToast('success', 'Overtime request submitted successfully!');
     setOvertimeHistoryRefreshKey(prev => prev + 1);
+  };
+
+  const handleCashAdvanceSuccess = () => {
+    showToast('success', 'Cash advance request submitted successfully!');
   };
 
   // Initialize dashboard - load all data in parallel
@@ -695,6 +702,13 @@ const EmployeeDashboard: React.FC = () => {
         userId={user?.id || ''}
       />
 
+      <FileCashAdvanceModal
+        isOpen={isFileCashAdvanceModalOpen}
+        onClose={() => setIsFileCashAdvanceModalOpen(false)}
+        onSuccess={handleCashAdvanceSuccess}
+        userId={user?.id || ''}
+      />
+
       <WorkScheduleCalendar
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
@@ -774,6 +788,16 @@ const EmployeeDashboard: React.FC = () => {
                       >
                         <Clock className="w-4 h-4 text-slate-400" />
                         <span>File Overtime Request</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFileCashAdvanceModalOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                      >
+                        <span className="w-4 h-4 text-slate-400 font-bold text-sm flex items-center justify-center">₱</span>
+                        <span>File Cash Advance</span>
                       </button>
                       <button
                         onClick={() => {
@@ -868,6 +892,17 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <Clock size={18} />
                 <span className="font-medium text-sm">File Overtime Request</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsFileCashAdvanceModalOpen(true);
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
+              >
+                <span className="w-[18px] h-[18px] font-bold text-base flex items-center justify-center">₱</span>
+                <span className="font-medium text-sm">File Cash Advance</span>
               </button>
 
               <button
@@ -1060,6 +1095,11 @@ const EmployeeDashboard: React.FC = () => {
             <div>
                  <LeaveRequestHistory refreshTrigger={leaveRefreshTrigger} />
             </div>
+        </div>
+
+        {/* Cash Advance History */}
+        <div>
+          <CashAdvanceHistory />
         </div>
       </main>
     </div>
