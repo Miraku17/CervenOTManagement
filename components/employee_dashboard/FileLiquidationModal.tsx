@@ -1,0 +1,1325 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { X, AlertCircle, Loader2, Check, Plus, Trash2, Receipt, Upload, File, XCircle, Pencil, FileImage } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { format } from 'date-fns';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+interface LiquidationItemData {
+  id: string;
+  from_destination: string;
+  to_destination: string;
+  jeep: number;
+  bus: number;
+  fx_van: number;
+  gas: number;
+  toll: number;
+  meals: number;
+  lodging: number;
+  others: number;
+  total: number;
+  remarks: string;
+}
+
+interface LiquidationAttachment {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+}
+
+interface EditingLiquidation {
+  id: string;
+  cash_advance_id: string;
+  store_id: string;
+  ticket_id: number | null;
+  liquidation_date: string;
+  remarks: string | null;
+  cash_advances: {
+    id: string;
+    amount: number;
+    date_requested: string;
+  } | null;
+  liquidation_items: LiquidationItemData[];
+  liquidation_attachments?: LiquidationAttachment[];
+}
+
+interface FileLiquidationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  userId: string;
+  editingLiquidation?: EditingLiquidation | null;
+}
+
+interface CashAdvance {
+  id: string;
+  type: 'personal' | 'support';
+  amount: number;
+  purpose: string | null;
+  status: string;
+  date_requested: string;
+  created_at: string;
+}
+
+interface Store {
+  id: string;
+  store_code: string;
+  store_name: string;
+}
+
+interface Ticket {
+  id: number;
+  rcc_reference_number: string;
+  stores: {
+    store_name: string;
+    store_code: string;
+  } | null;
+}
+
+interface LiquidationItem {
+  id: string;
+  from_destination: string;
+  to_destination: string;
+  jeep: string;
+  bus: string;
+  fx_van: string;
+  gas: string;
+  toll: string;
+  meals: string;
+  lodging: string;
+  others: string;
+  remarks: string;
+}
+
+interface LiquidationFormData {
+  cash_advance_id: string;
+  store_id: string;
+  ticket_id: string;
+  liquidation_date: string;
+  remarks: string;
+  items: LiquidationItem[];
+}
+
+const emptyItem = (): LiquidationItem => ({
+  id: Math.random().toString(36).substr(2, 9),
+  from_destination: '',
+  to_destination: '',
+  jeep: '',
+  bus: '',
+  fx_van: '',
+  gas: '',
+  toll: '',
+  meals: '',
+  lodging: '',
+  others: '',
+  remarks: '',
+});
+
+const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
+  const response = await fetch('/api/cash-advance/my-requests?limit=100');
+  if (!response.ok) {
+    throw new Error('Failed to fetch cash advances');
+  }
+  const data = await response.json();
+  // Only return approved support cash advances that don't have liquidations yet
+  return data.cashAdvances.filter(
+    (ca: CashAdvance) => ca.status === 'approved' && ca.type === 'support'
+  );
+};
+
+const fetchStores = async (): Promise<Store[]> => {
+  const response = await fetch('/api/stores/get');
+  if (!response.ok) {
+    throw new Error('Failed to fetch stores');
+  }
+  const data = await response.json();
+  return data.stores || [];
+};
+
+const fetchTickets = async (): Promise<Ticket[]> => {
+  const response = await fetch('/api/tickets/get?limit=100');
+  if (!response.ok) {
+    throw new Error('Failed to fetch tickets');
+  }
+  const data = await response.json();
+  return data.tickets || [];
+};
+
+const submitLiquidation = async (data: LiquidationFormData & { userId: string }) => {
+  const response = await fetch('/api/liquidation/file', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to submit liquidation');
+  }
+
+  return result;
+};
+
+const updateLiquidation = async (data: LiquidationFormData & { liquidation_id: string; attachments_to_remove?: string[] }) => {
+  const response = await fetch('/api/liquidation/update', {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to update liquidation');
+  }
+
+  return result;
+};
+
+interface UploadReceiptsData {
+  liquidation_id: string;
+  files: {
+    fileName: string;
+    fileType: string;
+    fileSize: number;
+    fileData: string;
+  }[];
+}
+
+const uploadReceipts = async (data: UploadReceiptsData) => {
+  const response = await fetch('/api/liquidation/upload-receipts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error || 'Failed to upload receipts');
+  }
+
+  return result;
+};
+
+const fetchAttachmentUrl = async (attachmentId: string): Promise<string | null> => {
+  const response = await fetch(`/api/liquidation/get-receipt-url?attachment_id=${attachmentId}`);
+  if (response.ok) {
+    const data = await response.json();
+    return data.url;
+  }
+  return null;
+};
+
+const fetchAllAttachmentUrls = async (attachments: LiquidationAttachment[]): Promise<{ [key: string]: string }> => {
+  const urls: { [key: string]: string } = {};
+
+  await Promise.all(
+    attachments.map(async (attachment) => {
+      const url = await fetchAttachmentUrl(attachment.id);
+      if (url) {
+        urls[attachment.id] = url;
+      }
+    })
+  );
+
+  return urls;
+};
+
+const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  userId,
+  editingLiquidation,
+}) => {
+  const queryClient = useQueryClient();
+  const isEditMode = !!editingLiquidation;
+
+  const [formData, setFormData] = useState<LiquidationFormData>({
+    cash_advance_id: '',
+    store_id: '',
+    ticket_id: '',
+    liquidation_date: format(new Date(), 'yyyy-MM-dd'),
+    remarks: '',
+    items: [emptyItem()],
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<{ [key: number]: string }>({});
+  const [attachmentsToRemove, setAttachmentsToRemove] = useState<string[]>([]);
+  const [hasPopulatedForm, setHasPopulatedForm] = useState(false);
+
+  // Fetch approved cash advances
+  const { data: cashAdvances = [], isLoading: loadingCashAdvances } = useQuery({
+    queryKey: ['approved-cash-advances'],
+    queryFn: fetchApprovedCashAdvances,
+    enabled: isOpen && !isEditMode,
+  });
+
+  // Fetch stores
+  const { data: stores = [], isLoading: loadingStores } = useQuery({
+    queryKey: ['stores-list'],
+    queryFn: fetchStores,
+    enabled: isOpen,
+  });
+
+  // Fetch tickets
+  const { data: tickets = [], isLoading: loadingTickets } = useQuery({
+    queryKey: ['tickets-list'],
+    queryFn: fetchTickets,
+    enabled: isOpen,
+  });
+
+  // Fetch existing attachment URLs for edit mode
+  const attachmentIds = editingLiquidation?.liquidation_attachments?.map(a => a.id) || [];
+  const { data: existingAttachmentUrls = {}, isLoading: loadingExistingAttachments } = useQuery({
+    queryKey: ['attachment-urls', editingLiquidation?.id],
+    queryFn: () => fetchAllAttachmentUrls(editingLiquidation?.liquidation_attachments || []),
+    enabled: isOpen && isEditMode && attachmentIds.length > 0,
+    staleTime: 1000 * 60 * 5, // 5 minutes - signed URLs are valid for 1 hour
+  });
+
+  // Upload receipts mutation
+  const uploadMutation = useMutation({
+    mutationFn: uploadReceipts,
+    onError: (err: Error) => {
+      console.error('Failed to upload receipts:', err.message);
+    },
+  });
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  // Helper function to prepare files for upload
+  const prepareFilesForUpload = async () => {
+    return Promise.all(
+      selectedFiles.map(async (file) => {
+        const base64 = await fileToBase64(file);
+        return {
+          fileName: file.name,
+          fileType: file.type,
+          fileSize: file.size,
+          fileData: base64,
+        };
+      })
+    );
+  };
+
+  const createMutation = useMutation({
+    mutationFn: submitLiquidation,
+    onSuccess: async (result) => {
+      // Upload files if any
+      if (selectedFiles.length > 0 && result.liquidation?.id) {
+        const filesData = await prepareFilesForUpload();
+        await uploadMutation.mutateAsync({
+          liquidation_id: result.liquidation.id,
+          files: filesData,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
+      queryClient.invalidateQueries({ queryKey: ['approved-cash-advances'] });
+      onSuccess();
+      handleClose();
+    },
+    onError: (err: Error) => {
+      setError(err.message || 'An unexpected error occurred.');
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: updateLiquidation,
+    onSuccess: async (result) => {
+      // Upload files if any
+      if (selectedFiles.length > 0 && result.liquidation?.id) {
+        const filesData = await prepareFilesForUpload();
+        await uploadMutation.mutateAsync({
+          liquidation_id: result.liquidation.id,
+          files: filesData,
+        });
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
+      queryClient.invalidateQueries({ queryKey: ['attachment-urls', result.liquidation?.id] });
+      onSuccess();
+      handleClose();
+    },
+    onError: (err: Error) => {
+      setError(err.message || 'An unexpected error occurred.');
+    },
+  });
+
+  // Clean up preview URLs when modal closes
+  useEffect(() => {
+    return () => {
+      // Revoke all object URLs to prevent memory leaks
+      Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [filePreviews]);
+
+  // Reset state when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setHasPopulatedForm(false);
+      setError(null);
+      setSelectedFiles([]);
+      setFilePreviews({});
+      setAttachmentsToRemove([]);
+    }
+  }, [isOpen]);
+
+  // Populate form when modal opens and data is ready
+  // For edit mode: wait for stores and tickets to load
+  // For create mode: populate immediately
+  useEffect(() => {
+    if (!isOpen || hasPopulatedForm) return;
+
+    // For create mode, populate immediately
+    if (!editingLiquidation) {
+      setFormData({
+        cash_advance_id: '',
+        store_id: '',
+        ticket_id: '',
+        liquidation_date: format(new Date(), 'yyyy-MM-dd'),
+        remarks: '',
+        items: [emptyItem()],
+      });
+      setHasPopulatedForm(true);
+      return;
+    }
+
+    // For edit mode, wait for stores and tickets to load
+    if (loadingStores || loadingTickets) return;
+
+    // Populate form with existing data
+    setFormData({
+      cash_advance_id: editingLiquidation.cash_advance_id,
+      store_id: editingLiquidation.store_id,
+      ticket_id: editingLiquidation.ticket_id ? String(editingLiquidation.ticket_id) : '',
+      liquidation_date: editingLiquidation.liquidation_date.split('T')[0],
+      remarks: editingLiquidation.remarks || '',
+      items: editingLiquidation.liquidation_items.map((item) => ({
+        id: item.id || Math.random().toString(36).substr(2, 9),
+        from_destination: item.from_destination || '',
+        to_destination: item.to_destination || '',
+        jeep: item.jeep > 0 ? String(item.jeep) : '',
+        bus: item.bus > 0 ? String(item.bus) : '',
+        fx_van: item.fx_van > 0 ? String(item.fx_van) : '',
+        gas: item.gas > 0 ? String(item.gas) : '',
+        toll: item.toll > 0 ? String(item.toll) : '',
+        meals: item.meals > 0 ? String(item.meals) : '',
+        lodging: item.lodging > 0 ? String(item.lodging) : '',
+        others: item.others > 0 ? String(item.others) : '',
+        remarks: item.remarks || '',
+      })),
+    });
+
+    setHasPopulatedForm(true);
+  }, [isOpen, editingLiquidation, hasPopulatedForm, loadingStores, loadingTickets]);
+
+  const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
+    e?.preventDefault();
+    setError(null);
+
+    // Validate
+    if (!isEditMode && !formData.cash_advance_id) {
+      setError('Please select a cash advance to liquidate.');
+      return;
+    }
+
+    if (!formData.store_id) {
+      setError('Please select a store/site.');
+      return;
+    }
+
+    if (!formData.ticket_id) {
+      setError('Please select an incident/ticket number.');
+      return;
+    }
+
+    // Check if at least one item has values
+    const hasValues = formData.items.some(
+      (item) =>
+        parseFloat(item.jeep || '0') > 0 ||
+        parseFloat(item.bus || '0') > 0 ||
+        parseFloat(item.fx_van || '0') > 0 ||
+        parseFloat(item.gas || '0') > 0 ||
+        parseFloat(item.toll || '0') > 0 ||
+        parseFloat(item.meals || '0') > 0 ||
+        parseFloat(item.lodging || '0') > 0 ||
+        parseFloat(item.others || '0') > 0
+    );
+
+    if (!hasValues) {
+      console.log('Validation failed: no expense values');
+      setError('Please add at least one expense item.');
+      return;
+    }
+
+    console.log('Validation passed, calling mutation');
+
+    if (isEditMode && editingLiquidation) {
+      console.log('Calling updateMutation with:', {
+        ...formData,
+        liquidation_id: editingLiquidation.id,
+        attachments_to_remove: attachmentsToRemove,
+      });
+      updateMutation.mutate({
+        ...formData,
+        liquidation_id: editingLiquidation.id,
+        attachments_to_remove: attachmentsToRemove.length > 0 ? attachmentsToRemove : undefined,
+      });
+    } else {
+      createMutation.mutate({
+        ...formData,
+        userId,
+      });
+    }
+  };
+
+  const handleClose = () => {
+    // Revoke all object URLs before clearing
+    Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url));
+
+    // Reset form to initial state
+    setFormData({
+      cash_advance_id: '',
+      store_id: '',
+      ticket_id: '',
+      liquidation_date: format(new Date(), 'yyyy-MM-dd'),
+      remarks: '',
+      items: [emptyItem()],
+    });
+
+    onClose();
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const newFiles = Array.from(files);
+      const startIndex = selectedFiles.length;
+
+      // Create preview URLs for image files
+      const newPreviews: { [key: number]: string } = {};
+      newFiles.forEach((file, index) => {
+        if (file.type.startsWith('image/')) {
+          newPreviews[startIndex + index] = URL.createObjectURL(file);
+        }
+      });
+
+      setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
+      setSelectedFiles((prev) => [...prev, ...newFiles]);
+    }
+    e.target.value = '';
+  };
+
+  const removeFile = (index: number) => {
+    // Revoke the object URL if it exists to prevent memory leaks
+    if (filePreviews[index]) {
+      URL.revokeObjectURL(filePreviews[index]);
+    }
+
+    // Remove the file
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+
+    // Re-index the previews after removal
+    setFilePreviews((prev) => {
+      const newPreviews: { [key: number]: string } = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        const keyNum = parseInt(key);
+        if (keyNum < index) {
+          newPreviews[keyNum] = value;
+        } else if (keyNum > index) {
+          newPreviews[keyNum - 1] = value;
+        }
+      });
+      return newPreviews;
+    });
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  };
+
+  const addItem = () => {
+    setFormData({
+      ...formData,
+      items: [...formData.items, emptyItem()],
+    });
+  };
+
+  const removeItem = (id: string) => {
+    if (formData.items.length === 1) return;
+    setFormData({
+      ...formData,
+      items: formData.items.filter((item) => item.id !== id),
+    });
+  };
+
+  const updateItem = (id: string, field: keyof LiquidationItem, value: string) => {
+    setFormData({
+      ...formData,
+      items: formData.items.map((item) =>
+        item.id === id ? { ...item, [field]: value } : item
+      ),
+    });
+  };
+
+  const formatCurrency = (value: string) => {
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    return numericValue;
+  };
+
+  const calculateItemTotal = (item: LiquidationItem): number => {
+    return (
+      parseFloat(item.jeep || '0') +
+      parseFloat(item.bus || '0') +
+      parseFloat(item.fx_van || '0') +
+      parseFloat(item.gas || '0') +
+      parseFloat(item.toll || '0') +
+      parseFloat(item.meals || '0') +
+      parseFloat(item.lodging || '0') +
+      parseFloat(item.others || '0')
+    );
+  };
+
+  const calculateGrandTotal = (): number => {
+    return formData.items.reduce((sum, item) => sum + calculateItemTotal(item), 0);
+  };
+
+  const getSelectedCashAdvance = (): CashAdvance | { amount: number; date_requested: string } | undefined => {
+    if (isEditMode && editingLiquidation?.cash_advances) {
+      return {
+        amount: editingLiquidation.cash_advances.amount,
+        date_requested: editingLiquidation.cash_advances.date_requested,
+      };
+    }
+    return cashAdvances.find((ca) => ca.id === formData.cash_advance_id);
+  };
+
+  const calculateReturnToCompany = (): number => {
+    const selectedCA = getSelectedCashAdvance();
+    if (!selectedCA) return 0;
+    const diff = selectedCA.amount - calculateGrandTotal();
+    return diff > 0 ? diff : 0;
+  };
+
+  const calculateReimbursement = (): number => {
+    const selectedCA = getSelectedCashAdvance();
+    if (!selectedCA) return 0;
+    const diff = calculateGrandTotal() - selectedCA.amount;
+    return diff > 0 ? diff : 0;
+  };
+
+  const formatPeso = (amount: number) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+  };
+
+  const isPending = createMutation.isPending || updateMutation.isPending;
+  const isUploadingFiles = uploadMutation.isPending;
+  const isLoadingData = isEditMode && (loadingStores || loadingTickets || !hasPopulatedForm);
+
+  if (!isOpen) return null;
+
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
+      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[90vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-slate-700 shrink-0">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            {isEditMode ? (
+              <>
+                <Pencil className="text-orange-400" size={24} />
+                Edit Liquidation
+              </>
+            ) : (
+              <>
+                <Receipt className="text-orange-400" size={24} />
+                File Liquidation
+              </>
+            )}
+          </h2>
+          <button
+            onClick={handleClose}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+          {isLoadingData ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="flex flex-col items-center gap-3">
+                <Loader2 className="w-8 h-8 text-orange-400 animate-spin" />
+                <p className="text-slate-400 text-sm">Loading liquidation data...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+          {error && (
+            <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 flex items-center gap-3 text-sm">
+              <AlertCircle size={20} className="shrink-0" />
+              {error}
+            </div>
+          )}
+
+          {/* Top Section: Cash Advance, Store, Ticket, Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Cash Advance Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                Cash Advance <span className="text-red-400">*</span>
+              </label>
+              {isEditMode ? (
+                <div className="w-full bg-slate-950 border border-slate-700 text-white h-11 rounded-xl px-4 flex items-center">
+                  <span className="text-slate-300">
+                    {editingLiquidation?.cash_advances
+                      ? `${formatPeso(editingLiquidation.cash_advances.amount)} - ${format(new Date(editingLiquidation.cash_advances.date_requested), 'MMM dd, yyyy')}`
+                      : 'N/A'}
+                  </span>
+                </div>
+              ) : (
+                <Select
+                  value={formData.cash_advance_id}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, cash_advance_id: value })
+                  }
+                  disabled={loadingCashAdvances}
+                >
+                  <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white h-11 rounded-xl focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 [&>span]:text-left">
+                    <SelectValue placeholder="Select cash advance" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60 z-[10000]">
+                    {cashAdvances.map((ca) => (
+                      <SelectItem
+                        key={ca.id}
+                        value={ca.id}
+                        className="text-white focus:bg-slate-800 focus:text-white cursor-pointer"
+                      >
+                        {formatPeso(ca.amount)} - {format(new Date(ca.date_requested), 'MMM dd, yyyy')}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {!isEditMode && cashAdvances.length === 0 && !loadingCashAdvances && (
+                <p className="text-xs text-amber-400 mt-1">
+                  No approved support cash advances available
+                </p>
+              )}
+            </div>
+
+            {/* Store/Site Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                Site Name (Store Code) <span className="text-red-400">*</span>
+              </label>
+              <Select
+                value={formData.store_id}
+                onValueChange={(value) => setFormData({ ...formData, store_id: value })}
+                disabled={loadingStores}
+              >
+                <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white h-11 rounded-xl focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 [&>span]:text-left">
+                  <SelectValue placeholder="Select store" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60 z-[10000]">
+                  {stores.map((store) => (
+                    <SelectItem
+                      key={store.id}
+                      value={store.id}
+                      className="text-white focus:bg-slate-800 focus:text-white cursor-pointer"
+                    >
+                      {store.store_code} - {store.store_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Ticket/Incident Selection */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                Incident No. (Ticket) <span className="text-red-400">*</span>
+              </label>
+              <Select
+                value={formData.ticket_id}
+                onValueChange={(value) => setFormData({ ...formData, ticket_id: value })}
+                disabled={loadingTickets}
+              >
+                <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white h-11 rounded-xl focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 [&>span]:text-left">
+                  <SelectValue placeholder={loadingTickets ? "Loading tickets..." : "Select ticket"} />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60 z-[10000]">
+                  {tickets.map((ticket) => (
+                    <SelectItem
+                      key={ticket.id}
+                      value={String(ticket.id)}
+                      className="text-white focus:bg-slate-800 focus:text-white cursor-pointer"
+                    >
+                      {ticket.rcc_reference_number} - {ticket.stores?.store_code || 'N/A'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                Liquidation Date
+              </label>
+              <input
+                type="date"
+                value={formData.liquidation_date}
+                onChange={(e) =>
+                  setFormData({ ...formData, liquidation_date: e.target.value })
+                }
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none [color-scheme:dark]"
+              />
+            </div>
+          </div>
+
+          {/* Expense Items Table */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-400">
+                Expense Items
+              </label>
+              <button
+                type="button"
+                onClick={addItem}
+                className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                <Plus size={14} />
+                Add Row
+              </button>
+            </div>
+
+            <div className="overflow-x-auto border border-slate-700 rounded-xl">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-800/50 text-slate-400 text-xs uppercase">
+                    <th colSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700">
+                      Dispatch
+                    </th>
+                    <th colSpan={5} className="px-3 py-2 text-center border-b border-r border-slate-700">
+                      Mode of Transportation
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Meals
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Lodging
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Others
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Total
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Remarks
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-slate-700 align-bottom">
+
+                    </th>
+                  </tr>
+                  <tr className="bg-slate-800/30 text-slate-400 text-xs">
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">From</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">To</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">Jeep</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">Bus</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">FX/Van</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">Gas</th>
+                    <th className="px-2 py-2 text-center border-b border-r border-slate-700">Toll</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {formData.items.map((item) => (
+                    <tr key={item.id} className="border-b border-slate-700 last:border-b-0">
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          value={item.from_destination}
+                          onChange={(e) =>
+                            updateItem(item.id, 'from_destination', e.target.value)
+                          }
+                          placeholder="From"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[80px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          value={item.to_destination}
+                          onChange={(e) =>
+                            updateItem(item.id, 'to_destination', e.target.value)
+                          }
+                          placeholder="To"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[80px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.jeep}
+                          onChange={(e) =>
+                            updateItem(item.id, 'jeep', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.bus}
+                          onChange={(e) =>
+                            updateItem(item.id, 'bus', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.fx_van}
+                          onChange={(e) =>
+                            updateItem(item.id, 'fx_van', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.gas}
+                          onChange={(e) =>
+                            updateItem(item.id, 'gas', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.toll}
+                          onChange={(e) =>
+                            updateItem(item.id, 'toll', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.meals}
+                          onChange={(e) =>
+                            updateItem(item.id, 'meals', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.lodging}
+                          onChange={(e) =>
+                            updateItem(item.id, 'lodging', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.others}
+                          onChange={(e) =>
+                            updateItem(item.id, 'others', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <div className="px-2 py-1.5 text-right text-xs font-mono text-orange-400 min-w-[70px]">
+                          {formatPeso(calculateItemTotal(item))}
+                        </div>
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          value={item.remarks}
+                          onChange={(e) =>
+                            updateItem(item.id, 'remarks', e.target.value)
+                          }
+                          placeholder="Remarks"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[100px]"
+                        />
+                      </td>
+                      <td className="p-1 text-center">
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          disabled={formData.items.length === 1}
+                          className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Summary Section */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Remarks */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-slate-400 mb-1.5">
+                General Remarks
+              </label>
+              <textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                placeholder="Any additional notes..."
+                rows={3}
+                className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none resize-none placeholder-slate-500"
+              />
+            </div>
+
+            {/* Totals */}
+            <div className="space-y-3">
+              <div className="p-4 bg-slate-800/50 border border-slate-700 rounded-xl space-y-3">
+                {getSelectedCashAdvance() && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-400">Cash Advance:</span>
+                    <span className="text-white font-mono">
+                      {formatPeso(getSelectedCashAdvance()!.amount)}
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-slate-400">Total Expenses:</span>
+                  <span className="text-orange-400 font-mono font-semibold">
+                    {formatPeso(calculateGrandTotal())}
+                  </span>
+                </div>
+                {getSelectedCashAdvance() && (
+                  <div className="border-t border-slate-700 pt-3 space-y-2">
+                    {calculateReturnToCompany() > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Return to Company:</span>
+                        <span className="font-mono font-bold text-emerald-400">
+                          {formatPeso(calculateReturnToCompany())}
+                        </span>
+                      </div>
+                    )}
+                    {calculateReimbursement() > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Reimbursement:</span>
+                        <span className="font-mono font-bold text-blue-400">
+                          {formatPeso(calculateReimbursement())}
+                        </span>
+                      </div>
+                    )}
+                    {calculateReturnToCompany() === 0 && calculateReimbursement() === 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-slate-400">Balance:</span>
+                        <span className="font-mono font-bold text-slate-300">
+                          {formatPeso(0)}
+                        </span>
+                      </div>
+                    )}
+                    {calculateReimbursement() > 0 && (
+                      <p className="text-xs text-blue-400">
+                        Company owes you for excess expenses
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Existing Attachments (Edit Mode) */}
+          {isEditMode && editingLiquidation?.liquidation_attachments && editingLiquidation.liquidation_attachments.length > 0 && (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-slate-400 flex items-center gap-2">
+                Existing Attachments
+                {loadingExistingAttachments && <Loader2 size={14} className="animate-spin" />}
+                {attachmentsToRemove.length > 0 && (
+                  <span className="text-xs text-red-400">
+                    ({attachmentsToRemove.length} marked for removal)
+                  </span>
+                )}
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto">
+                {editingLiquidation.liquidation_attachments
+                  .filter((attachment) => !attachmentsToRemove.includes(attachment.id))
+                  .map((attachment) => {
+                    const signedUrl = existingAttachmentUrls[attachment.id];
+                    const isImage = attachment.file_type?.startsWith('image/');
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="relative group bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden"
+                      >
+                        {/* Image Preview or File Icon */}
+                        {isImage ? (
+                          <a
+                            href={signedUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => !signedUrl && e.preventDefault()}
+                            className="block aspect-square"
+                          >
+                            {signedUrl ? (
+                              <img
+                                src={signedUrl}
+                                alt={attachment.file_name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center bg-slate-900">
+                                <Loader2 size={24} className="text-slate-500 animate-spin" />
+                              </div>
+                            )}
+                          </a>
+                        ) : (
+                          <a
+                            href={signedUrl || '#'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => !signedUrl && e.preventDefault()}
+                            className="aspect-square flex items-center justify-center bg-slate-900"
+                          >
+                            <File size={32} className="text-slate-400" />
+                          </a>
+                        )}
+
+                        {/* File Info Overlay */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-2 pointer-events-none">
+                          <p className="text-xs text-white truncate font-medium flex items-center gap-1">
+                            {isImage ? (
+                              <FileImage size={12} className="text-blue-400 shrink-0" />
+                            ) : (
+                              <File size={12} className="text-slate-400 shrink-0" />
+                            )}
+                            <span className="truncate">{attachment.file_name}</span>
+                          </p>
+                        </div>
+
+                        {/* Remove Button */}
+                        <button
+                          type="button"
+                          onClick={() => setAttachmentsToRemove((prev) => [...prev, attachment.id])}
+                          className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full hover:bg-red-500"
+                          title="Remove attachment"
+                        >
+                          <XCircle size={16} />
+                        </button>
+                      </div>
+                    );
+                  })}
+              </div>
+              {/* Show removed attachments with undo option */}
+              {attachmentsToRemove.length > 0 && (
+                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
+                  <span className="text-xs text-slate-500">Removed:</span>
+                  {editingLiquidation.liquidation_attachments
+                    .filter((attachment) => attachmentsToRemove.includes(attachment.id))
+                    .map((attachment) => (
+                      <button
+                        key={attachment.id}
+                        type="button"
+                        onClick={() => setAttachmentsToRemove((prev) => prev.filter((id) => id !== attachment.id))}
+                        className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400 hover:bg-red-500/20 transition-colors"
+                        title="Click to undo removal"
+                      >
+                        <span className="truncate max-w-[100px]">{attachment.file_name}</span>
+                        <span className="text-red-300">↩</span>
+                      </button>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Receipt Attachments */}
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-slate-400">
+              {isEditMode ? 'Add More Receipts' : 'Receipt Attachments'}
+            </label>
+
+            {/* File Input */}
+            <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center hover:border-orange-500/50 transition-colors">
+              <input
+                type="file"
+                id="receipt-upload"
+                multiple
+                accept="image/*,.pdf"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <label
+                htmlFor="receipt-upload"
+                className="cursor-pointer flex flex-col items-center gap-2"
+              >
+                <div className="p-3 bg-slate-800 rounded-full">
+                  <Upload size={24} className="text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-white font-medium">
+                    Click to upload receipts
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    PNG, JPG, or PDF (max 10MB each)
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            {/* Selected Files List with Previews */}
+            {selectedFiles.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-slate-400">
+                  {selectedFiles.length} file(s) selected
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto">
+                  {selectedFiles.map((file, index) => (
+                    <div
+                      key={index}
+                      className="relative group bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden"
+                    >
+                      {/* Image Preview or File Icon */}
+                      {filePreviews[index] ? (
+                        <div className="aspect-square">
+                          <img
+                            src={filePreviews[index]}
+                            alt={file.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ) : (
+                        <div className="aspect-square flex items-center justify-center bg-slate-900">
+                          <File size={32} className="text-slate-400" />
+                        </div>
+                      )}
+
+                      {/* File Info Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-2">
+                        <p className="text-xs text-white truncate font-medium">{file.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {formatFileSize(file.size)}
+                        </p>
+                      </div>
+
+                      {/* Remove Button */}
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
+                      >
+                        <XCircle size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+            </>
+          )}
+        </form>
+
+        {/* Footer */}
+        <div className="flex flex-col-reverse sm:flex-row items-stretch gap-3 p-6 border-t border-slate-700 shrink-0">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={isPending}
+            className="w-full sm:flex-1 px-4 py-2.5 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 rounded-xl transition-colors disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isPending || isUploadingFiles || isLoadingData || (!isEditMode && cashAdvances.length === 0)}
+            className="w-full sm:flex-1 px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-500 rounded-xl transition-colors shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isPending || isUploadingFiles ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                <span>{isUploadingFiles ? 'Uploading receipts...' : 'Saving...'}</span>
+              </>
+            ) : (
+              <>
+                <Check size={18} />
+                <span>{isEditMode ? 'Update Liquidation' : 'Submit Liquidation'}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return typeof document !== 'undefined' ? createPortal(modalContent, document.body) : null;
+};
+
+export default FileLiquidationModal;
