@@ -4,7 +4,8 @@
       "Bash(ls:*)",
       "Bash(python3:*)",
       "Bash(grep:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)"
     ]
   }
 }
