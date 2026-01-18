@@ -15,7 +15,8 @@ import {
   AlertTriangle,
   BookOpen,
   CalendarCheck,
-  Wallet
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -91,6 +92,11 @@ export default function AdminLayout({
     return hasPermission('manage_cash_flow');
   };
 
+  // Check if user has access to liquidation management
+  const hasLiquidationAccess = () => {
+    return hasPermission('manage_liquidation');
+  };
+
   const handleNavigate = (path: string) => {
     router.push(path);
     setIsMobileMenuOpen(false);
@@ -119,6 +125,7 @@ export default function AdminLayout({
     if (pathname.startsWith('/dashboard/admin/employee-schedule')) return 'Employee Schedule';
     if (pathname.startsWith('/dashboard/admin/holidays')) return 'Holidays';
     if (pathname.startsWith('/dashboard/admin/cash-flow-requests')) return 'Cash Advance Requests';
+    if (pathname.startsWith('/dashboard/admin/liquidation-requests')) return 'Liquidation Requests';
     if (pathname.startsWith('/dashboard/knowledge-base')) return 'Knowledge Base';
 
     return 'Dashboard';
@@ -197,7 +204,7 @@ export default function AdminLayout({
           </div>
 
           {/* Requests Section */}
-          {(hasLeaveRequestsAccess() || hasOvertimeAccess() || hasCashFlowAccess()) && (
+          {(hasLeaveRequestsAccess() || hasOvertimeAccess() || hasCashFlowAccess() || hasLiquidationAccess()) && (
             <div>
               <SidebarLabel>Requests</SidebarLabel>
               <div className="space-y-1">
@@ -223,6 +230,14 @@ export default function AdminLayout({
                     label="Cash Advance"
                     isActive={isActive('/dashboard/admin/cash-flow-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/cash-flow-requests')}
+                  />
+                )}
+                {hasLiquidationAccess() && (
+                  <SidebarItem
+                    icon={<Receipt size={18} />}
+                    label="Liquidations"
+                    isActive={isActive('/dashboard/admin/liquidation-requests')}
+                    onClick={() => handleNavigate('/dashboard/admin/liquidation-requests')}
                   />
                 )}
               </div>
@@ -393,6 +408,14 @@ export default function AdminLayout({
                 label="Cash Advance"
                 isActive={isActive('/dashboard/admin/cash-flow-requests')}
                 onClick={() => handleNavigate('/dashboard/admin/cash-flow-requests')}
+              />
+            )}
+            {hasLiquidationAccess() && (
+              <SidebarItem
+                icon={<Receipt size={24} />}
+                label="Liquidations"
+                isActive={isActive('/dashboard/admin/liquidation-requests')}
+                onClick={() => handleNavigate('/dashboard/admin/liquidation-requests')}
               />
             )}
             {hasImportScheduleAccess() && (
