@@ -573,6 +573,157 @@ export default function TicketsPage() {
     }
   };
 
+  // SLA Thresholds in minutes (L2 Support - excluding SEV4)
+  const SLA_THRESHOLDS: Record<string, { response: number; resolution: number }> = {
+    sev1: { response: 30, resolution: 240 },      // 30 mins response, 4 hours resolution
+    sev2: { response: 60, resolution: 720 },      // 1 hour response, 12 hours resolution
+    sev3: { response: 240, resolution: 1440 },    // 4 hours response, 24 hours resolution
+  };
+
+  const calculateSLAStatus = (ticket: Ticket): { status: 'Passed' | 'Failed' | 'Pending' | 'N/A'; responseTime?: number; resolutionTime?: number } => {
+    // Use database sla_status if available (for resolved tickets)
+    if (ticket.sla_status) {
+      const dbStatus = ticket.sla_status.toLowerCase();
+      if (dbStatus === 'passed') return { status: 'Passed' };
+      if (dbStatus === 'failed') return { status: 'Failed' };
+    }
+
+    const sev = ticket.sev?.toLowerCase();
+
+    // Skip SEV4 and unknown severities
+    if (!sev || !SLA_THRESHOLDS[sev]) {
+      return { status: 'N/A' };
+    }
+
+    const threshold = SLA_THRESHOLDS[sev];
+
+    // Parse reported datetime
+    if (!ticket.date_reported || !ticket.time_reported) {
+      return { status: 'Pending' };
+    }
+    const reportedDateTime = new Date(`${ticket.date_reported}T${ticket.time_reported}`);
+
+    // Check if ticket is resolved
+    if (!ticket.date_resolved || !ticket.time_resolved) {
+      return { status: 'Pending' };
+    }
+
+    // Calculate response time (using date_responded/time_responded)
+    let responseTimeMinutes: number | undefined;
+    if (ticket.date_responded && ticket.time_responded) {
+      const respondedDateTime = new Date(`${ticket.date_responded}T${ticket.time_responded}`);
+      responseTimeMinutes = (respondedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+    }
+
+    // Calculate resolution time
+    const resolvedDateTime = new Date(`${ticket.date_resolved}T${ticket.time_resolved}`);
+    const resolutionTimeMinutes = (resolvedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+
+    // Determine if SLA passed or failed
+    // For resolution: must be within threshold
+    const resolutionPassed = resolutionTimeMinutes <= threshold.resolution;
+
+    // For response: if we have response time, check it; otherwise just check resolution
+    const responsePassed = responseTimeMinutes !== undefined
+      ? responseTimeMinutes <= threshold.response
+      : true; // If no response time recorded, we only check resolution
+
+    const passed = resolutionPassed && responsePassed;
+
+    return {
+      status: passed ? 'Passed' : 'Failed',
+      responseTime: responseTimeMinutes,
+      resolutionTime: resolutionTimeMinutes,
+    };
+  };
+
+  const getSLAStatusColor = (status: 'Passed' | 'Failed' | 'Pending' | 'N/A') => {
+    switch (status) {
+      case 'Passed': return 'bg-green-500/20 text-green-400 border-green-500/20';
+      case 'Failed': return 'bg-red-500/20 text-red-400 border-red-500/20';
+      case 'Pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
+      default: return 'bg-slate-500/20 text-slate-400 border-slate-500/20';
+    }
+  };
+
+  // Format minutes to human readable duration
+  const formatDuration = (minutes: number): string => {
+    if (minutes < 0) return '0 Minutes';
+
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.floor(minutes % 60);
+
+    if (hours === 0) {
+      return `${mins} Minute${mins !== 1 ? 's' : ''}`;
+    } else if (mins === 0) {
+      return `${hours} Hour${hours !== 1 ? 's' : ''}`;
+    } else {
+      return `${hours} Hour${hours !== 1 ? 's' : ''} ${mins} Minute${mins !== 1 ? 's' : ''}`;
+    }
+  };
+
+  // Calculate SLA metrics for a ticket
+  const calculateSLAMetrics = (ticket: Ticket): {
+    elapsedTime: number; // in minutes
+    timeLeft: number; // in minutes
+    elapsedPercentage: number;
+    targetMinutes: number;
+  } | null => {
+    const sev = ticket.sev?.toLowerCase();
+
+    // Skip SEV4 and unknown severities
+    if (!sev || !SLA_THRESHOLDS[sev]) {
+      return null;
+    }
+
+    const threshold = SLA_THRESHOLDS[sev];
+    const targetMinutes = threshold.resolution;
+
+    // Parse reported datetime
+    if (!ticket.date_reported || !ticket.time_reported) {
+      return null;
+    }
+    const reportedDateTime = new Date(`${ticket.date_reported}T${ticket.time_reported}`);
+
+    // Calculate elapsed time
+    let elapsedTime: number;
+    if (ticket.date_resolved && ticket.time_resolved) {
+      // Ticket is resolved - use resolution time
+      const resolvedDateTime = new Date(`${ticket.date_resolved}T${ticket.time_resolved}`);
+      elapsedTime = (resolvedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+    } else {
+      // Ticket is still open - use current time
+      elapsedTime = (Date.now() - reportedDateTime.getTime()) / (1000 * 60);
+    }
+
+    const timeLeft = Math.max(0, targetMinutes - elapsedTime);
+    const elapsedPercentage = (elapsedTime / targetMinutes) * 100;
+
+    return {
+      elapsedTime,
+      timeLeft,
+      elapsedPercentage,
+      targetMinutes,
+    };
+  };
+
+  // Get color for elapsed percentage
+  const getElapsedPercentageColor = (percentage: number): { bg: string; text: string; bar: string } => {
+    if (percentage >= 100) {
+      // Breached - Red
+      return { bg: 'bg-red-500/20', text: 'text-red-400', bar: 'bg-red-500' };
+    } else if (percentage >= 75) {
+      // Critical - Orange/Red
+      return { bg: 'bg-orange-500/20', text: 'text-orange-400', bar: 'bg-orange-500' };
+    } else if (percentage >= 50) {
+      // Medium - Yellow
+      return { bg: 'bg-yellow-500/20', text: 'text-yellow-400', bar: 'bg-yellow-500' };
+    } else {
+      // Safe - Green
+      return { bg: 'bg-green-500/20', text: 'text-green-400', bar: 'bg-green-500' };
+    }
+  };
+
   // Show loading while checking permissions or fetching tickets
   if (permissionsLoading || checkingRole || isLoading) {
     return (
@@ -851,6 +1002,10 @@ export default function TicketsPage() {
                 <TableHead className="text-slate-400 font-semibold">Reference #</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Status</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Severity</TableHead>
+                <TableHead className="text-slate-400 font-semibold">SLA Status</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Time Left</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Elapsed Time</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Elapsed %</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Date Reported</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Request Type</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Device</TableHead>
@@ -879,6 +1034,54 @@ export default function TicketsPage() {
                       <AlertTriangle size={12} />
                       {ticket.sev}
                     </span>
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const slaResult = calculateSLAStatus(ticket);
+                      return (
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${getSLAStatusColor(slaResult.status)}`}>
+                          {slaResult.status}
+                        </span>
+                      );
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-slate-300">
+                    {(() => {
+                      const metrics = calculateSLAMetrics(ticket);
+                      if (!metrics) return <span className="text-slate-500">N/A</span>;
+                      if (ticket.date_resolved && ticket.time_resolved) {
+                        return <span className="text-slate-500">-</span>;
+                      }
+                      return <span>{formatDuration(metrics.timeLeft)}</span>;
+                    })()}
+                  </TableCell>
+                  <TableCell className="text-slate-300">
+                    {(() => {
+                      const metrics = calculateSLAMetrics(ticket);
+                      if (!metrics) return <span className="text-slate-500">N/A</span>;
+                      return <span>{formatDuration(metrics.elapsedTime)}</span>;
+                    })()}
+                  </TableCell>
+                  <TableCell>
+                    {(() => {
+                      const metrics = calculateSLAMetrics(ticket);
+                      if (!metrics) return <span className="text-slate-500">N/A</span>;
+                      const colors = getElapsedPercentageColor(metrics.elapsedPercentage);
+                      const displayPercentage = Math.min(metrics.elapsedPercentage, 100);
+                      return (
+                        <div className="flex items-center gap-2 min-w-[100px]">
+                          <span className={`text-xs font-medium ${colors.text}`}>
+                            {metrics.elapsedPercentage.toFixed(1)}%
+                          </span>
+                          <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full ${colors.bar} transition-all`}
+                              style={{ width: `${displayPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-slate-300">
                     <div className="flex flex-col">

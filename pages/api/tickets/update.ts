@@ -3,6 +3,62 @@ import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
 
+// SLA Thresholds in minutes (L2 Support - excluding SEV4)
+const SLA_THRESHOLDS: Record<string, { response: number; resolution: number }> = {
+  sev1: { response: 30, resolution: 240 },      // 30 mins response, 4 hours resolution
+  sev2: { response: 60, resolution: 720 },      // 1 hour response, 12 hours resolution
+  sev3: { response: 240, resolution: 1440 },    // 4 hours response, 24 hours resolution
+};
+
+// Calculate SLA status based on severity and time thresholds
+function calculateSLAStatus(
+  sev: string | null,
+  dateReported: string | null,
+  timeReported: string | null,
+  dateResponded: string | null,
+  timeResponded: string | null,
+  dateResolved: string | null,
+  timeResolved: string | null
+): 'Passed' | 'Failed' | null {
+  const severity = sev?.toLowerCase();
+
+  // Skip SEV4 and unknown severities
+  if (!severity || !SLA_THRESHOLDS[severity]) {
+    return null;
+  }
+
+  // Need reported and resolved times to calculate
+  if (!dateReported || !timeReported || !dateResolved || !timeResolved) {
+    return null;
+  }
+
+  const threshold = SLA_THRESHOLDS[severity];
+
+  try {
+    const reportedDateTime = new Date(`${dateReported}T${timeReported}`);
+    const resolvedDateTime = new Date(`${dateResolved}T${timeResolved}`);
+
+    // Calculate resolution time in minutes
+    const resolutionTimeMinutes = (resolvedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+
+    // Check resolution time against threshold
+    const resolutionPassed = resolutionTimeMinutes <= threshold.resolution;
+
+    // Calculate response time if available
+    let responsePassed = true;
+    if (dateResponded && timeResponded) {
+      const respondedDateTime = new Date(`${dateResponded}T${timeResponded}`);
+      const responseTimeMinutes = (respondedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+      responsePassed = responseTimeMinutes <= threshold.response;
+    }
+
+    return (resolutionPassed && responsePassed) ? 'Passed' : 'Failed';
+  } catch (error) {
+    console.error('Error calculating SLA status:', error);
+    return null;
+  }
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'PUT' && req.method !== 'PATCH') {
     res.setHeader('Allow', ['PUT', 'PATCH']);
@@ -36,7 +92,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch the existing ticket to get current data for SLA calculation
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by, date_reported, time_reported, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2')
+      .select('id, serviced_by, sev, date_reported, time_reported, date_responded, time_responded, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2')
       .eq('id', id)
       .single();
 
@@ -222,6 +278,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     } else if (updateData.date_ack === null || updateData.time_ack === null || updateData.date_attended === null || updateData.work_end === null) {
       // If required fields are being cleared, also clear sla_count_hrs
       updateData.sla_count_hrs = null;
+    }
+
+    // Calculate SLA Status (Passed/Failed) when ticket has resolved date/time
+    const sev = updateData.sev !== undefined ? updateData.sev : existingTicket.sev;
+    const dateReported = existingTicket.date_reported;
+    const timeReported = existingTicket.time_reported;
+    const dateResponded = updateData.date_responded !== undefined ? updateData.date_responded : existingTicket.date_responded;
+    const timeResponded = updateData.time_responded !== undefined ? updateData.time_responded : existingTicket.time_responded;
+    const dateResolved = updateData.date_resolved !== undefined ? updateData.date_resolved : existingTicket.date_resolved;
+    const timeResolved = updateData.time_resolved !== undefined ? updateData.time_resolved : existingTicket.time_resolved;
+
+    // Calculate and set SLA status
+    const slaStatus = calculateSLAStatus(
+      sev,
+      dateReported,
+      timeReported,
+      dateResponded,
+      timeResponded,
+      dateResolved,
+      timeResolved
+    );
+
+    if (slaStatus !== null) {
+      updateData.sla_status = slaStatus;
+    } else if (updateData.date_resolved === null || updateData.time_resolved === null) {
+      // Clear SLA status if resolved date/time is being cleared
+      updateData.sla_status = null;
     }
 
     // Update the ticket
