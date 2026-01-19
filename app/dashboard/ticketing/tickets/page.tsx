@@ -140,7 +140,7 @@ export default function TicketsPage() {
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   const [toasts, setToasts] = useState<ToastProps[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageLimit, setPageLimit] = useState(20);
+  const [pageLimit, setPageLimit] = useState(100);
   const [showAll, setShowAll] = useState(false);
 
   // Fetch tickets with TanStack Query
