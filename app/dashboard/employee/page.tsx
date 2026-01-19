@@ -7,12 +7,14 @@ import { WorkScheduleCalendar } from '@/components/WorkScheduleCalendar';
 import OvertimeHistory from '@/components/employee_dashboard/OvertimeHistory';
 import LeaveRequestHistory from '@/components/employee_dashboard/LeaveRequestHistory';
 import CashAdvanceHistory from '@/components/employee_dashboard/CashAdvanceHistory';
+import LiquidationHistory from '@/components/employee_dashboard/LiquidationHistory';
 import FileLeaveModal from '@/components/employee_dashboard/FileLeaveModal';
 import FileOvertimeModal from '@/components/employee_dashboard/FileOvertimeModal';
 import FileCashAdvanceModal from '@/components/employee_dashboard/FileCashAdvanceModal';
+import FileLiquidationModal from '@/components/employee_dashboard/FileLiquidationModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard } from 'lucide-react';
+import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard, Receipt } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
@@ -141,6 +143,7 @@ const EmployeeDashboard: React.FC = () => {
   const [isFileLeaveModalOpen, setIsFileLeaveModalOpen] = useState(false);
   const [isFileOvertimeModalOpen, setIsFileOvertimeModalOpen] = useState(false);
   const [isFileCashAdvanceModalOpen, setIsFileCashAdvanceModalOpen] = useState(false);
+  const [isFileLiquidationModalOpen, setIsFileLiquidationModalOpen] = useState(false);
   const [leaveRefreshTrigger, setLeaveRefreshTrigger] = useState(0);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -173,6 +176,10 @@ const EmployeeDashboard: React.FC = () => {
 
   const handleCashAdvanceSuccess = () => {
     showToast('success', 'Cash advance request submitted successfully!');
+  };
+
+  const handleLiquidationSuccess = () => {
+    showToast('success', 'Liquidation submitted successfully!');
   };
 
   // Initialize dashboard - load all data in parallel
@@ -709,6 +716,13 @@ const EmployeeDashboard: React.FC = () => {
         userId={user?.id || ''}
       />
 
+      <FileLiquidationModal
+        isOpen={isFileLiquidationModalOpen}
+        onClose={() => setIsFileLiquidationModalOpen(false)}
+        onSuccess={handleLiquidationSuccess}
+        userId={user?.id || ''}
+      />
+
       <WorkScheduleCalendar
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
@@ -798,6 +812,16 @@ const EmployeeDashboard: React.FC = () => {
                       >
                         <span className="w-4 h-4 text-slate-400 font-bold text-sm flex items-center justify-center">₱</span>
                         <span>File Cash Advance</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsFileLiquidationModalOpen(true);
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                      >
+                        <Receipt className="w-4 h-4 text-slate-400" />
+                        <span>File Liquidation</span>
                       </button>
                       <button
                         onClick={() => {
@@ -903,6 +927,17 @@ const EmployeeDashboard: React.FC = () => {
               >
                 <span className="w-[18px] h-[18px] font-bold text-base flex items-center justify-center">₱</span>
                 <span className="font-medium text-sm">File Cash Advance</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsFileLiquidationModalOpen(true);
+                  setIsMobileMenuOpen(false); // Close menu after clicking
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
+              >
+                <Receipt size={18} className="text-slate-400" />
+                <span className="font-medium text-sm">File Liquidation</span>
               </button>
 
               <button
@@ -1100,6 +1135,11 @@ const EmployeeDashboard: React.FC = () => {
         {/* Cash Advance History */}
         <div>
           <CashAdvanceHistory />
+        </div>
+
+        {/* Liquidation History */}
+        <div>
+          <LiquidationHistory />
         </div>
       </main>
     </div>
