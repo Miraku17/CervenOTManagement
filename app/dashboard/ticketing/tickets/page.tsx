@@ -14,6 +14,14 @@ import { supabase } from '@/services/supabase';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { Pagination } from "@/components/ui/pagination";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // Define the Ticket interface to match the API response and Modal props
 interface Ticket {
@@ -828,84 +836,91 @@ export default function TicketsPage() {
       </div>
 
 
-      {/* Tickets List */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {/* Tickets Table */}
+      <div className="bg-slate-900/50 rounded-xl border border-slate-800 overflow-hidden">
         {filteredTickets.length === 0 ? (
-          <div className="text-center py-12 bg-slate-900/50 rounded-2xl border border-slate-800 border-dashed col-span-full">
+          <div className="text-center py-12">
             <TicketIcon size={48} className="mx-auto text-slate-600 mb-4" />
             <h3 className="text-lg font-medium text-slate-300">No tickets found</h3>
             <p className="text-slate-500 mt-1">Try adjusting your filters or create a new ticket.</p>
           </div>
         ) : (
-          <>
-            {filteredTickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                onClick={() => handleTicketClick(ticket)}
-                className="group bg-slate-900 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 rounded-lg transition-all cursor-pointer shadow-md shadow-slate-950/30"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
-                  <div className="flex flex-wrap items-center gap-2 flex-1 min-w-0">
-                    <span className="text-sm font-mono text-slate-400 shrink-0">#{ticket.rcc_reference_number}</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase shrink-0`}>
+          <Table>
+            <TableHeader>
+              <TableRow className="border-slate-800 hover:bg-transparent">
+                <TableHead className="text-slate-400 font-semibold">Reference #</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Status</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Severity</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Date Reported</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Request Type</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Device</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Request Detail</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Store</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Serviced By</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredTickets.map((ticket) => (
+                <TableRow
+                  key={ticket.id}
+                  onClick={() => handleTicketClick(ticket)}
+                  className="border-slate-800 cursor-pointer hover:bg-slate-800/50 transition-colors"
+                >
+                  <TableCell className="font-mono text-slate-300">
+                    #{ticket.rcc_reference_number}
+                  </TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(ticket.status)} uppercase`}>
                       {ticket.status.replace(/_/g, ' ')}
                     </span>
-                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded ${getSeverityColor(ticket.sev)} shrink-0`}>
-                      <AlertTriangle size={11} />
+                  </TableCell>
+                  <TableCell>
+                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded w-fit ${getSeverityColor(ticket.sev)}`}>
+                      <AlertTriangle size={12} />
                       {ticket.sev}
                     </span>
-                  </div>
-                </div>
-
-                {/* Body */}
-                <div className="p-4 space-y-3">
-                  {/* Date & Time - Prominent Display */}
-                  <div className="flex items-center gap-3 bg-slate-950/50 rounded-lg px-3 py-2 border border-slate-800">
-                    <div className="flex items-center gap-2 flex-1">
-                      <Calendar size={16} className="text-blue-400 flex-shrink-0" />
-                      <span className="text-sm font-medium text-white">
+                  </TableCell>
+                  <TableCell className="text-slate-300">
+                    <div className="flex flex-col">
+                      <span className="font-medium">
                         {format(new Date(ticket.date_reported), 'MMM d, yyyy')}
                       </span>
-                    </div>
-                    <div className="w-px h-4 bg-slate-700"></div>
-                    <div className="flex items-center gap-2">
-                      <Clock size={16} className="text-blue-400 flex-shrink-0" />
-                      <span className="text-sm font-medium text-white">
+                      <span className="text-xs text-slate-500">
                         {ticket.time_reported
                           ? format(new Date(`1970-01-01T${ticket.time_reported}`), 'h:mm a')
                           : '--:--'}
                       </span>
                     </div>
-                  </div>
-
-                  {/* Main Info */}
-                  <div>
-                    <h3 className="text-base font-semibold text-white group-hover:text-blue-400 transition-colors mb-1">
-                      {ticket.request_types?.name || ticket.request_type} - {ticket.device}
-                    </h3>
-                    <p className="text-sm text-slate-400 line-clamp-1">{ticket.request_detail}</p>
-                  </div>
-
-                  {/* Metadata */}
-                  <div className="flex flex-col gap-2 text-xs">
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <MapPin size={13} className="text-slate-600 flex-shrink-0" />
-                      <span className="truncate">{ticket.stores?.store_name}</span>
+                  </TableCell>
+                  <TableCell className="text-slate-300">
+                    {ticket.request_types?.name || ticket.request_type}
+                  </TableCell>
+                  <TableCell className="text-slate-300">
+                    {ticket.device}
+                  </TableCell>
+                  <TableCell className="text-slate-400">
+                    <span className="truncate max-w-[200px] block">{ticket.request_detail}</span>
+                  </TableCell>
+                  <TableCell className="text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <MapPin size={14} className="text-slate-600 flex-shrink-0" />
+                      <span className="truncate max-w-[150px]">{ticket.stores?.store_name}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-slate-400">
-                      <User size={13} className="text-slate-600 flex-shrink-0" />
-                      <span className="truncate">
+                  </TableCell>
+                  <TableCell className="text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <User size={14} className="text-slate-600 flex-shrink-0" />
+                      <span className="truncate max-w-[120px]">
                         {ticket.serviced_by_user
                           ? `${ticket.serviced_by_user.first_name} ${ticket.serviced_by_user.last_name}`
                           : 'Unassigned'}
                       </span>
                     </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </div>
 
