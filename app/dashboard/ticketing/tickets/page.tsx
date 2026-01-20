@@ -573,16 +573,25 @@ export default function TicketsPage() {
     }
   };
 
-  // SLA Thresholds in minutes (L2 Support - excluding SEV4)
+  // SLA Thresholds in minutes (L2 Support) - for metrics display
   const SLA_THRESHOLDS: Record<string, { response: number; resolution: number }> = {
     sev1: { response: 30, resolution: 240 },      // 30 mins response, 4 hours resolution
     sev2: { response: 60, resolution: 720 },      // 1 hour response, 12 hours resolution
     sev3: { response: 240, resolution: 1440 },    // 4 hours response, 24 hours resolution
+    sev4: { response: 1440, resolution: 2880 },   // 24 hours response, 48 hours resolution
   };
 
-  // SLA calculation starts from acknowledge date/time (date_ack/time_ack)
-  const calculateSLAStatus = (ticket: Ticket): { status: 'Passed' | 'Failed' | 'Pending' | 'N/A'; responseTime?: number; resolutionTime?: number } => {
-    // Use database sla_status if available (for resolved tickets)
+  // SLA Resolution Thresholds in hours - for status calculation
+  const SLA_RESOLUTION_HOURS: Record<string, number> = {
+    sev1: 4,    // 4 hours resolution
+    sev2: 12,   // 12 hours resolution
+    sev3: 24,   // 24 hours resolution
+    sev4: 48,   // 48 hours resolution
+  };
+
+  // SLA status calculation based on sla_count_hrs
+  const calculateSLAStatus = (ticket: Ticket): { status: 'Passed' | 'Failed' | 'Pending' | 'In Progress' | 'N/A' } => {
+    // Use database sla_status if available
     if (ticket.sla_status) {
       const dbStatus = ticket.sla_status.toLowerCase();
       if (dbStatus === 'passed') return { status: 'Passed' };
@@ -591,57 +600,34 @@ export default function TicketsPage() {
 
     const sev = ticket.sev?.toLowerCase();
 
-    // Skip SEV4 and unknown severities
-    if (!sev || !SLA_THRESHOLDS[sev]) {
+    // Skip unknown severities
+    if (!sev || !SLA_RESOLUTION_HOURS[sev]) {
       return { status: 'N/A' };
     }
 
-    const threshold = SLA_THRESHOLDS[sev];
-
-    // Parse acknowledge datetime (SLA starts from acknowledge time)
-    if (!ticket.date_ack || !ticket.time_ack) {
-      return { status: 'Pending' };
+    // If ticket is in progress, show "In Progress" status
+    if (ticket.status?.toLowerCase() === 'in_progress') {
+      return { status: 'In Progress' };
     }
-    const ackDateTime = new Date(`${ticket.date_ack}T${ticket.time_ack}`);
 
-    // Check if ticket is resolved
-    if (!ticket.date_resolved || !ticket.time_resolved) {
+    // Need sla_count_hrs to calculate status
+    if (ticket.sla_count_hrs === null || ticket.sla_count_hrs === undefined) {
       return { status: 'Pending' };
     }
 
-    // Calculate response time from acknowledge time
-    let responseTimeMinutes: number | undefined;
-    if (ticket.date_responded && ticket.time_responded) {
-      const respondedDateTime = new Date(`${ticket.date_responded}T${ticket.time_responded}`);
-      responseTimeMinutes = (respondedDateTime.getTime() - ackDateTime.getTime()) / (1000 * 60);
-    }
+    const thresholdHours = SLA_RESOLUTION_HOURS[sev];
 
-    // Calculate resolution time from acknowledge time
-    const resolvedDateTime = new Date(`${ticket.date_resolved}T${ticket.time_resolved}`);
-    const resolutionTimeMinutes = (resolvedDateTime.getTime() - ackDateTime.getTime()) / (1000 * 60);
-
-    // Determine if SLA passed or failed
-    // For resolution: must be within threshold
-    const resolutionPassed = resolutionTimeMinutes <= threshold.resolution;
-
-    // For response: if we have response time, check it; otherwise just check resolution
-    const responsePassed = responseTimeMinutes !== undefined
-      ? responseTimeMinutes <= threshold.response
-      : true; // If no response time recorded, we only check resolution
-
-    const passed = resolutionPassed && responsePassed;
-
+    // Compare sla_count_hrs against threshold
     return {
-      status: passed ? 'Passed' : 'Failed',
-      responseTime: responseTimeMinutes,
-      resolutionTime: resolutionTimeMinutes,
+      status: ticket.sla_count_hrs <= thresholdHours ? 'Passed' : 'Failed',
     };
   };
 
-  const getSLAStatusColor = (status: 'Passed' | 'Failed' | 'Pending' | 'N/A') => {
+  const getSLAStatusColor = (status: 'Passed' | 'Failed' | 'Pending' | 'In Progress' | 'N/A') => {
     switch (status) {
       case 'Passed': return 'bg-green-500/20 text-green-400 border-green-500/20';
       case 'Failed': return 'bg-red-500/20 text-red-400 border-red-500/20';
+      case 'In Progress': return 'bg-blue-500/20 text-blue-400 border-blue-500/20';
       case 'Pending': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20';
       default: return 'bg-slate-500/20 text-slate-400 border-slate-500/20';
     }
@@ -1040,7 +1026,7 @@ export default function TicketsPage() {
                     {(() => {
                       const slaResult = calculateSLAStatus(ticket);
                       return (
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${getSLAStatusColor(slaResult.status)}`}>
+                        <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${getSLAStatusColor(slaResult.status)}`}>
                           {slaResult.status}
                         </span>
                       );
@@ -1048,10 +1034,6 @@ export default function TicketsPage() {
                   </TableCell>
                   <TableCell className="text-slate-300">
                     {(() => {
-                      // Only show Time Left for in_progress tickets
-                      if (ticket.status?.toLowerCase() !== 'in_progress') {
-                        return <span className="text-slate-500">-</span>;
-                      }
                       const metrics = calculateSLAMetrics(ticket);
                       if (!metrics) return <span className="text-slate-500">N/A</span>;
                       return <span>{formatDuration(metrics.timeLeft)}</span>;
@@ -1059,10 +1041,6 @@ export default function TicketsPage() {
                   </TableCell>
                   <TableCell className="text-slate-300">
                     {(() => {
-                      // Only show Elapsed Time for in_progress tickets
-                      if (ticket.status?.toLowerCase() !== 'in_progress') {
-                        return <span className="text-slate-500">-</span>;
-                      }
                       const metrics = calculateSLAMetrics(ticket);
                       if (!metrics) return <span className="text-slate-500">N/A</span>;
                       return <span>{formatDuration(metrics.elapsedTime)}</span>;
@@ -1070,10 +1048,6 @@ export default function TicketsPage() {
                   </TableCell>
                   <TableCell>
                     {(() => {
-                      // Only show Elapsed % for in_progress tickets
-                      if (ticket.status?.toLowerCase() !== 'in_progress') {
-                        return <span className="text-slate-500">-</span>;
-                      }
                       const metrics = calculateSLAMetrics(ticket);
                       if (!metrics) return <span className="text-slate-500">N/A</span>;
                       const colors = getElapsedPercentageColor(metrics.elapsedPercentage);
