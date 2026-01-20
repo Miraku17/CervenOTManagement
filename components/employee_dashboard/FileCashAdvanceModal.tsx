@@ -145,18 +145,6 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, type: 'personal' })}
-                  className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
-                    formData.type === 'personal'
-                      ? 'border-green-500 bg-green-500/10 text-green-400'
-                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
-                  }`}
-                >
-                  <span className="font-semibold">Personal</span>
-                  <span className="text-xs opacity-70">Personal Cash Advance</span>
-                </button>
-                <button
-                  type="button"
                   onClick={() => setFormData({ ...formData, type: 'support' })}
                   className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
                     formData.type === 'support'
@@ -166,6 +154,18 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
                 >
                   <span className="font-semibold">Support</span>
                   <span className="text-xs opacity-70">Support Cash Advance</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type: 'personal' })}
+                  className={`px-4 py-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-1 ${
+                    formData.type === 'personal'
+                      ? 'border-green-500 bg-green-500/10 text-green-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <span className="font-semibold">Personal</span>
+                  <span className="text-xs opacity-70">Personal Cash Advance</span>
                 </button>
               </div>
             </div>
