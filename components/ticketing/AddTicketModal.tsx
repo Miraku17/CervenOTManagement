@@ -908,12 +908,35 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-1">Manager on Duty</label>
-                  <input
-                    type="text"
-                    value={managerOnDuty}
-                    readOnly
-                    className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
-                  />
+                  {managers.length > 1 ? (
+                    <div className="relative">
+                      <select
+                        value={formData.mod_id}
+                        onChange={(e) => {
+                          const selectedManager = managers.find(m => m.id === e.target.value);
+                          if (selectedManager) {
+                            setManagerOnDuty(selectedManager.manager_name);
+                            setFormData(prev => ({ ...prev, mod_id: selectedManager.id }));
+                          }
+                        }}
+                        className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none appearance-none"
+                      >
+                        {managers.map((manager) => (
+                          <option key={manager.id} value={manager.id}>
+                            {manager.manager_name}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      value={managerOnDuty}
+                      readOnly
+                      className="w-full bg-slate-900 border border-slate-700 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
+                    />
+                  )}
                 </div>
               </div>
             )}

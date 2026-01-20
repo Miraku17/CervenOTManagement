@@ -11,10 +11,11 @@ const SLA_THRESHOLDS: Record<string, { response: number; resolution: number }> =
 };
 
 // Calculate SLA status based on severity and time thresholds
+// SLA starts from acknowledge date/time (date_ack/time_ack)
 function calculateSLAStatus(
   sev: string | null,
-  dateReported: string | null,
-  timeReported: string | null,
+  dateAck: string | null,
+  timeAck: string | null,
   dateResponded: string | null,
   timeResponded: string | null,
   dateResolved: string | null,
@@ -27,28 +28,28 @@ function calculateSLAStatus(
     return null;
   }
 
-  // Need reported and resolved times to calculate
-  if (!dateReported || !timeReported || !dateResolved || !timeResolved) {
+  // Need acknowledge and resolved times to calculate SLA
+  if (!dateAck || !timeAck || !dateResolved || !timeResolved) {
     return null;
   }
 
   const threshold = SLA_THRESHOLDS[severity];
 
   try {
-    const reportedDateTime = new Date(`${dateReported}T${timeReported}`);
+    const ackDateTime = new Date(`${dateAck}T${timeAck}`);
     const resolvedDateTime = new Date(`${dateResolved}T${timeResolved}`);
 
-    // Calculate resolution time in minutes
-    const resolutionTimeMinutes = (resolvedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+    // Calculate resolution time in minutes (from acknowledge time)
+    const resolutionTimeMinutes = (resolvedDateTime.getTime() - ackDateTime.getTime()) / (1000 * 60);
 
     // Check resolution time against threshold
     const resolutionPassed = resolutionTimeMinutes <= threshold.resolution;
 
-    // Calculate response time if available
+    // Calculate response time if available (from acknowledge time)
     let responsePassed = true;
     if (dateResponded && timeResponded) {
       const respondedDateTime = new Date(`${dateResponded}T${timeResponded}`);
-      const responseTimeMinutes = (respondedDateTime.getTime() - reportedDateTime.getTime()) / (1000 * 60);
+      const responseTimeMinutes = (respondedDateTime.getTime() - ackDateTime.getTime()) / (1000 * 60);
       responsePassed = responseTimeMinutes <= threshold.response;
     }
 
@@ -281,19 +282,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Calculate SLA Status (Passed/Failed) when ticket has resolved date/time
+    // SLA starts from acknowledge date/time
     const sev = updateData.sev !== undefined ? updateData.sev : existingTicket.sev;
-    const dateReported = existingTicket.date_reported;
-    const timeReported = existingTicket.time_reported;
     const dateResponded = updateData.date_responded !== undefined ? updateData.date_responded : existingTicket.date_responded;
     const timeResponded = updateData.time_responded !== undefined ? updateData.time_responded : existingTicket.time_responded;
     const dateResolved = updateData.date_resolved !== undefined ? updateData.date_resolved : existingTicket.date_resolved;
     const timeResolved = updateData.time_resolved !== undefined ? updateData.time_resolved : existingTicket.time_resolved;
 
-    // Calculate and set SLA status
+    // Calculate and set SLA status (using acknowledge date/time as start)
     const slaStatus = calculateSLAStatus(
       sev,
-      dateReported,
-      timeReported,
+      dateAck,
+      timeAck,
       dateResponded,
       timeResponded,
       dateResolved,
