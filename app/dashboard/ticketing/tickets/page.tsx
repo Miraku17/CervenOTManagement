@@ -649,7 +649,7 @@ export default function TicketsPage() {
     }
   };
 
-  // Calculate SLA metrics for a ticket (starts from acknowledge date/time)
+  // Calculate SLA metrics for a ticket (uses sla_count_hrs for consistency with SLA status)
   const calculateSLAMetrics = (ticket: Ticket): {
     elapsedTime: number; // in minutes
     timeLeft: number; // in minutes
@@ -658,7 +658,7 @@ export default function TicketsPage() {
   } | null => {
     const sev = ticket.sev?.toLowerCase();
 
-    // Skip SEV4 and unknown severities
+    // Skip unknown severities
     if (!sev || !SLA_THRESHOLDS[sev]) {
       return null;
     }
@@ -666,22 +666,13 @@ export default function TicketsPage() {
     const threshold = SLA_THRESHOLDS[sev];
     const targetMinutes = threshold.resolution;
 
-    // Parse acknowledge datetime (SLA starts from acknowledge time)
-    if (!ticket.date_ack || !ticket.time_ack) {
+    // Use sla_count_hrs for elapsed time (accounts for pause times)
+    if (ticket.sla_count_hrs === null || ticket.sla_count_hrs === undefined) {
       return null;
     }
-    const ackDateTime = new Date(`${ticket.date_ack}T${ticket.time_ack}`);
 
-    // Calculate elapsed time from acknowledge time
-    let elapsedTime: number;
-    if (ticket.date_resolved && ticket.time_resolved) {
-      // Ticket is resolved - use resolution time
-      const resolvedDateTime = new Date(`${ticket.date_resolved}T${ticket.time_resolved}`);
-      elapsedTime = (resolvedDateTime.getTime() - ackDateTime.getTime()) / (1000 * 60);
-    } else {
-      // Ticket is still open - use current time
-      elapsedTime = (Date.now() - ackDateTime.getTime()) / (1000 * 60);
-    }
+    // Convert sla_count_hrs to minutes
+    const elapsedTime = ticket.sla_count_hrs * 60;
 
     const timeLeft = Math.max(0, targetMinutes - elapsedTime);
     const elapsedPercentage = (elapsedTime / targetMinutes) * 100;
