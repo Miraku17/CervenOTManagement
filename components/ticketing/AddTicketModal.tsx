@@ -307,7 +307,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
       setIsLoadingDevices(true);
       try {
-        const response = await fetch(`/api/inventory/get?store_id=${selectedStore.id}`);
+        // Fetch all devices for the store (using high limit to get all)
+        const response = await fetch(`/api/inventory/get?store_id=${selectedStore.id}&limit=10000`);
         const data = await response.json();
         if (response.ok) {
           setInventoryItems(data.items || []);
