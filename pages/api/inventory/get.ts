@@ -42,254 +42,309 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const searchTerm = (req.query.search as string) || '';
-    
+
     // Filter parameters
     const categoryFilter = (req.query.category as string) || '';
     const storeFilter = (req.query.store as string) || '';
     const storeIdFilter = (req.query.store_id as string) || '';
     const brandFilter = (req.query.brand as string) || '';
 
-    // Calculate stats from total inventory (always constant, ignores filters)
-    const { count: totalItems } = await supabaseAdmin
-      .from('store_inventory')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
+    // Fetch stats in parallel for better performance
+    const [totalItemsResult, uniqueCategoriesResult, uniqueStoresResult] = await Promise.all([
+      // Total items count
+      supabaseAdmin
+        .from('store_inventory')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null),
+      // Unique categories count
+      supabaseAdmin
+        .from('categories')
+        .select('*', { count: 'exact', head: true })
+        .is('deleted_at', null),
+      // Unique stores count (stores with inventory items)
+      supabaseAdmin
+        .from('store_inventory')
+        .select('store_id', { count: 'exact', head: true })
+        .is('deleted_at', null)
+        .not('store_id', 'is', null)
+    ]);
 
-    // Get unique categories count (Total available categories)
-    const { count: uniqueCategories } = await supabaseAdmin
-      .from('categories')
-      .select('*', { count: 'exact', head: true })
-      .is('deleted_at', null);
+    // Get actual unique store count with a more efficient query
+    const { data: uniqueStoreData } = await supabaseAdmin
+      .rpc('count_unique_stores_with_inventory');
 
-    // Get unique stores count (only stores that have inventory items)
-    // Use pagination to ensure we get all items
-    const uniqueStoreIds = new Set<string>();
-    let storeIdPage = 0;
-    let hasMoreStoreIds = true;
-    const STORE_PAGE_SIZE = 1000;
-
-    while (hasMoreStoreIds) {
-      const { data: storeInventoryItems } = await supabaseAdmin
+    // Fallback if RPC doesn't exist
+    let uniqueStores = 0;
+    if (uniqueStoreData !== null && uniqueStoreData !== undefined) {
+      uniqueStores = uniqueStoreData;
+    } else {
+      // Fallback: use a simple distinct query
+      const { data: storeIds } = await supabaseAdmin
         .from('store_inventory')
         .select('store_id')
         .is('deleted_at', null)
-        .range(storeIdPage * STORE_PAGE_SIZE, (storeIdPage + 1) * STORE_PAGE_SIZE - 1);
+        .not('store_id', 'is', null)
+        .limit(10000);
 
-      if (storeInventoryItems && storeInventoryItems.length > 0) {
-        storeInventoryItems.forEach(item => {
-          if (item.store_id) {
-            uniqueStoreIds.add(item.store_id);
-          }
-        });
-
-        if (storeInventoryItems.length < STORE_PAGE_SIZE) {
-          hasMoreStoreIds = false;
-        } else {
-          storeIdPage++;
-        }
-      } else {
-        hasMoreStoreIds = false;
+      if (storeIds) {
+        const uniqueSet = new Set(storeIds.map(s => s.store_id));
+        uniqueStores = uniqueSet.size;
       }
     }
 
-    const uniqueStores = uniqueStoreIds.size;
-
     const stats = {
-      totalItems: totalItems || 0,
-      uniqueCategories,
+      totalItems: totalItemsResult.count || 0,
+      uniqueCategories: uniqueCategoriesResult.count || 0,
       uniqueStores,
     };
 
-    // Build filtered query - fetch all items in batches to avoid the 1000 row limit
-    // We need to fetch all data because filtering happens in memory (nested relations)
-    let allFilteredItems: any[] = [];
-    let fetchError = null;
-    let rangeStart = 0;
-    const batchSize = 1000;
-    let hasMore = true;
-
-    while (hasMore) {
-      let query = supabaseAdmin
-        .from('store_inventory')
-        .select(`
+    // Build the main query with filters applied at database level
+    let query = supabaseAdmin
+      .from('store_inventory')
+      .select(`
+        id,
+        created_at,
+        updated_at,
+        created_by,
+        updated_by,
+        serial_number,
+        under_warranty,
+        warranty_date,
+        status,
+        stores:store_id (
           id,
-          created_at,
-          updated_at,
-          created_by,
-          updated_by,
-          serial_number,
-          under_warranty,
-          warranty_date,
-          status,
-          stores:store_id (
-            id,
-            store_name,
-            store_code
-          ),
-          stations:station_id (
-            id,
-            name
-          ),
-          categories:category_id (
-            id,
-            name
-          ),
-          brands:brand_id (
-            id,
-            name
-          ),
-          models:model_id (
-            id,
-            name
-          )
-        `)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+          store_name,
+          store_code
+        ),
+        stations:station_id (
+          id,
+          name
+        ),
+        categories:category_id (
+          id,
+          name
+        ),
+        brands:brand_id (
+          id,
+          name
+        ),
+        models:model_id (
+          id,
+          name
+        ),
+        created_by_user:created_by (
+          id,
+          first_name,
+          last_name,
+          email
+        ),
+        updated_by_user:updated_by (
+          id,
+          first_name,
+          last_name,
+          email
+        )
+      `, { count: 'exact' })
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false });
 
-      // Filter by store_id directly in query (more efficient)
-      if (storeIdFilter) {
-        query = query.eq('store_id', storeIdFilter);
-      }
-
-      const { data, error } = await query.range(rangeStart, rangeStart + batchSize - 1);
-
-      if (error) {
-        fetchError = error;
-        break;
-      }
-
-      if (data && data.length > 0) {
-        allFilteredItems = [...allFilteredItems, ...data];
-        rangeStart += batchSize;
-        hasMore = data.length === batchSize;
-      } else {
-        hasMore = false;
-      }
+    // Apply store_id filter directly
+    if (storeIdFilter) {
+      query = query.eq('store_id', storeIdFilter);
     }
 
-    if (fetchError) throw fetchError;
+    // For text search on related tables, we need to use or() with ilike
+    // But Supabase doesn't support ilike on joined tables directly
+    // So we'll use a different approach - filter by IDs
 
-    // Apply additional filters in memory (for nested relation fields)
-    let filteredItems = allFilteredItems || [];
-
+    // Get category ID if filter is set
     if (categoryFilter) {
-      filteredItems = filteredItems.filter((item: any) => {
-        const categoryName = Array.isArray(item.categories) ? item.categories[0]?.name : item.categories?.name;
-        return categoryName === categoryFilter;
-      });
+      const { data: categoryData } = await supabaseAdmin
+        .from('categories')
+        .select('id')
+        .eq('name', categoryFilter)
+        .single();
+
+      if (categoryData) {
+        query = query.eq('category_id', categoryData.id);
+      } else {
+        // No matching category, return empty
+        return res.status(200).json({
+          items: [],
+          stats,
+          pagination: { currentPage: page, pageSize: limit, totalCount: 0, totalPages: 0 },
+          filterOptions: { categories: [], stores: [], brands: [] },
+          hasEditAccess: hasEditAccess || hasManageStoreInventory,
+          isEditOnly: hasEditAccess && !hasManageStoreInventory,
+        });
+      }
     }
+
+    // Get store ID if filter is set (store filter is by store_code)
     if (storeFilter) {
-      filteredItems = filteredItems.filter((item: any) => {
-        const storeCode = Array.isArray(item.stores) ? item.stores[0]?.store_code : item.stores?.store_code;
-        return storeCode === storeFilter;
-      });
+      const { data: storeData } = await supabaseAdmin
+        .from('stores')
+        .select('id')
+        .eq('store_code', storeFilter)
+        .single();
+
+      if (storeData) {
+        query = query.eq('store_id', storeData.id);
+      } else {
+        return res.status(200).json({
+          items: [],
+          stats,
+          pagination: { currentPage: page, pageSize: limit, totalCount: 0, totalPages: 0 },
+          filterOptions: { categories: [], stores: [], brands: [] },
+          hasEditAccess: hasEditAccess || hasManageStoreInventory,
+          isEditOnly: hasEditAccess && !hasManageStoreInventory,
+        });
+      }
     }
+
+    // Get brand ID if filter is set
     if (brandFilter) {
-      filteredItems = filteredItems.filter((item: any) => {
-        const brandName = Array.isArray(item.brands) ? item.brands[0]?.name : item.brands?.name;
-        return brandName === brandFilter;
-      });
+      const { data: brandData } = await supabaseAdmin
+        .from('brands')
+        .select('id')
+        .eq('name', brandFilter)
+        .single();
+
+      if (brandData) {
+        query = query.eq('brand_id', brandData.id);
+      } else {
+        return res.status(200).json({
+          items: [],
+          stats,
+          pagination: { currentPage: page, pageSize: limit, totalCount: 0, totalPages: 0 },
+          filterOptions: { categories: [], stores: [], brands: [] },
+          hasEditAccess: hasEditAccess || hasManageStoreInventory,
+          isEditOnly: hasEditAccess && !hasManageStoreInventory,
+        });
+      }
     }
 
+    // Handle text search - need to search across multiple fields
     if (searchTerm) {
-      const searchLower = searchTerm.toLowerCase();
-      filteredItems = filteredItems.filter((item: any) => {
-        const categoryName = Array.isArray(item.categories) ? item.categories[0]?.name : item.categories?.name;
-        const brandName = Array.isArray(item.brands) ? item.brands[0]?.name : item.brands?.name;
-        const modelName = Array.isArray(item.models) ? item.models[0]?.name : item.models?.name;
-        const storeName = Array.isArray(item.stores) ? item.stores[0]?.store_name : item.stores?.store_name;
-        const storeCode = Array.isArray(item.stores) ? item.stores[0]?.store_code : item.stores?.store_code;
-        const stationName = Array.isArray(item.stations) ? item.stations[0]?.name : item.stations?.name;
+      // Get matching IDs from related tables
+      const [categoryIds, brandIds, modelIds, storeIds, stationIds] = await Promise.all([
+        supabaseAdmin
+          .from('categories')
+          .select('id')
+          .ilike('name', `%${searchTerm}%`)
+          .then(r => r.data?.map(c => c.id) || []),
+        supabaseAdmin
+          .from('brands')
+          .select('id')
+          .ilike('name', `%${searchTerm}%`)
+          .then(r => r.data?.map(b => b.id) || []),
+        supabaseAdmin
+          .from('models')
+          .select('id')
+          .ilike('name', `%${searchTerm}%`)
+          .then(r => r.data?.map(m => m.id) || []),
+        supabaseAdmin
+          .from('stores')
+          .select('id')
+          .or(`store_name.ilike.%${searchTerm}%,store_code.ilike.%${searchTerm}%`)
+          .then(r => r.data?.map(s => s.id) || []),
+        supabaseAdmin
+          .from('stations')
+          .select('id')
+          .ilike('name', `%${searchTerm}%`)
+          .then(r => r.data?.map(s => s.id) || []),
+      ]);
 
-        return (
-          item.serial_number?.toLowerCase().includes(searchLower) ||
-          categoryName?.toLowerCase().includes(searchLower) ||
-          brandName?.toLowerCase().includes(searchLower) ||
-          modelName?.toLowerCase().includes(searchLower) ||
-          storeName?.toLowerCase().includes(searchLower) ||
-          storeCode?.toLowerCase().includes(searchLower) ||
-          stationName?.toLowerCase().includes(searchLower)
-        );
-      });
+      // Build OR conditions for the search
+      const orConditions: string[] = [];
+
+      // Search in serial_number directly
+      orConditions.push(`serial_number.ilike.%${searchTerm}%`);
+
+      // Add ID-based filters for related tables
+      if (categoryIds.length > 0) {
+        orConditions.push(`category_id.in.(${categoryIds.join(',')})`);
+      }
+      if (brandIds.length > 0) {
+        orConditions.push(`brand_id.in.(${brandIds.join(',')})`);
+      }
+      if (modelIds.length > 0) {
+        orConditions.push(`model_id.in.(${modelIds.join(',')})`);
+      }
+      if (storeIds.length > 0) {
+        orConditions.push(`store_id.in.(${storeIds.join(',')})`);
+      }
+      if (stationIds.length > 0) {
+        orConditions.push(`station_id.in.(${stationIds.join(',')})`);
+      }
+
+      if (orConditions.length > 0) {
+        query = query.or(orConditions.join(','));
+      }
     }
 
     // Apply pagination
-    const totalCount = filteredItems.length;
     const from = (page - 1) * limit;
-    const to = from + limit;
-    const paginatedItems = filteredItems.slice(from, to);
+    const to = from + limit - 1;
 
-    // Fetch user details for the paginated items
-    const inventoryItems = await Promise.all(
-      (paginatedItems || []).map(async (item) => {
-        let created_by_user = null;
-        let updated_by_user = null;
+    const { data: inventoryItems, error: fetchError, count: totalCount } = await query.range(from, to);
 
-        if (item.created_by && supabaseAdmin) {
-          const { data: creator } = await supabaseAdmin
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', item.created_by)
-            .single();
-          created_by_user = creator;
-        }
+    if (fetchError) throw fetchError;
 
-        if (item.updated_by && supabaseAdmin) {
-          const { data: updater } = await supabaseAdmin
-            .from('profiles')
-            .select('id, first_name, last_name, email')
-            .eq('id', item.updated_by)
-            .single();
-          updated_by_user = updater;
-        }
+    // Fetch filter options efficiently (only distinct values)
+    const [categoriesResult, storesResult, brandsResult] = await Promise.all([
+      supabaseAdmin
+        .from('store_inventory')
+        .select('categories:category_id(name)')
+        .is('deleted_at', null)
+        .not('category_id', 'is', null)
+        .limit(1000),
+      supabaseAdmin
+        .from('store_inventory')
+        .select('stores:store_id(store_code)')
+        .is('deleted_at', null)
+        .not('store_id', 'is', null)
+        .limit(1000),
+      supabaseAdmin
+        .from('store_inventory')
+        .select('brands:brand_id(name)')
+        .is('deleted_at', null)
+        .not('brand_id', 'is', null)
+        .limit(1000),
+    ]);
 
-        return {
-          ...item,
-          created_by_user,
-          updated_by_user,
-        };
-      })
-    );
-
-    // Extract filter options from all items
     const categories = Array.from(
       new Set(
-        allFilteredItems
+        (categoriesResult.data || [])
           .map((item: any) => {
-            const categoryName = Array.isArray(item.categories)
-              ? item.categories[0]?.name
-              : item.categories?.name;
-            return categoryName;
+            const cat = Array.isArray(item.categories) ? item.categories[0] : item.categories;
+            return cat?.name;
           })
           .filter(Boolean)
       )
-    ).sort();
+    ).sort() as string[];
 
     const stores = Array.from(
       new Set(
-        allFilteredItems
+        (storesResult.data || [])
           .map((item: any) => {
-            const storeCode = Array.isArray(item.stores)
-              ? item.stores[0]?.store_code
-              : item.stores?.store_code;
-            return storeCode;
+            const store = Array.isArray(item.stores) ? item.stores[0] : item.stores;
+            return store?.store_code;
           })
           .filter(Boolean)
       )
-    ).sort();
+    ).sort() as string[];
 
     const brands = Array.from(
       new Set(
-        allFilteredItems
+        (brandsResult.data || [])
           .map((item: any) => {
-            const brandName = Array.isArray(item.brands)
-              ? item.brands[0]?.name
-              : item.brands?.name;
-            return brandName;
+            const brand = Array.isArray(item.brands) ? item.brands[0] : item.brands;
+            return brand?.name;
           })
           .filter(Boolean)
       )
-    ).sort();
+    ).sort() as string[];
 
     return res.status(200).json({
       items: inventoryItems || [],

@@ -73,6 +73,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [storeCode, setStoreCode] = useState('');
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [isLoadingStores, setIsLoadingStores] = useState(false);
 
   const [station, setStation] = useState('');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
@@ -124,16 +125,41 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     }, 3000);
   };
 
-  // Fetch stores, stations, categories, brands, and models when modal opens
+  // Fetch stations, categories, brands, and models when modal opens
   useEffect(() => {
     if (isOpen) {
-      fetchStores();
       fetchStations();
       fetchCategories();
       fetchBrands();
       fetchModels();
     }
   }, [isOpen]);
+
+  // Search stores as user types (debounced)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const searchStores = async () => {
+      setIsLoadingStores(true);
+      try {
+        const query = storeSearchTerm.trim();
+        const response = await fetch(`/api/stores/search?q=${encodeURIComponent(query)}&limit=30`);
+        const data = await response.json();
+        if (response.ok) {
+          setStores(data.stores || []);
+        } else {
+          console.error('Failed to search stores:', data.error);
+        }
+      } catch (err) {
+        console.error('Error searching stores:', err);
+      } finally {
+        setIsLoadingStores(false);
+      }
+    };
+
+    const timer = setTimeout(searchStores, 300);
+    return () => clearTimeout(timer);
+  }, [storeSearchTerm, isOpen]);
 
   // Populate form fields when editing
   useEffect(() => {
@@ -228,20 +254,6 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     };
   }, [isOpen]);
 
-  const fetchStores = async () => {
-    try {
-      const response = await fetch('/api/stores/get?limit=5000');
-      const data = await response.json();
-      if (response.ok) {
-        setStores(data.stores || []);
-      } else {
-        console.error('Failed to fetch stores:', data.error);
-      }
-    } catch (error) {
-      console.error('Error fetching stores:', error);
-    }
-  };
-
   const fetchStations = async () => {
     try {
       const response = await fetch('/api/stations/get');
@@ -330,10 +342,8 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     setShowModelDropdown(false);
   };
 
-  const filteredStores = stores.filter(store =>
-    store.store_name.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
-    store.store_code.toLowerCase().includes(storeSearchTerm.toLowerCase())
-  );
+  // Stores are now filtered server-side via search API
+  const filteredStores = stores;
 
   const filteredStations = stations.filter(s =>
     !station || s.name.toLowerCase().includes(station.toLowerCase())
@@ -549,7 +559,11 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
             {/* Dropdown Menu */}
             {showStoreDropdown && (
               <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
-                {filteredStores.length > 0 ? (
+                {isLoadingStores ? (
+                  <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                    Searching stores...
+                  </div>
+                ) : filteredStores.length > 0 ? (
                   filteredStores.map((store) => (
                     <button
                       key={store.id}
@@ -567,7 +581,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                   ))
                 ) : (
                   <div className="px-4 py-3 text-sm text-slate-500 text-center">
-                    No stores found
+                    No stores found matching "{storeSearchTerm}"
                   </div>
                 )}
               </div>
