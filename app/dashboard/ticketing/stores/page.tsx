@@ -6,19 +6,38 @@ import { Store } from '@/types';
 import StoreModal from '@/components/ticketing/StoreModal';
 import StoreDetailModal from '@/components/ticketing/StoreDetailModal';
 import ImportStoresModal from '@/components/ticketing/ImportStoresModal';
+import { Pagination } from '@/components/ui/pagination';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
+
+interface StoresResponse {
+  stores: Store[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
 
 export default function StoresPage() {
   const { user } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
   const [stores, setStores] = useState<Store[]>([]);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [showAll, setShowAll] = useState(false);
 
   // Access control check
   // Stores: accessible by users with view_stores permission (all except HR and Accounting)
@@ -45,15 +64,39 @@ export default function StoresPage() {
   // Import Modal State
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
 
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm]);
+
   const fetchStores = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/stores/get');
-      const data = await response.json();
+      const params = new URLSearchParams({
+        page: currentPage.toString(),
+        limit: showAll ? '999999' : pageSize.toString(),
+      });
+
+      if (debouncedSearchTerm) {
+        params.append('search', debouncedSearchTerm);
+      }
+
+      const response = await fetch(`/api/stores/get?${params.toString()}`);
+      const data: StoresResponse = await response.json();
       if (response.ok) {
         setStores(data.stores);
+        setTotalCount(data.pagination.total);
+        setTotalPages(data.pagination.totalPages);
       } else {
-        console.error('Failed to fetch stores:', data.error);
+        console.error('Failed to fetch stores:', data);
       }
     } catch (error) {
       console.error('Error fetching stores:', error);
@@ -83,9 +126,25 @@ export default function StoresPage() {
     }
   };
 
-  const handleExportAllStoresExcel = () => {
+  const handleExportAllStoresExcel = async () => {
+    // Fetch ALL stores for export (not just current page)
+    let allStores: Store[] = [];
+    try {
+      const response = await fetch('/api/stores/get?limit=999999');
+      const data: StoresResponse = await response.json();
+      if (response.ok) {
+        allStores = data.stores;
+      } else {
+        // Fallback to current stores if fetch fails
+        allStores = stores;
+      }
+    } catch (error) {
+      console.error('Error fetching all stores for export:', error);
+      allStores = stores;
+    }
+
     // Prepare data for Excel
-    const excelData = stores.map((store) => ({
+    const excelData = allStores.map((store) => ({
       'Store Name': store.store_name,
       'Store Code': store.store_code,
       'Store Type': store.store_type || 'N/A',
@@ -128,7 +187,7 @@ export default function StoresPage() {
     const metaData = [
       { Field: 'Report Title', Value: 'All Stores Data' },
       { Field: 'Generated Date', Value: today },
-      { Field: 'Total Stores', Value: stores.length },
+      { Field: 'Total Stores', Value: allStores.length },
     ];
     const metaSheet = XLSX.utils.json_to_sheet(metaData);
     XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
@@ -140,20 +199,15 @@ export default function StoresPage() {
 
   useEffect(() => {
     fetchStores();
-  }, []);
+  }, [currentPage, pageSize, showAll, debouncedSearchTerm]);
 
   const handleStoreClick = (store: Store) => {
     setSelectedStore(store);
     setIsDetailModalOpen(true);
   };
 
-  const filteredStores = stores.filter(store =>
-    store.store_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.store_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    store.group?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Search is now done server-side, so we just use stores directly
+  const filteredStores = stores;
 
   return (
     <div className="space-y-6">
@@ -335,6 +389,31 @@ export default function StoresPage() {
             <StoreIcon size={48} className="mx-auto text-slate-600 mb-4" />
             <h3 className="text-lg font-medium text-slate-300">No stores found</h3>
             <p className="text-slate-500 mt-1">Get started by creating your first store.</p>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && totalCount > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            pageSize={pageSize}
+            totalCount={totalCount}
+            showAll={showAll}
+            onPageChange={setCurrentPage}
+            onPageSizeChange={(size) => {
+              if (size === 'all') {
+                setShowAll(true);
+                setCurrentPage(1);
+              } else {
+                setShowAll(false);
+                setPageSize(size);
+                setCurrentPage(1);
+              }
+            }}
+            pageSizeOptions={[10, 20, 50, 100]}
+          />
         </div>
       )}
 
