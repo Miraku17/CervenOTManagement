@@ -138,7 +138,7 @@ const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
 };
 
 const fetchStores = async (): Promise<Store[]> => {
-  const response = await fetch('/api/stores/get');
+  const response = await fetch('/api/stores/get?limit=5000');
   if (!response.ok) {
     throw new Error('Failed to fetch stores');
   }

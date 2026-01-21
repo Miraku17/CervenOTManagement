@@ -189,8 +189,8 @@ export default function AssetInventoryPage() {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      // Use a very large number for "All" option - larger than any realistic inventory size
-      const effectiveLimit = showAll ? 9999999 : pageSize;
+      // Use a reasonable limit for "All" option
+      const effectiveLimit = showAll ? 5000 : pageSize;
       const effectivePage = showAll ? 1 : currentPage;
 
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';

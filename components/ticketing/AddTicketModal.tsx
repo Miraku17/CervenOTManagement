@@ -84,6 +84,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
   const [storeCode, setStoreCode] = useState('');
   const [storeSearchTerm, setStoreSearchTerm] = useState('');
   const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [managers, setManagers] = useState<Manager[]>([]);
   const [managerOnDuty, setManagerOnDuty] = useState('');
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -149,17 +150,37 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     time_reported: formatInTimeZone(new Date(), 'Asia/Manila', 'HH:mm'),
   });
 
-  // Fetch stores, employees and stations
+  // Search stores as user types (debounced)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const searchStores = async () => {
+      setIsLoadingStores(true);
+      try {
+        const query = storeSearchTerm.trim();
+        const response = await fetch(`/api/stores/search?q=${encodeURIComponent(query)}&limit=30`);
+        const data = await response.json();
+        if (response.ok) {
+          setStores(data.stores || []);
+        } else {
+          console.error('Failed to search stores:', data.error);
+        }
+      } catch (err) {
+        console.error('Error searching stores:', err);
+      } finally {
+        setIsLoadingStores(false);
+      }
+    };
+
+    // Debounce the search
+    const timer = setTimeout(searchStores, 300);
+    return () => clearTimeout(timer);
+  }, [storeSearchTerm, isOpen]);
+
+  // Fetch employees, stations, and other data
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch stores
-        const storesResponse = await fetch('/api/stores/get');
-        const storesData = await storesResponse.json();
-        if (storesResponse.ok) {
-          setStores(storesData.stores || []);
-        }
-
         // Fetch employees
         const employeesResponse = await fetch('/api/employees/get');
         const employeesData = await employeesResponse.json();
@@ -362,10 +383,8 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     setShowDeviceDropdown(false);
   };
 
-  const filteredStores = stores.filter(store =>
-    store.store_name.toLowerCase().includes(storeSearchTerm.toLowerCase()) ||
-    store.store_code.toLowerCase().includes(storeSearchTerm.toLowerCase())
-  );
+  // Stores are now filtered server-side via search API
+  const filteredStores = stores;
 
   const filteredEmployees = employees.filter(emp =>
     emp.fullName.toLowerCase().includes(employeeSearchTerm.toLowerCase()) ||
@@ -860,7 +879,12 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
               {/* Dropdown Menu */}
               {showStoreDropdown && (
                 <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto">
-                  {filteredStores.length > 0 ? (
+                  {isLoadingStores ? (
+                    <div className="px-4 py-3 text-sm text-slate-400 text-center flex items-center justify-center gap-2">
+                      <Loader2 size={16} className="animate-spin" />
+                      Searching stores...
+                    </div>
+                  ) : filteredStores.length > 0 ? (
                     filteredStores.map((store) => (
                       <button
                         key={store.id}
@@ -876,9 +900,13 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
                         </div>
                       </button>
                     ))
+                  ) : storeSearchTerm.trim() ? (
+                    <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                      No stores found matching "{storeSearchTerm}"
+                    </div>
                   ) : (
                     <div className="px-4 py-3 text-sm text-slate-500 text-center">
-                      No stores found
+                      Type to search by store name or code
                     </div>
                   )}
                 </div>

@@ -230,7 +230,7 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
 
   const fetchStores = async () => {
     try {
-      const response = await fetch('/api/stores/get');
+      const response = await fetch('/api/stores/get?limit=5000');
       const data = await response.json();
       if (response.ok) {
         setStores(data.stores || []);

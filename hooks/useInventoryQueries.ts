@@ -53,7 +53,7 @@ export function useInventory({
       showAll,
     ],
     queryFn: async () => {
-      const effectiveLimit = showAll ? 9999999 : pageSize;
+      const effectiveLimit = showAll ? 5000 : pageSize;
       const params = new URLSearchParams({
         page: showAll ? '1' : page.toString(),
         limit: effectiveLimit.toString(),
