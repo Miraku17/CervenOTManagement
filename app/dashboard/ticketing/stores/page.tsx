@@ -82,7 +82,7 @@ export default function StoresPage() {
     try {
       const params = new URLSearchParams({
         page: currentPage.toString(),
-        limit: showAll ? '999999' : pageSize.toString(),
+        limit: showAll ? '5000' : pageSize.toString(),
       });
 
       if (debouncedSearchTerm) {
@@ -130,7 +130,7 @@ export default function StoresPage() {
     // Fetch ALL stores for export (not just current page)
     let allStores: Store[] = [];
     try {
-      const response = await fetch('/api/stores/get?limit=999999');
+      const response = await fetch('/api/stores/get?limit=5000');
       const data: StoresResponse = await response.json();
       if (response.ok) {
         allStores = data.stores;

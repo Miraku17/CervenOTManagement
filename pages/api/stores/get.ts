@@ -14,13 +14,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(401).json({ error: 'User not authenticated' });
   }
 
-  // Check if user has view_stores permission (all except HR and Accounting)
-  const hasPermission = await userHasPermission(userId, 'view_stores');
-  if (!hasPermission) {
-    return res.status(403).json({ error: 'You do not have permission to view stores' });
-  }
-
   try {
+    // Check if user has permission to view stores
+    // Users with these permissions need access to stores list
+    const [canViewStores, canManageStores, canManageTickets, canManageInventory] = await Promise.all([
+      userHasPermission(userId, 'view_stores'),
+      userHasPermission(userId, 'manage_stores'),
+      userHasPermission(userId, 'manage_tickets'),
+      userHasPermission(userId, 'manage_store_inventory'),
+    ]);
+
+    if (!canViewStores && !canManageStores && !canManageTickets && !canManageInventory) {
+      return res.status(403).json({ error: 'You do not have permission to view stores' });
+    }
     if (!supabaseAdmin) {
       throw new Error('Database connection not available');
     }
@@ -54,7 +60,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Apply pagination (unless limit is very large, meaning "show all")
-    if (limit < 999999) {
+    if (limit < 5000) {
       storesQuery = storesQuery.range(offset, offset + limit - 1);
     }
 

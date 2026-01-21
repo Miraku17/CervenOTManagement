@@ -153,8 +153,8 @@ export default function TicketsPage() {
 
   // Fetch tickets with TanStack Query
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tickets', currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate],
-    queryFn: () => fetchTickets(currentPage, showAll ? 999999 : pageLimit, statusFilter, searchTerm, startDate, endDate),
+    queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate],
+    queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
