@@ -940,6 +940,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
 
   const getSeverityColor = (sev: string) => {
     switch (sev.toLowerCase()) {
+      case 'sev4':
+        return 'text-purple-400';
       case 'sev3':
         return 'text-red-400';
       case 'sev2':

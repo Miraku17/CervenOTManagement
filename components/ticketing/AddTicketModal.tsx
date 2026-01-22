@@ -546,6 +546,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
     { value: 'sev1', label: 'sev1', color: 'text-blue-400' },
     { value: 'sev2', label: 'sev2', color: 'text-yellow-400' },
     { value: 'sev3', label: 'sev3', color: 'text-red-400' },
+    { value: 'sev4', label: 'sev4', color: 'text-purple-400' },
   ];
 
   if (!isOpen) return null;
