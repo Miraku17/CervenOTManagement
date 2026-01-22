@@ -101,6 +101,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     priorityMap.set('SEV1', 0);
     priorityMap.set('SEV2', 0);
     priorityMap.set('SEV3', 0);
+    priorityMap.set('SEV4', 0);
 
     const statusMap = new Map<string, number>();
     const categoryMap = new Map<string, number>();
@@ -209,6 +210,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (name.toUpperCase() === 'SEV1') color = '#ef4444'; // Red
       if (name.toUpperCase() === 'SEV2') color = '#f59e0b'; // Amber
       if (name.toUpperCase() === 'SEV3') color = '#3b82f6'; // Blue
+      if (name.toUpperCase() === 'SEV4') color = '#a855f7'; // Purple
       return { name, value, color };
     });
 

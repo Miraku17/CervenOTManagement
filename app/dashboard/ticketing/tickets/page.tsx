@@ -569,6 +569,7 @@ export default function TicketsPage() {
       case 'sev1': return 'text-red-400 bg-red-400/10 border-red-400/20';
       case 'sev2': return 'text-yellow-400 bg-yellow-400/10 border-yellow-400/20';
       case 'sev3': return 'text-blue-400 bg-blue-400/10 border-blue-400/20';
+      case 'sev4': return 'text-purple-400 bg-purple-400/10 border-purple-400/20';
       default: return 'text-slate-400 bg-slate-400/10 border-slate-400/20';
     }
   };
