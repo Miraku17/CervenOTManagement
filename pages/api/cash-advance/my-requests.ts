@@ -24,7 +24,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const limitNum = parseInt(limit as string, 10);
     const offset = (pageNum - 1) * limitNum;
 
-    // Fetch user's own cash advance requests
+    // Fetch user's own cash advance requests (excluding soft-deleted)
     const { data: cashAdvances, error, count } = await supabaseAdmin
       .from('cash_advances')
       .select(`
@@ -36,6 +36,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `, { count: 'exact' })
       .eq('requested_by', userId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false })
       .range(offset, offset + limitNum - 1);
 
