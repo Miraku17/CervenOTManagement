@@ -6,7 +6,8 @@
       "Bash(grep:*)",
       "Bash(npx tsc:*)",
       "Bash(npm install:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx next lint:*)"
     ]
   }
 }

@@ -50,6 +50,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           last_name
         )
       `, { count: 'exact' })
+      .is('deleted_at', null) // Exclude soft-deleted records
       .order('created_at', { ascending: false });
 
     // Apply filters
