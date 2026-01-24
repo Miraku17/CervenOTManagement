@@ -137,8 +137,9 @@ export default function StoreInventoryPage() {
   }, [inventoryData]);
 
   // Dropdown states
-  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
 
   // Edit/Delete states
   const [editItem, setEditItem] = useState<InventoryItem | null>(null);
@@ -171,8 +172,9 @@ export default function StoreInventoryPage() {
   const [showImportErrors, setShowImportErrors] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const filterRef = useRef<HTMLDivElement>(null);
   const categoryRef = useRef<HTMLDivElement>(null);
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
+  const brandDropdownRef = useRef<HTMLDivElement>(null);
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -191,14 +193,17 @@ export default function StoreInventoryPage() {
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setShowFilterDropdown(false);
-      }
       if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
         setShowCategoryDropdown(false);
       }
       if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
         setIsActionsDropdownOpen(false);
+      }
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(event.target as Node)) {
+        setShowStoreDropdown(false);
+      }
+      if (brandDropdownRef.current && !brandDropdownRef.current.contains(event.target as Node)) {
+        setShowBrandDropdown(false);
       }
     };
 
@@ -688,91 +693,131 @@ export default function StoreInventoryPage() {
 
         {/* Filter Buttons - Stack on mobile, row on desktop, aligned right */}
         <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
-            {/* Filter Button with Dropdown */}
-            <div ref={filterRef} className="relative flex-1 sm:flex-none">
+            {/* Clear All Filters Button */}
+            {hasActiveFilters && (
               <button
-                onClick={() => setShowFilterDropdown(!showFilterDropdown)}
-                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ hasActiveFilters ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                onClick={clearAllFilters}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 text-sm text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors"
               >
-                <Filter size={18} />
-                <span>Filter</span>
-                {hasActiveFilters && (
-                  <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
-                    {[selectedStore, selectedBrand].filter(Boolean).length}
-                  </span>
-                )}
-                <ChevronDown size={16} className={`transition-transform ${showFilterDropdown ? 'rotate-180' : ''}`} />
+                <X size={16} />
+                <span>Clear filters</span>
+              </button>
+            )}
+
+            {/* Store Dropdown */}
+            <div ref={storeDropdownRef} className="relative flex-1 sm:flex-none">
+              <button
+                onClick={() => {
+                  setShowStoreDropdown(!showStoreDropdown);
+                  setShowBrandDropdown(false);
+                  setShowCategoryDropdown(false);
+                }}
+                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedStore ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+              >
+                <Package size={18} />
+                <span className="truncate max-w-[120px]">{selectedStore || 'Store'}</span>
+                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${showStoreDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Filter Dropdown */}
-              {showFilterDropdown && (
-                <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                  <div className="p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-white">Filters</h3>
-                      {hasActiveFilters && (
-                        <button
-                          onClick={clearAllFilters}
-                          className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
-                        >
-                          <X size={14} />
-                          Clear all
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Store Filter */}
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-2">Store</label>
-                      <div className="relative">
-                        <select
-                          value={selectedStore || ''}
-                          onChange={(e) => setSelectedStore(e.target.value || null)}
-                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                        >
-                          <option value="">All Stores</option>
-                          {filterOptions.stores.map((store) => (
-                            <option key={store} value={store}>{store}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    {/* Brand Filter */}
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-2">Brand</label>
-                      <div className="relative">
-                        <select
-                          value={selectedBrand || ''}
-                          onChange={(e) => setSelectedBrand(e.target.value || null)}
-                          className="w-full bg-slate-950 border border-slate-700 text-slate-200 px-3 py-2 pr-10 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                        >
-                          <option value="">All Brands</option>
-                          {filterOptions.brands.map((brand) => (
-                            <option key={brand} value={brand}>{brand}</option>
-                          ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4 pointer-events-none" />
-                      </div>
-                    </div>
-                  </div>
+              {/* Store Dropdown Menu */}
+              {showStoreDropdown && (
+                <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setSelectedStore(null);
+                      setShowStoreDropdown(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedStore
+                        ? 'bg-blue-500/10 text-blue-400 font-medium'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    All Stores
+                  </button>
+                  {filterOptions.stores.map((store) => (
+                    <button
+                      key={store}
+                      onClick={() => {
+                        setSelectedStore(store);
+                        setShowStoreDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedStore === store
+                          ? 'bg-blue-500/10 text-blue-400 font-medium'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      {store}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Device Button with Dropdown */}
-            <div ref={categoryRef} className="relative flex-1 sm:flex-none">
+            {/* Brand Dropdown */}
+            <div ref={brandDropdownRef} className="relative flex-1 sm:flex-none">
               <button
-                onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
-                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+                onClick={() => {
+                  setShowBrandDropdown(!showBrandDropdown);
+                  setShowStoreDropdown(false);
+                  setShowCategoryDropdown(false);
+                }}
+                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedBrand ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
               >
                 <Box size={18} />
-                <span className="truncate">{selectedCategory || 'Device'}</span>
+                <span className="truncate max-w-[120px]">{selectedBrand || 'Brand'}</span>
+                <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${showBrandDropdown ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Brand Dropdown Menu */}
+              {showBrandDropdown && (
+                <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
+                  <button
+                    onClick={() => {
+                      setSelectedBrand(null);
+                      setShowBrandDropdown(false);
+                    }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${ !selectedBrand
+                        ? 'bg-blue-500/10 text-blue-400 font-medium'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    All Brands
+                  </button>
+                  {filterOptions.brands.map((brand) => (
+                    <button
+                      key={brand}
+                      onClick={() => {
+                        setSelectedBrand(brand);
+                        setShowBrandDropdown(false);
+                      }}
+                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors border-t border-slate-800 ${ selectedBrand === brand
+                          ? 'bg-blue-500/10 text-blue-400 font-medium'
+                          : 'text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      {brand}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Device Dropdown */}
+            <div ref={categoryRef} className="relative flex-1 sm:flex-none">
+              <button
+                onClick={() => {
+                  setShowCategoryDropdown(!showCategoryDropdown);
+                  setShowStoreDropdown(false);
+                  setShowBrandDropdown(false);
+                }}
+                className={`w-full sm:w-auto flex items-center justify-center sm:justify-start gap-2 px-4 py-2.5 bg-slate-950 border rounded-xl transition-colors ${ selectedCategory ? 'border-blue-500 text-blue-400' : 'border-slate-800 text-slate-300 hover:border-slate-600'}`}
+              >
+                <Filter size={18} />
+                <span className="truncate max-w-[120px]">{selectedCategory || 'Device'}</span>
                 <ChevronDown size={16} className={`transition-transform flex-shrink-0 ${showCategoryDropdown ? 'rotate-180' : ''}`} />
               </button>
 
-              {/* Device Dropdown */}
+              {/* Device Dropdown Menu */}
               {showCategoryDropdown && (
                 <div className="absolute top-full mt-2 left-0 sm:left-auto sm:right-0 w-full sm:w-56 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden max-h-80 overflow-y-auto">
                   <button

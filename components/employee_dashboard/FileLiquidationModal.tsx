@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, AlertCircle, Loader2, Check, Plus, Trash2, Receipt, Upload, File, XCircle, Pencil, FileImage } from 'lucide-react';
+import { X, AlertCircle, Loader2, Check, Plus, Trash2, Receipt, Upload, File, XCircle, Pencil, FileImage, Search, ChevronDown } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -137,22 +137,36 @@ const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
   );
 };
 
-const fetchStores = async (): Promise<Store[]> => {
-  const response = await fetch('/api/stores/get?limit=5000');
+const searchStores = async (query: string): Promise<Store[]> => {
+  const response = await fetch(`/api/stores/search?q=${encodeURIComponent(query)}&limit=30`);
   if (!response.ok) {
-    throw new Error('Failed to fetch stores');
+    throw new Error('Failed to search stores');
   }
   const data = await response.json();
   return data.stores || [];
 };
 
-const fetchTickets = async (): Promise<Ticket[]> => {
-  const response = await fetch('/api/tickets/get?limit=100');
+const searchTickets = async (query: string): Promise<Ticket[]> => {
+  const response = await fetch(`/api/tickets/search?q=${encodeURIComponent(query)}&limit=30`);
   if (!response.ok) {
-    throw new Error('Failed to fetch tickets');
+    throw new Error('Failed to search tickets');
   }
   const data = await response.json();
   return data.tickets || [];
+};
+
+const fetchStoreById = async (id: string): Promise<Store | null> => {
+  const response = await fetch(`/api/stores/search?id=${encodeURIComponent(id)}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.stores?.[0] || null;
+};
+
+const fetchTicketById = async (id: string): Promise<Ticket | null> => {
+  const response = await fetch(`/api/tickets/search?id=${encodeURIComponent(id)}`);
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.tickets?.[0] || null;
 };
 
 const submitLiquidation = async (data: LiquidationFormData & { userId: string }) => {
@@ -267,6 +281,50 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const [attachmentsToRemove, setAttachmentsToRemove] = useState<string[]>([]);
   const [hasPopulatedForm, setHasPopulatedForm] = useState(false);
 
+  // Search states for store and ticket
+  const [storeSearch, setStoreSearch] = useState('');
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [debouncedStoreSearch, setDebouncedStoreSearch] = useState('');
+  const [debouncedTicketSearch, setDebouncedTicketSearch] = useState('');
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+  const [showTicketDropdown, setShowTicketDropdown] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+
+  // Refs for dropdown click outside handling
+  const storeDropdownRef = useRef<HTMLDivElement>(null);
+  const ticketDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Debounce search inputs
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedStoreSearch(storeSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [storeSearch]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTicketSearch(ticketSearch);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [ticketSearch]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (storeDropdownRef.current && !storeDropdownRef.current.contains(event.target as Node)) {
+        setShowStoreDropdown(false);
+      }
+      if (ticketDropdownRef.current && !ticketDropdownRef.current.contains(event.target as Node)) {
+        setShowTicketDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Fetch approved cash advances
   const { data: cashAdvances = [], isLoading: loadingCashAdvances } = useQuery({
     queryKey: ['approved-cash-advances'],
@@ -274,18 +332,20 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     enabled: isOpen && !isEditMode,
   });
 
-  // Fetch stores
+  // Search stores
   const { data: stores = [], isLoading: loadingStores } = useQuery({
-    queryKey: ['stores-list'],
-    queryFn: fetchStores,
-    enabled: isOpen,
+    queryKey: ['stores-search', debouncedStoreSearch],
+    queryFn: () => searchStores(debouncedStoreSearch),
+    enabled: isOpen && showStoreDropdown,
+    staleTime: 1000 * 60, // 1 minute
   });
 
-  // Fetch tickets
+  // Search tickets
   const { data: tickets = [], isLoading: loadingTickets } = useQuery({
-    queryKey: ['tickets-list'],
-    queryFn: fetchTickets,
-    enabled: isOpen,
+    queryKey: ['tickets-search', debouncedTicketSearch],
+    queryFn: () => searchTickets(debouncedTicketSearch),
+    enabled: isOpen && showTicketDropdown,
+    staleTime: 1000 * 60, // 1 minute
   });
 
   // Fetch existing attachment URLs for edit mode
@@ -394,11 +454,17 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       setSelectedFiles([]);
       setFilePreviews({});
       setAttachmentsToRemove([]);
+      setStoreSearch('');
+      setTicketSearch('');
+      setSelectedStore(null);
+      setSelectedTicket(null);
+      setShowStoreDropdown(false);
+      setShowTicketDropdown(false);
     }
   }, [isOpen]);
 
   // Populate form when modal opens and data is ready
-  // For edit mode: wait for stores and tickets to load
+  // For edit mode: fetch store and ticket data
   // For create mode: populate immediately
   useEffect(() => {
     if (!isOpen || hasPopulatedForm) return;
@@ -417,34 +483,51 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       return;
     }
 
-    // For edit mode, wait for stores and tickets to load
-    if (loadingStores || loadingTickets) return;
+    // For edit mode, fetch store and ticket data
+    const loadEditData = async () => {
+      // Populate form with existing data
+      setFormData({
+        cash_advance_id: editingLiquidation.cash_advance_id,
+        store_id: editingLiquidation.store_id,
+        ticket_id: editingLiquidation.ticket_id ? String(editingLiquidation.ticket_id) : '',
+        liquidation_date: editingLiquidation.liquidation_date.split('T')[0],
+        remarks: editingLiquidation.remarks || '',
+        items: editingLiquidation.liquidation_items.map((item) => ({
+          id: item.id || Math.random().toString(36).substr(2, 9),
+          from_destination: item.from_destination || '',
+          to_destination: item.to_destination || '',
+          jeep: item.jeep > 0 ? String(item.jeep) : '',
+          bus: item.bus > 0 ? String(item.bus) : '',
+          fx_van: item.fx_van > 0 ? String(item.fx_van) : '',
+          gas: item.gas > 0 ? String(item.gas) : '',
+          toll: item.toll > 0 ? String(item.toll) : '',
+          meals: item.meals > 0 ? String(item.meals) : '',
+          lodging: item.lodging > 0 ? String(item.lodging) : '',
+          others: item.others > 0 ? String(item.others) : '',
+          remarks: item.remarks || '',
+        })),
+      });
 
-    // Populate form with existing data
-    setFormData({
-      cash_advance_id: editingLiquidation.cash_advance_id,
-      store_id: editingLiquidation.store_id,
-      ticket_id: editingLiquidation.ticket_id ? String(editingLiquidation.ticket_id) : '',
-      liquidation_date: editingLiquidation.liquidation_date.split('T')[0],
-      remarks: editingLiquidation.remarks || '',
-      items: editingLiquidation.liquidation_items.map((item) => ({
-        id: item.id || Math.random().toString(36).substr(2, 9),
-        from_destination: item.from_destination || '',
-        to_destination: item.to_destination || '',
-        jeep: item.jeep > 0 ? String(item.jeep) : '',
-        bus: item.bus > 0 ? String(item.bus) : '',
-        fx_van: item.fx_van > 0 ? String(item.fx_van) : '',
-        gas: item.gas > 0 ? String(item.gas) : '',
-        toll: item.toll > 0 ? String(item.toll) : '',
-        meals: item.meals > 0 ? String(item.meals) : '',
-        lodging: item.lodging > 0 ? String(item.lodging) : '',
-        others: item.others > 0 ? String(item.others) : '',
-        remarks: item.remarks || '',
-      })),
-    });
+      // Fetch store and ticket data for display
+      if (editingLiquidation.store_id) {
+        const store = await fetchStoreById(editingLiquidation.store_id);
+        if (store) {
+          setSelectedStore(store);
+        }
+      }
 
-    setHasPopulatedForm(true);
-  }, [isOpen, editingLiquidation, hasPopulatedForm, loadingStores, loadingTickets]);
+      if (editingLiquidation.ticket_id) {
+        const ticket = await fetchTicketById(String(editingLiquidation.ticket_id));
+        if (ticket) {
+          setSelectedTicket(ticket);
+        }
+      }
+
+      setHasPopulatedForm(true);
+    };
+
+    loadEditData();
+  }, [isOpen, editingLiquidation, hasPopulatedForm]);
 
   const handleSubmit = async (e?: React.FormEvent | React.MouseEvent) => {
     e?.preventDefault();
@@ -456,15 +539,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       return;
     }
 
-    if (!formData.store_id) {
-      setError('Please select a store/site.');
-      return;
-    }
-
-    if (!formData.ticket_id) {
-      setError('Please select an incident/ticket number.');
-      return;
-    }
 
     // Check if at least one item has values
     const hasValues = formData.items.some(
@@ -519,6 +593,14 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       remarks: '',
       items: [emptyItem()],
     });
+
+    // Reset search states
+    setStoreSearch('');
+    setTicketSearch('');
+    setSelectedStore(null);
+    setSelectedTicket(null);
+    setShowStoreDropdown(false);
+    setShowTicketDropdown(false);
 
     onClose();
   };
@@ -652,7 +734,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const isUploadingFiles = uploadMutation.isPending;
-  const isLoadingData = isEditMode && (loadingStores || loadingTickets || !hasPopulatedForm);
+  const isLoadingData = isEditMode && !hasPopulatedForm;
 
   if (!isOpen) return null;
 
@@ -746,58 +828,138 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
               )}
             </div>
 
-            {/* Store/Site Selection */}
-            <div>
+            {/* Store/Site Selection - Searchable */}
+            <div ref={storeDropdownRef} className="relative">
               <label className="block text-sm font-medium text-slate-400 mb-1.5">
-                Site Name (Store Code) <span className="text-red-400">*</span>
+                Site Name (Store Code)
               </label>
-              <Select
-                value={formData.store_id}
-                onValueChange={(value) => setFormData({ ...formData, store_id: value })}
-                disabled={loadingStores}
-              >
-                <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white h-11 rounded-xl focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 [&>span]:text-left">
-                  <SelectValue placeholder="Select store" />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60 z-[10000]">
-                  {stores.map((store) => (
-                    <SelectItem
-                      key={store.id}
-                      value={store.id}
-                      className="text-white focus:bg-slate-800 focus:text-white cursor-pointer"
-                    >
-                      {store.store_code} - {store.store_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                <input
+                  type="text"
+                  value={selectedStore ? `${selectedStore.store_code} - ${selectedStore.store_name}` : storeSearch}
+                  onChange={(e) => {
+                    setStoreSearch(e.target.value);
+                    setSelectedStore(null);
+                    setFormData({ ...formData, store_id: '' });
+                    if (!showStoreDropdown) setShowStoreDropdown(true);
+                  }}
+                  onFocus={() => setShowStoreDropdown(true)}
+                  placeholder="Search store by name or code..."
+                  className="w-full bg-slate-950 border border-slate-700 text-white pl-9 pr-10 py-2.5 h-11 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none placeholder-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowStoreDropdown(!showStoreDropdown)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300"
+                >
+                  <ChevronDown size={18} className={`transition-transform ${showStoreDropdown ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Store Dropdown */}
+              {showStoreDropdown && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[10000] overflow-hidden max-h-60 overflow-y-auto">
+                  {loadingStores ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
+                      <span className="ml-2 text-sm text-slate-400">Searching...</span>
+                    </div>
+                  ) : stores.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                      {debouncedStoreSearch ? 'No stores found' : 'Type to search stores'}
+                    </div>
+                  ) : (
+                    stores.map((store) => (
+                      <button
+                        key={store.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedStore(store);
+                          setFormData({ ...formData, store_id: store.id });
+                          setStoreSearch('');
+                          setShowStoreDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-800 ${
+                          formData.store_id === store.id
+                            ? 'bg-orange-500/10 text-orange-400'
+                            : 'text-slate-300'
+                        }`}
+                      >
+                        <span className="font-medium">{store.store_code}</span>
+                        <span className="text-slate-400"> - {store.store_name}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Ticket/Incident Selection */}
-            <div>
+            {/* Ticket/Incident Selection - Searchable */}
+            <div ref={ticketDropdownRef} className="relative">
               <label className="block text-sm font-medium text-slate-400 mb-1.5">
-                Incident No. (Ticket) <span className="text-red-400">*</span>
+                Incident No. (Ticket)
               </label>
-              <Select
-                value={formData.ticket_id}
-                onValueChange={(value) => setFormData({ ...formData, ticket_id: value })}
-                disabled={loadingTickets}
-              >
-                <SelectTrigger className="w-full bg-slate-950 border-slate-700 text-white h-11 rounded-xl focus:ring-2 focus:ring-orange-500 focus:ring-offset-0 [&>span]:text-left">
-                  <SelectValue placeholder={loadingTickets ? "Loading tickets..." : "Select ticket"} />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-900 border-slate-700 text-white max-h-60 z-[10000]">
-                  {tickets.map((ticket) => (
-                    <SelectItem
-                      key={ticket.id}
-                      value={String(ticket.id)}
-                      className="text-white focus:bg-slate-800 focus:text-white cursor-pointer"
-                    >
-                      {ticket.rcc_reference_number} - {ticket.stores?.store_code || 'N/A'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                <input
+                  type="text"
+                  value={selectedTicket ? `${selectedTicket.rcc_reference_number} - ${selectedTicket.stores?.store_code || 'N/A'}` : ticketSearch}
+                  onChange={(e) => {
+                    setTicketSearch(e.target.value);
+                    setSelectedTicket(null);
+                    setFormData({ ...formData, ticket_id: '' });
+                    if (!showTicketDropdown) setShowTicketDropdown(true);
+                  }}
+                  onFocus={() => setShowTicketDropdown(true)}
+                  placeholder="Search by incident number..."
+                  className="w-full bg-slate-950 border border-slate-700 text-white pl-9 pr-10 py-2.5 h-11 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none placeholder-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowTicketDropdown(!showTicketDropdown)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300"
+                >
+                  <ChevronDown size={18} className={`transition-transform ${showTicketDropdown ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+
+              {/* Ticket Dropdown */}
+              {showTicketDropdown && (
+                <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[10000] overflow-hidden max-h-60 overflow-y-auto">
+                  {loadingTickets ? (
+                    <div className="flex items-center justify-center py-4">
+                      <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
+                      <span className="ml-2 text-sm text-slate-400">Searching...</span>
+                    </div>
+                  ) : tickets.length === 0 ? (
+                    <div className="px-4 py-3 text-sm text-slate-400 text-center">
+                      {debouncedTicketSearch ? 'No tickets found' : 'Type to search tickets'}
+                    </div>
+                  ) : (
+                    tickets.map((ticket) => (
+                      <button
+                        key={ticket.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTicket(ticket);
+                          setFormData({ ...formData, ticket_id: String(ticket.id) });
+                          setTicketSearch('');
+                          setShowTicketDropdown(false);
+                        }}
+                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-800 ${
+                          formData.ticket_id === String(ticket.id)
+                            ? 'bg-orange-500/10 text-orange-400'
+                            : 'text-slate-300'
+                        }`}
+                      >
+                        <span className="font-medium">{ticket.rcc_reference_number}</span>
+                        <span className="text-slate-400"> - {ticket.stores?.store_code || 'N/A'}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Date */}

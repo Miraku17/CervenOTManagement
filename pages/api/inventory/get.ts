@@ -291,60 +291,37 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (fetchError) throw fetchError;
 
-    // Fetch filter options efficiently (only distinct values)
+    // Fetch ALL filter options from source tables (not just items with inventory)
+    // This allows filtering by stores/brands even if they don't have inventory yet
     const [categoriesResult, storesResult, brandsResult] = await Promise.all([
       supabaseAdmin
-        .from('store_inventory')
-        .select('categories:category_id(name)')
+        .from('categories')
+        .select('name')
         .is('deleted_at', null)
-        .not('category_id', 'is', null)
-        .limit(1000),
+        .order('name'),
       supabaseAdmin
-        .from('store_inventory')
-        .select('stores:store_id(store_code)')
+        .from('stores')
+        .select('store_code')
         .is('deleted_at', null)
-        .not('store_id', 'is', null)
-        .limit(1000),
+        .order('store_code'),
       supabaseAdmin
-        .from('store_inventory')
-        .select('brands:brand_id(name)')
+        .from('brands')
+        .select('name')
         .is('deleted_at', null)
-        .not('brand_id', 'is', null)
-        .limit(1000),
+        .order('name'),
     ]);
 
-    const categories = Array.from(
-      new Set(
-        (categoriesResult.data || [])
-          .map((item: any) => {
-            const cat = Array.isArray(item.categories) ? item.categories[0] : item.categories;
-            return cat?.name;
-          })
-          .filter(Boolean)
-      )
-    ).sort() as string[];
+    const categories = (categoriesResult.data || [])
+      .map((item: any) => item.name)
+      .filter(Boolean) as string[];
 
-    const stores = Array.from(
-      new Set(
-        (storesResult.data || [])
-          .map((item: any) => {
-            const store = Array.isArray(item.stores) ? item.stores[0] : item.stores;
-            return store?.store_code;
-          })
-          .filter(Boolean)
-      )
-    ).sort() as string[];
+    const stores = (storesResult.data || [])
+      .map((item: any) => item.store_code)
+      .filter(Boolean) as string[];
 
-    const brands = Array.from(
-      new Set(
-        (brandsResult.data || [])
-          .map((item: any) => {
-            const brand = Array.isArray(item.brands) ? item.brands[0] : item.brands;
-            return brand?.name;
-          })
-          .filter(Boolean)
-      )
-    ).sort() as string[];
+    const brands = (brandsResult.data || [])
+      .map((item: any) => item.name)
+      .filter(Boolean) as string[];
 
     return res.status(200).json({
       items: inventoryItems || [],
