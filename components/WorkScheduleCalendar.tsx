@@ -612,7 +612,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canEditSchedules && !selectedHoliday && !selectedLeaveRequest && !isEditing && (
+                  {canEditSchedules && !selectedHoliday && !isEditing && (
                     <button
                       onClick={() => handleEdit(selectedSchedule, selectedDate)}
                       className="p-2.5 hover:bg-slate-800 rounded-xl text-blue-400 hover:text-blue-300 transition-all hover:scale-105"
@@ -896,7 +896,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                       </div>
                     </div>
                   )
-                ) : !selectedHoliday && !selectedLeaveRequest && (
+                ) : !selectedHoliday && (
                   <div className="md:col-span-2 bg-slate-800/50 border border-slate-700/50 rounded-2xl p-10 text-center">
                     <div className="inline-flex items-center justify-center w-20 h-20 rounded-3xl bg-slate-700/50 border border-slate-600/50 mb-5">
                       <CalendarIcon className="w-10 h-10 text-slate-500" />
