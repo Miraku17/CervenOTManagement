@@ -51,17 +51,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const updatePayload: Record<string, unknown> = {};
 
     if (store_id !== undefined) {
-      // Verify the store exists
-      const { data: store, error: storeError } = await supabaseAdmin
-        .from('stores')
-        .select('id')
-        .eq('id', store_id)
-        .single();
+      // Allow null for optional store
+      if (store_id !== null && store_id !== '') {
+        // Verify the store exists
+        const { data: store, error: storeError } = await supabaseAdmin
+          .from('stores')
+          .select('id')
+          .eq('id', store_id)
+          .single();
 
-      if (storeError || !store) {
-        return res.status(400).json({ error: 'Invalid store selected' });
+        if (storeError || !store) {
+          return res.status(400).json({ error: 'Invalid store selected' });
+        }
+        updatePayload.store_id = store_id;
+      } else {
+        updatePayload.store_id = null;
       }
-      updatePayload.store_id = store_id;
     }
 
     if (ticket_id !== undefined) {
