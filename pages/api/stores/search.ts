@@ -32,7 +32,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const search = (req.query.q as string) || '';
+    const storeId = req.query.id as string;
     const limit = Math.min(parseInt(req.query.limit as string) || 30, 50); // Max 50 results
+
+    // If fetching by ID, return that specific store
+    if (storeId) {
+      const { data: store, error } = await supabaseAdmin
+        .from('stores')
+        .select('id, store_name, store_code')
+        .eq('id', storeId)
+        .is('deleted_at', null)
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return res.status(200).json({ stores: store ? [store] : [] });
+    }
 
     // Build the query
     let query = supabaseAdmin
