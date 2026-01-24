@@ -26,9 +26,9 @@ export const useMFA = () => {
 
   /**
    * Enroll a new TOTP factor
-   * Returns QR code data for the authenticator app
+   * Returns QR code data for the authenticator app, or throws an error
    */
-  const enrollTOTP = useCallback(async (friendlyName?: string): Promise<EnrollmentResult | null> => {
+  const enrollTOTP = useCallback(async (friendlyName?: string): Promise<EnrollmentResult> => {
     setLoading(true);
     setError(null);
 
@@ -41,14 +41,21 @@ export const useMFA = () => {
       if (enrollError) {
         console.error('MFA enrollment error:', enrollError);
         setError(enrollError.message);
-        return null;
+        throw new Error(enrollError.message);
+      }
+
+      if (!data) {
+        const msg = 'No enrollment data returned. MFA may not be enabled in Supabase.';
+        setError(msg);
+        throw new Error(msg);
       }
 
       return data as EnrollmentResult;
     } catch (err: any) {
       console.error('MFA enrollment exception:', err);
-      setError(err.message || 'Failed to enroll MFA');
-      return null;
+      const errorMsg = err.message || 'Failed to enroll MFA';
+      setError(errorMsg);
+      throw err;
     } finally {
       setLoading(false);
     }

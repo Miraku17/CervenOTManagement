@@ -3,46 +3,60 @@
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Shield, Loader2, AlertCircle } from 'lucide-react';
-import { useMFA } from '@/hooks/useMFA';
 import { supabase } from '@/services/supabase';
 import Aurora from '@/components/react_bits/Aurora';
 
 function MFAVerifyContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { challengeAndVerify, listFactors, loading, error, setError } = useMFA();
 
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [factorId, setFactorId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Get factor ID from URL or fetch from user's factors
   useEffect(() => {
     const initializeMFA = async () => {
-      // Check if factor ID is in URL
-      const urlFactorId = searchParams?.get('factorId');
-      if (urlFactorId) {
-        setFactorId(urlFactorId);
+      try {
+        // Check if factor ID is in URL
+        const urlFactorId = searchParams?.get('factorId');
+        if (urlFactorId) {
+          setFactorId(urlFactorId);
+          setIsLoading(false);
+          setTimeout(() => inputRefs.current[0]?.focus(), 100);
+          return;
+        }
+
+        // Otherwise, fetch the user's verified TOTP factor
+        const { data: factors, error: listError } = await supabase.auth.mfa.listFactors();
+
+        if (listError) {
+          console.error('Error listing factors:', listError);
+          setError(listError.message);
+          setIsLoading(false);
+          return;
+        }
+
+        const totpFactor = factors?.totp?.[0];
+
+        if (totpFactor) {
+          setFactorId(totpFactor.id);
+        } else {
+          // No TOTP factor, redirect to setup
+          router.push('/auth/mfa/setup');
+          return;
+        }
+
         setIsLoading(false);
-        inputRefs.current[0]?.focus();
-        return;
+        setTimeout(() => inputRefs.current[0]?.focus(), 100);
+      } catch (err: any) {
+        console.error('MFA init error:', err);
+        setError(err.message || 'Failed to initialize MFA');
+        setIsLoading(false);
       }
-
-      // Otherwise, fetch the user's verified TOTP factor
-      const factors = await listFactors();
-      const verifiedFactor = factors.find(f => f.status === 'verified');
-
-      if (verifiedFactor) {
-        setFactorId(verifiedFactor.id);
-      } else {
-        // No verified factor, redirect to setup
-        router.push('/auth/mfa/setup');
-        return;
-      }
-
-      setIsLoading(false);
-      setTimeout(() => inputRefs.current[0]?.focus(), 100);
     };
 
     initializeMFA();
@@ -90,13 +104,42 @@ function MFAVerifyContent() {
     }
 
     setError(null);
-    const success = await challengeAndVerify(factorId, code);
+    setVerifying(true);
 
-    if (success) {
+    try {
+      // Create a challenge
+      const challenge = await supabase.auth.mfa.challenge({ factorId });
+      if (challenge.error) {
+        setError(challenge.error.message);
+        setVerifying(false);
+        setVerificationCode(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+        return;
+      }
+
+      const challengeId = challenge.data.id;
+
+      // Verify the code
+      const verify = await supabase.auth.mfa.verify({
+        factorId,
+        challengeId,
+        code,
+      });
+
+      if (verify.error) {
+        setError(verify.error.message);
+        setVerifying(false);
+        setVerificationCode(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+        return;
+      }
+
       // Successfully verified, redirect to dashboard
       window.location.href = '/dashboard';
-    } else {
-      // Clear code on error
+    } catch (err: any) {
+      console.error('Verification error:', err);
+      setError(err.message || 'Verification failed');
+      setVerifying(false);
       setVerificationCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
@@ -155,7 +198,7 @@ function MFAVerifyContent() {
                 onChange={e => handleCodeChange(index, e.target.value)}
                 onKeyDown={e => handleKeyDown(index, e)}
                 className="w-11 h-14 text-center text-xl font-bold bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                disabled={loading}
+                disabled={verifying}
                 autoComplete="one-time-code"
               />
             ))}
@@ -165,13 +208,13 @@ function MFAVerifyContent() {
         {/* Error Message */}
         {error && (
           <div className="flex items-center gap-2 text-red-400 text-sm mb-4 justify-center bg-red-500/10 rounded-lg p-3">
-            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Loading State */}
-        {loading && (
+        {verifying && (
           <div className="flex items-center justify-center gap-2 text-blue-400 mb-4">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span className="text-sm">Verifying...</span>
