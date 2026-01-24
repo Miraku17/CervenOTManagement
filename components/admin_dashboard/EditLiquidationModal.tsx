@@ -137,7 +137,7 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
         },
         body: JSON.stringify({
           id: liquidation.id,
-          store_id: formData.store_id,
+          store_id: formData.store_id || null,
           ticket_id: formData.ticket_id ? parseInt(formData.ticket_id) : null,
           liquidation_date: formData.liquidation_date,
           remarks: formData.remarks.trim() || null,
@@ -260,7 +260,7 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
             {/* Store */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Store
+                Store (Optional)
               </label>
               <select
                 name="store_id"

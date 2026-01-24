@@ -382,7 +382,7 @@ const LiquidationHistory: React.FC = () => {
               {selectedLiquidation.remarks && (
                 <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-semibold">Remarks</label>
-                  <p className="text-white mt-2 text-sm">
+                  <p className="text-white mt-2 text-sm whitespace-pre-wrap">
                     {selectedLiquidation.remarks}
                   </p>
                 </div>

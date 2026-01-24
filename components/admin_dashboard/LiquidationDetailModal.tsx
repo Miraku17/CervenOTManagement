@@ -410,7 +410,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
           {liquidation.remarks && (
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <h4 className="font-semibold text-white mb-2">Remarks</h4>
-              <p className="text-slate-300 text-sm bg-slate-900/50 p-3 rounded-lg border border-slate-700 italic">
+              <p className="text-slate-300 text-sm bg-slate-900/50 p-3 rounded-lg border border-slate-700 italic whitespace-pre-wrap">
                 &quot;{liquidation.remarks}&quot;
               </p>
             </div>
@@ -491,7 +491,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
                 {liquidation.reviewer_comment && (
                   <div>
                     <p className="text-xs text-slate-400 mb-1">Comment</p>
-                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg italic border border-slate-700">
+                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg italic border border-slate-700 whitespace-pre-wrap">
                       &quot;{liquidation.reviewer_comment}&quot;
                     </p>
                   </div>

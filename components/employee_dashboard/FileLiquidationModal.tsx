@@ -125,6 +125,83 @@ const emptyItem = (): LiquidationItem => ({
   remarks: '',
 });
 
+// Image compression utility
+const compressImage = (file: File, maxWidth = 1920, maxHeight = 1920, quality = 0.8): Promise<File> => {
+  return new Promise((resolve, reject) => {
+    // Skip non-image files
+    if (!file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+
+    // Skip if file is already small (less than 500KB)
+    if (file.size < 500 * 1024) {
+      resolve(file);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = document.createElement('img');
+      img.onload = () => {
+        // Calculate new dimensions
+        let width = img.naturalWidth;
+        let height = img.naturalHeight;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height;
+          height = maxHeight;
+        }
+
+        // Create canvas and draw resized image
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+
+            // Only use compressed version if it's smaller
+            if (blob.size < file.size) {
+              // Create a new file from the blob
+              const compressedFile = new window.File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file);
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+};
+
 const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
   const response = await fetch('/api/cash-advance/my-requests?limit=100');
   if (!response.ok) {
@@ -605,22 +682,51 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     onClose();
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isCompressing, setIsCompressing] = useState(false);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       const newFiles = Array.from(files);
       const startIndex = selectedFiles.length;
 
-      // Create preview URLs for image files
-      const newPreviews: { [key: number]: string } = {};
-      newFiles.forEach((file, index) => {
-        if (file.type.startsWith('image/')) {
-          newPreviews[startIndex + index] = URL.createObjectURL(file);
-        }
-      });
+      setIsCompressing(true);
 
-      setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
-      setSelectedFiles((prev) => [...prev, ...newFiles]);
+      try {
+        // Compress images before adding
+        const processedFiles = await Promise.all(
+          newFiles.map(async (file) => {
+            if (file.type.startsWith('image/')) {
+              return await compressImage(file);
+            }
+            return file;
+          })
+        );
+
+        // Create preview URLs for image files
+        const newPreviews: { [key: number]: string } = {};
+        processedFiles.forEach((file, index) => {
+          if (file.type.startsWith('image/')) {
+            newPreviews[startIndex + index] = URL.createObjectURL(file);
+          }
+        });
+
+        setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
+        setSelectedFiles((prev) => [...prev, ...processedFiles]);
+      } catch (error) {
+        console.error('Error processing files:', error);
+        // Fallback to original files if compression fails
+        const newPreviews: { [key: number]: string } = {};
+        newFiles.forEach((file, index) => {
+          if (file.type.startsWith('image/')) {
+            newPreviews[startIndex + index] = URL.createObjectURL(file);
+          }
+        });
+        setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
+        setSelectedFiles((prev) => [...prev, ...newFiles]);
+      } finally {
+        setIsCompressing(false);
+      }
     }
     e.target.value = '';
   };
@@ -1368,7 +1474,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
             </label>
 
             {/* File Input */}
-            <div className="border-2 border-dashed border-slate-700 rounded-xl p-6 text-center hover:border-orange-500/50 transition-colors">
+            <div className={`border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-colors ${isCompressing ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-500/50'}`}>
               <input
                 type="file"
                 id="receipt-upload"
@@ -1376,20 +1482,25 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                 accept="image/*,.pdf"
                 onChange={handleFileSelect}
                 className="hidden"
+                disabled={isCompressing}
               />
               <label
                 htmlFor="receipt-upload"
-                className="cursor-pointer flex flex-col items-center gap-2"
+                className={`flex flex-col items-center gap-2 ${isCompressing ? 'cursor-not-allowed' : 'cursor-pointer'}`}
               >
                 <div className="p-3 bg-slate-800 rounded-full">
-                  <Upload size={24} className="text-orange-400" />
+                  {isCompressing ? (
+                    <Loader2 size={24} className="text-orange-400 animate-spin" />
+                  ) : (
+                    <Upload size={24} className="text-orange-400" />
+                  )}
                 </div>
                 <div>
                   <p className="text-sm text-white font-medium">
-                    Click to upload receipts
+                    {isCompressing ? 'Compressing images...' : 'Click to upload receipts'}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
-                    PNG, JPG, or PDF (max 10MB each)
+                    PNG, JPG, or PDF (max 10MB each) - Images auto-compressed
                   </p>
                 </div>
               </label>
@@ -1461,7 +1572,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isPending || isUploadingFiles || isLoadingData || (!isEditMode && cashAdvances.length === 0)}
+            disabled={isPending || isUploadingFiles || isLoadingData || isCompressing || (!isEditMode && cashAdvances.length === 0)}
             className="w-full sm:flex-1 px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-500 rounded-xl transition-colors shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending || isUploadingFiles ? (
