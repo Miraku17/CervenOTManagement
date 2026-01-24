@@ -31,6 +31,7 @@ export async function middleware(request: NextRequest) {
   const isAuthRoute = pathname.startsWith('/auth/login') ||
                       pathname.startsWith('/auth/forgot-password') ||
                       pathname.startsWith('/auth/reset-password');
+  const isMFARoute = pathname.startsWith('/auth/mfa');
   const isPublicRoute = isRootPath || isAuthRoute;
 
   // Protected routes
@@ -47,6 +48,35 @@ export async function middleware(request: NextRequest) {
 
   // If user is authenticated
   if (user) {
+    // Check MFA status for protected routes
+    const { data: factorsData } = await supabase.auth.mfa.listFactors();
+    const verifiedFactors = factorsData?.totp?.filter(f => f.status === 'verified') || [];
+    const hasVerifiedMFA = verifiedFactors.length > 0;
+
+    // Check current assurance level
+    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const currentAAL = aalData?.currentLevel;
+    const nextAAL = aalData?.nextLevel;
+
+    // If user has MFA but hasn't verified this session, redirect to verify
+    if (hasVerifiedMFA && currentAAL === 'aal1' && nextAAL === 'aal2') {
+      // Allow access to MFA verify page
+      if (!isMFARoute) {
+        const factorId = verifiedFactors[0]?.id;
+        return NextResponse.redirect(new URL(`/auth/mfa/verify?factorId=${factorId}`, request.url));
+      }
+    }
+
+    // If user doesn't have MFA set up, redirect to setup (for protected routes)
+    if (!hasVerifiedMFA && isProtectedRoute) {
+      return NextResponse.redirect(new URL('/auth/mfa/setup', request.url));
+    }
+
+    // Allow MFA routes for authenticated users
+    if (isMFARoute) {
+      return response;
+    }
+
     // Fetch user role from profiles table
     const { data: profile } = await supabase
       .from('profiles')

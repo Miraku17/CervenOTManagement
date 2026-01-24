@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useMFA } from "@/hooks/useMFA";
 import Aurora from "@/components/react_bits/Aurora";
 
 function LoginPageContent() {
@@ -16,6 +17,7 @@ function LoginPageContent() {
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const { login } = useAuth();
+  const { listFactors, getAssuranceLevel } = useMFA();
 
   // Handle messages from query parameters
   useEffect(() => {
@@ -39,8 +41,25 @@ function LoginPageContent() {
       // Give a moment for the session to sync to cookies
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Navigate to dashboard - middleware will redirect to correct role-based dashboard
-      window.location.href = '/dashboard';
+      // Check MFA status
+      const factors = await listFactors();
+      const verifiedFactor = factors.find(f => f.status === 'verified');
+
+      if (verifiedFactor) {
+        // User has MFA enrolled, check if they need to verify
+        const aal = await getAssuranceLevel();
+
+        if (aal?.currentLevel === 'aal1' && aal?.nextLevel === 'aal2') {
+          // User needs to complete MFA verification
+          window.location.href = `/auth/mfa/verify?factorId=${verifiedFactor.id}`;
+          return;
+        }
+        // Already at aal2, proceed to dashboard
+        window.location.href = '/dashboard';
+      } else {
+        // No MFA enrolled, redirect to setup
+        window.location.href = '/auth/mfa/setup';
+      }
     } catch (err: any) {
       console.error('[Login Page] Login error:', err);
       setError(err.message || "An unexpected error occurred");

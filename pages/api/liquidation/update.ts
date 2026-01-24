@@ -19,7 +19,7 @@ interface LiquidationItem {
 
 interface UpdateLiquidationRequest {
   liquidation_id: string;
-  store_id: string;
+  store_id?: string;
   ticket_id?: string;
   liquidation_date: string;
   remarks: string;
@@ -56,14 +56,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Validate required fields
     if (!liquidation_id) {
       return res.status(400).json({ error: 'Liquidation ID is required' });
-    }
-
-    if (!store_id) {
-      return res.status(400).json({ error: 'Store is required' });
-    }
-
-    if (!ticket_id) {
-      return res.status(400).json({ error: 'Ticket/Incident number is required' });
     }
 
     if (!items || items.length === 0) {
@@ -137,7 +129,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const { data: updatedLiquidation, error: updateError } = await supabaseAdmin
       .from('liquidations')
       .update({
-        store_id,
+        store_id: store_id || null,
         ticket_id: ticket_id ? parseInt(ticket_id) : null,
         liquidation_date,
         total_amount: totalAmount,

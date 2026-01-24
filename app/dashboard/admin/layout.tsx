@@ -16,7 +16,8 @@ import {
   BookOpen,
   CalendarCheck,
   Wallet,
-  Receipt
+  Receipt,
+  Shield
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -270,6 +271,12 @@ export default function AdminLayout({
                 isActive={isActive('/dashboard/knowledge-base')}
                 onClick={() => handleNavigate('/dashboard/knowledge-base')}
               />
+              <SidebarItem
+                icon={<Shield size={18} />}
+                label="Settings"
+                isActive={isActive('/dashboard/settings')}
+                onClick={() => handleNavigate('/dashboard/settings')}
+              />
             </div>
           </div>
 
@@ -361,6 +368,12 @@ export default function AdminLayout({
               label="Knowledge Base"
               isActive={isActive('/dashboard/knowledge-base')}
               onClick={() => handleNavigate('/dashboard/knowledge-base')}
+            />
+            <SidebarItem
+              icon={<Shield size={24} />}
+              label="Settings"
+              isActive={isActive('/dashboard/settings')}
+              onClick={() => handleNavigate('/dashboard/settings')}
             />
             {hasImportScheduleAccess() && (
               <SidebarItem
