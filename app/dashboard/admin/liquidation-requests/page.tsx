@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, X, User } from 'lucide-react';
+import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, X, User, Pencil, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -18,6 +18,8 @@ import { Pagination } from '@/components/ui/pagination';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { LiquidationDetailModal } from '@/components/admin_dashboard/LiquidationDetailModal';
+import { EditLiquidationModal } from '@/components/admin_dashboard/EditLiquidationModal';
+import { DeleteLiquidationModal } from '@/components/admin_dashboard/DeleteLiquidationModal';
 
 interface LiquidationItem {
   id: string;
@@ -134,6 +136,10 @@ export default function LiquidationRequestsPage() {
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [selectedLiquidation, setSelectedLiquidation] = useState<Liquidation | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [liquidationToEdit, setLiquidationToEdit] = useState<Liquidation | null>(null);
+  const [liquidationToDelete, setLiquidationToDelete] = useState<Liquidation | null>(null);
 
   const canManageLiquidation = hasPermission('manage_liquidation');
 
@@ -476,6 +482,26 @@ export default function LiquidationRequestsPage() {
     queryClient.invalidateQueries({ queryKey: ['admin-liquidations'] });
   };
 
+  const handleEditLiquidation = (e: React.MouseEvent, liquidation: Liquidation) => {
+    e.stopPropagation();
+    setLiquidationToEdit(liquidation);
+    setIsEditModalOpen(true);
+  };
+
+  const handleDeleteLiquidation = (e: React.MouseEvent, liquidation: Liquidation) => {
+    e.stopPropagation();
+    setLiquidationToDelete(liquidation);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-liquidations'] });
+  };
+
+  const handleDeleteSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin-liquidations'] });
+  };
+
   const handlePageSizeChange = (size: number | 'all') => {
     if (size === 'all') {
       setShowAll(true);
@@ -684,16 +710,36 @@ export default function LiquidationRequestsPage() {
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(liquidation.status)}</td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleViewRequest(liquidation);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors text-xs font-medium"
-                      >
-                        <Eye size={14} />
-                        View
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewRequest(liquidation);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 hover:bg-blue-500/20 transition-colors text-xs font-medium"
+                        >
+                          <Eye size={14} />
+                          View
+                        </button>
+                        {canManageLiquidation && (
+                          <>
+                            <button
+                              onClick={(e) => handleEditLiquidation(e, liquidation)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 hover:bg-orange-500/20 transition-colors text-xs font-medium"
+                            >
+                              <Pencil size={14} />
+                              Edit
+                            </button>
+                            <button
+                              onClick={(e) => handleDeleteLiquidation(e, liquidation)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors text-xs font-medium"
+                            >
+                              <Trash2 size={14} />
+                              Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -723,6 +769,28 @@ export default function LiquidationRequestsPage() {
         liquidation={selectedLiquidation}
         adminId={user?.id || ''}
         onActionSuccess={handleActionSuccess}
+      />
+
+      {/* Edit Modal */}
+      <EditLiquidationModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setLiquidationToEdit(null);
+        }}
+        liquidation={liquidationToEdit}
+        onEditSuccess={handleEditSuccess}
+      />
+
+      {/* Delete Modal */}
+      <DeleteLiquidationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setLiquidationToDelete(null);
+        }}
+        liquidation={liquidationToDelete}
+        onDeleteSuccess={handleDeleteSuccess}
       />
 
       {/* Export Modal */}
