@@ -19,7 +19,7 @@ interface LiquidationItem {
 interface LiquidationRequest {
   userId: string;
   cash_advance_id: string;
-  store_id: string;
+  store_id?: string;
   ticket_id?: string;
   liquidation_date: string;
   remarks: string;
@@ -54,14 +54,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Validate required fields
     if (!cash_advance_id) {
       return res.status(400).json({ error: 'Cash advance is required' });
-    }
-
-    if (!store_id) {
-      return res.status(400).json({ error: 'Store is required' });
-    }
-
-    if (!ticket_id) {
-      return res.status(400).json({ error: 'Ticket/Incident number is required' });
     }
 
     if (!items || items.length === 0) {
@@ -141,7 +133,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .insert({
         cash_advance_id,
         user_id: userId,
-        store_id,
+        store_id: store_id || null,
         ticket_id: ticket_id ? parseInt(ticket_id) : null,
         liquidation_date,
         total_amount: totalAmount,
@@ -191,3 +183,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 }
 
 export default withAuth(handler);
+
