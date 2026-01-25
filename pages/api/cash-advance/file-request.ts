@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { sendCashAdvanceRequestEmail } from '@/lib/email';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -50,6 +51,28 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (insertError) {
       console.error('Error creating cash advance request:', insertError);
       throw insertError;
+    }
+
+    // Fetch user profile for email
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('first_name, last_name, email')
+      .eq('id', userId)
+      .single();
+
+    // Send email notification (don't block the response on email failure)
+    if (userProfile) {
+      sendCashAdvanceRequestEmail({
+        requesterName: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Unknown',
+        requesterEmail: userProfile.email || 'No email provided',
+        type,
+        amount: parseFloat(amount),
+        date: new Date(date).toISOString(),
+        purpose: purpose || undefined,
+        requestId: cashAdvance.id,
+      }).catch((err) => {
+        console.error('Failed to send cash advance email notification:', err);
+      });
     }
 
     return res.status(201).json({
