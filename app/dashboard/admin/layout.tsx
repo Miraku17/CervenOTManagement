@@ -8,6 +8,8 @@ import {
   LogOut,
   Menu,
   X,
+  ChevronLeft,
+  ChevronRight,
   FileText,
   Calendar,
   FileUp,
@@ -33,6 +35,7 @@ export default function AdminLayout({
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [userPosition, setUserPosition] = useState<string | null>(null);
   const [isLoadingPosition, setIsLoadingPosition] = useState(true);
 
@@ -134,39 +137,55 @@ export default function AdminLayout({
   return (
     <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden">
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex flex-col w-56 bg-slate-900 border-r border-slate-800 transition-all duration-300">
-        <div className="p-4 flex items-center gap-3 border-b border-slate-800/50">
+      <aside 
+        className={`hidden md:flex flex-col bg-slate-900 border-slate-800 transition-all duration-300 relative ${
+          isSidebarOpen ? 'w-56 border-r' : 'w-20 border-r'
+        }`}
+      >
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className="absolute -right-3 top-1/2 transform -translate-y-1/2 bg-slate-800 border border-slate-700 text-slate-400 hover:text-white rounded-full p-1 shadow-md z-10 hover:bg-slate-700 transition-colors"
+          title={isSidebarOpen ? "Collapse Sidebar" : "Expand Sidebar"}
+        >
+          {isSidebarOpen ? <ChevronLeft size={14} /> : <ChevronRight size={14} />}
+        </button>
+
+        <div className={`p-4 flex items-center ${isSidebarOpen ? 'gap-3' : 'justify-center'} border-b border-slate-800/50 min-h-[65px]`}>
           <img
             src="/cerventech.png"
             alt="Cerventech Logo"
             className="w-8 h-8 rounded-full object-cover shadow-lg border-2 border-gray-300"
           />
-          <h1 className="text-lg font-bold tracking-tight text-white">Cerventech Inc.</h1>
+          <h1 className={`text-lg font-bold tracking-tight text-white transition-opacity duration-200 ${isSidebarOpen ? 'opacity-100' : 'opacity-0 hidden'}`}>
+            Cerventech Inc.
+          </h1>
         </div>
 
-        <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar space-y-6">
+          <nav className="flex-1 px-3 py-4 overflow-y-auto custom-scrollbar space-y-6">
           {/* Overview Section */}
           <div>
-            <SidebarLabel>Overview</SidebarLabel>
+            <SidebarLabel isOpen={isSidebarOpen}>Overview</SidebarLabel>
             <div className="space-y-1">
               <SidebarItem
                 icon={<LayoutDashboard size={18} />}
                 label="Dashboard"
                 isActive={isActive('/dashboard/admin')}
                 onClick={() => handleNavigate('/dashboard/admin')}
+                isOpen={isSidebarOpen}
               />
             </div>
           </div>
 
           {/* Workforce Section */}
           <div>
-            <SidebarLabel>Workforce</SidebarLabel>
+            <SidebarLabel isOpen={isSidebarOpen}>Workforce</SidebarLabel>
             <div className="space-y-1">
               <SidebarItem
                 icon={<Users size={18} />}
                 label="Employees"
                 isActive={isActive('/dashboard/admin/employees')}
                 onClick={() => handleNavigate('/dashboard/admin/employees')}
+                isOpen={isSidebarOpen}
               />
               {hasPermission('view_all_schedules') && (
                 <SidebarItem
@@ -174,6 +193,7 @@ export default function AdminLayout({
                   label="Employee Schedule"
                   isActive={isActive('/dashboard/admin/employee-schedule')}
                   onClick={() => handleNavigate('/dashboard/admin/employee-schedule')}
+                  isOpen={isSidebarOpen}
                 />
               )}
               {hasImportScheduleAccess() && (
@@ -182,6 +202,7 @@ export default function AdminLayout({
                   label="Import Schedule"
                   isActive={isActive('/dashboard/admin/import-schedule')}
                   onClick={() => handleNavigate('/dashboard/admin/import-schedule')}
+                  isOpen={isSidebarOpen}
                 />
               )}
               {hasEditTimeAccess() && (
@@ -190,6 +211,7 @@ export default function AdminLayout({
                   label="Edit Time"
                   isActive={isActive('/dashboard/admin/edit-time')}
                   onClick={() => handleNavigate('/dashboard/admin/edit-time')}
+                  isOpen={isSidebarOpen}
                 />
               )}
               {hasEditTimeAccess() && (
@@ -198,6 +220,7 @@ export default function AdminLayout({
                   label="Stale Sessions"
                   isActive={isActive('/dashboard/admin/stale-sessions')}
                   onClick={() => handleNavigate('/dashboard/admin/stale-sessions')}
+                  isOpen={isSidebarOpen}
                 />
               )}
             </div>
@@ -206,7 +229,7 @@ export default function AdminLayout({
           {/* Requests Section */}
           {(hasLeaveRequestsAccess() || hasOvertimeAccess() || hasCashFlowAccess() || hasLiquidationAccess()) && (
             <div>
-              <SidebarLabel>Requests</SidebarLabel>
+              <SidebarLabel isOpen={isSidebarOpen}>Requests</SidebarLabel>
               <div className="space-y-1">
                 {hasLeaveRequestsAccess() && (
                   <SidebarItem
@@ -214,6 +237,7 @@ export default function AdminLayout({
                     label="Leave Requests"
                     isActive={isActive('/dashboard/admin/leave-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/leave-requests')}
+                    isOpen={isSidebarOpen}
                   />
                 )}
                 {hasOvertimeAccess() && (
@@ -222,6 +246,7 @@ export default function AdminLayout({
                     label="Overtime Requests"
                     isActive={isActive('/dashboard/admin/overtime-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/overtime-requests')}
+                    isOpen={isSidebarOpen}
                   />
                 )}
                 {hasCashFlowAccess() && (
@@ -230,6 +255,7 @@ export default function AdminLayout({
                     label="Cash Advance"
                     isActive={isActive('/dashboard/admin/cash-flow-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/cash-flow-requests')}
+                    isOpen={isSidebarOpen}
                   />
                 )}
                 {hasLiquidationAccess() && (
@@ -238,6 +264,7 @@ export default function AdminLayout({
                     label="Liquidations"
                     isActive={isActive('/dashboard/admin/liquidation-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/liquidation-requests')}
+                    isOpen={isSidebarOpen}
                   />
                 )}
               </div>
@@ -246,7 +273,7 @@ export default function AdminLayout({
 
           {/* System Section */}
           <div>
-            <SidebarLabel>System</SidebarLabel>
+            <SidebarLabel isOpen={isSidebarOpen}>System</SidebarLabel>
             <div className="space-y-1">
               {hasReportsAccess() && (
                 <SidebarItem
@@ -254,6 +281,7 @@ export default function AdminLayout({
                   label="Reports"
                   isActive={isActive('/dashboard/admin/reports')}
                   onClick={() => handleNavigate('/dashboard/admin/reports')}
+                  isOpen={isSidebarOpen}
                 />
               )}
               {hasImportScheduleAccess() && (
@@ -262,6 +290,7 @@ export default function AdminLayout({
                   label="Holidays"
                   isActive={isActive('/dashboard/admin/holidays')}
                   onClick={() => handleNavigate('/dashboard/admin/holidays')}
+                  isOpen={isSidebarOpen}
                 />
               )}
               <SidebarItem
@@ -269,6 +298,7 @@ export default function AdminLayout({
                 label="Knowledge Base"
                 isActive={isActive('/dashboard/knowledge-base')}
                 onClick={() => handleNavigate('/dashboard/knowledge-base')}
+                isOpen={isSidebarOpen}
               />
             </div>
           </div>
@@ -276,7 +306,7 @@ export default function AdminLayout({
           {/* Apps Section */}
           {!isLoadingPosition && userPosition !== null && hasPermission('manage_tickets') && (
             <div>
-              <SidebarLabel>Apps</SidebarLabel>
+              <SidebarLabel isOpen={isSidebarOpen}>Apps</SidebarLabel>
               <div className="space-y-1">
                 {userPosition.toLowerCase() === 'asset' || userPosition.toLowerCase() === 'assets' ? (
                   <SidebarItem
@@ -284,6 +314,7 @@ export default function AdminLayout({
                     label="Assets"
                     isActive={false}
                     onClick={() => router.push('/dashboard/ticketing/asset-inventory')}
+                    isOpen={isSidebarOpen}
                   />
                 ) : (
                   <SidebarItem
@@ -291,6 +322,7 @@ export default function AdminLayout({
                     label="Ticketing System"
                     isActive={false}
                     onClick={() => router.push('/dashboard/ticketing/tickets')}
+                    isOpen={isSidebarOpen}
                   />
                 )}
               </div>
@@ -302,17 +334,18 @@ export default function AdminLayout({
           <button
             onClick={logout}
             disabled={isLoggingOut}
-            className="flex items-center gap-3 text-slate-400 hover:text-white w-full px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800"
+            className={`flex items-center ${isSidebarOpen ? 'gap-3 px-3' : 'justify-center px-0'} text-slate-400 hover:text-white w-full py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-800`}
+            title={!isSidebarOpen ? "Logout" : undefined}
           >
             {isLoggingOut ? (
               <>
                 <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></div>
-                <span className="text-sm font-medium">Logging out...</span>
+                <span className={`text-sm font-medium ${!isSidebarOpen && 'hidden'}`}>Logging out...</span>
               </>
             ) : (
               <>
                 <LogOut size={18} />
-                <span className="text-sm font-medium">Logout</span>
+                <span className={`text-sm font-medium ${!isSidebarOpen && 'hidden'}`}>Logout</span>
               </>
             )}
           </button>
@@ -525,8 +558,8 @@ export default function AdminLayout({
 }
 
 // Helper Component for Sidebar Section Labels
-const SidebarLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <div className="px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+const SidebarLabel: React.FC<{ children: React.ReactNode; isOpen: boolean }> = ({ children, isOpen }) => (
+  <div className={`px-3 mb-2 text-xs font-semibold text-slate-500 uppercase tracking-wider ${!isOpen && 'hidden'}`}>
     {children}
   </div>
 );
@@ -537,18 +570,22 @@ const SidebarItem: React.FC<{
   label: string;
   isActive: boolean;
   onClick: () => void;
-}> = ({ icon, label, isActive, onClick }) => (
+  isOpen: boolean;
+}> = ({ icon, label, isActive, onClick, isOpen }) => (
   <button
     onClick={onClick}
-    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group ${
+    className={`w-full flex items-center ${isOpen ? 'gap-3 px-3' : 'justify-center px-0'} py-2 rounded-lg transition-all duration-200 group ${
       isActive
         ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
         : 'text-slate-400 hover:bg-slate-800 hover:text-white'
     }`}
+    title={!isOpen ? label : undefined}
   >
     <span className={isActive ? "text-white" : "text-slate-400 group-hover:text-white transition-colors"}>
       {icon}
     </span>
-    <span className="font-medium text-sm">{label}</span>
+    <span className={`font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 hidden'}`}>
+      {label}
+    </span>
   </button>
 );
