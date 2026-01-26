@@ -27,6 +27,24 @@ interface CashAdvance {
     first_name: string;
     last_name: string;
   } | null;
+  level1_status: 'pending' | 'approved' | 'rejected' | null;
+  level1_approved_by: string | null;
+  level1_date_approved: string | null;
+  level1_comment: string | null;
+  level2_status: 'pending' | 'approved' | 'rejected' | null;
+  level2_approved_by: string | null;
+  level2_date_approved: string | null;
+  level2_comment: string | null;
+  level1_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+  level2_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 interface CashAdvanceDetailModalProps {
@@ -35,6 +53,8 @@ interface CashAdvanceDetailModalProps {
   request: CashAdvance | null;
   adminId: string;
   onActionSuccess: () => void;
+  canApproveLevel1?: boolean;
+  canApproveLevel2?: boolean;
 }
 
 export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
@@ -43,13 +63,36 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
   request,
   adminId,
   onActionSuccess,
+  canApproveLevel1 = false,
+  canApproveLevel2 = false,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
+  const [actionLevel, setActionLevel] = useState<'level1' | 'level2' | null>(null);
   const [reviewerComment, setReviewerComment] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen || !request) return null;
+
+  // Determine which level is active for review
+  const getActiveLevel = (): 'level1' | 'level2' | null => {
+    // If final status is already set, no active level
+    if (request.status === 'approved' || request.status === 'rejected') {
+      return null;
+    }
+    // If level1 is pending or not set, level1 is active
+    if (request.level1_status !== 'approved') {
+      return canApproveLevel1 ? 'level1' : null;
+    }
+    // If level1 is approved and level2 is pending, level2 is active
+    if (request.level1_status === 'approved' && request.level2_status !== 'approved' && request.level2_status !== 'rejected') {
+      return canApproveLevel2 ? 'level2' : null;
+    }
+    return null;
+  };
+
+  const activeLevel = getActiveLevel();
+  const canTakeAction = activeLevel !== null;
 
   const getStatusConfig = (status: string) => {
     switch (status) {
@@ -116,9 +159,10 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
     }
   };
 
-  const handleAction = async (action: 'approve' | 'reject') => {
+  const handleAction = async (action: 'approve' | 'reject', level: 'level1' | 'level2') => {
     setIsProcessing(true);
     setActionType(action);
+    setActionLevel(level);
     setError(null);
 
     try {
@@ -132,6 +176,7 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
           action,
           adminId,
           reviewerComment: reviewerComment.trim() || undefined,
+          level,
         }),
       });
 
@@ -148,6 +193,36 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
     } finally {
       setIsProcessing(false);
       setActionType(null);
+      setActionLevel(null);
+    }
+  };
+
+  const getLevelStatusConfig = (status: 'pending' | 'approved' | 'rejected' | null) => {
+    switch (status) {
+      case 'approved':
+        return {
+          color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
+          icon: <CheckCircle size={16} />,
+          label: 'Approved',
+        };
+      case 'rejected':
+        return {
+          color: 'text-red-400 bg-red-500/10 border-red-500/20',
+          icon: <XCircle size={16} />,
+          label: 'Rejected',
+        };
+      case 'pending':
+        return {
+          color: 'text-amber-400 bg-amber-500/10 border-amber-500/20',
+          icon: <Clock size={16} />,
+          label: 'Pending',
+        };
+      default:
+        return {
+          color: 'text-slate-400 bg-slate-500/10 border-slate-500/20',
+          icon: <Clock size={16} />,
+          label: 'Not Started',
+        };
     }
   };
 
@@ -260,46 +335,100 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
             </div>
           )}
 
-          {/* Review Information (for non-pending) */}
-          {request.status !== 'pending' && (
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertCircle className="text-blue-400" size={18} />
-                <h4 className="font-semibold text-white">Review Information</h4>
+          {/* Approval Timeline */}
+          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <AlertCircle className="text-blue-400" size={18} />
+              <h4 className="font-semibold text-white">Approval Timeline</h4>
+            </div>
+            <div className="ml-6 space-y-4">
+              {/* Level 1 */}
+              <div className="relative pl-6 pb-4 border-l-2 border-slate-600">
+                <div className="absolute -left-2 top-0">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                    request.level1_status === 'approved' ? 'bg-emerald-500' :
+                    request.level1_status === 'rejected' ? 'bg-red-500' :
+                    request.level1_status === 'pending' ? 'bg-amber-500' : 'bg-slate-600'
+                  }`}>
+                    {request.level1_status === 'approved' && <CheckCircle size={10} className="text-white" />}
+                    {request.level1_status === 'rejected' && <XCircle size={10} className="text-white" />}
+                    {request.level1_status === 'pending' && <Clock size={10} className="text-white" />}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-white">Level 1 Approval</span>
+                    {request.level1_status && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getLevelStatusConfig(request.level1_status).color}`}>
+                        {getLevelStatusConfig(request.level1_status).icon}
+                        {getLevelStatusConfig(request.level1_status).label}
+                      </span>
+                    )}
+                  </div>
+                  {request.level1_reviewer_profile && (
+                    <p className="text-xs text-slate-400">
+                      By: {request.level1_reviewer_profile.first_name} {request.level1_reviewer_profile.last_name}
+                    </p>
+                  )}
+                  {request.level1_date_approved && (
+                    <p className="text-xs text-slate-500">{formatDateTime(request.level1_date_approved)}</p>
+                  )}
+                  {request.level1_comment && (
+                    <p className="text-xs text-slate-400 mt-1 italic">&quot;{request.level1_comment}&quot;</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-3 ml-6">
-                {request.approved_by_user && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Reviewed By</p>
-                    <p className="text-white font-medium">
-                      {request.approved_by_user.first_name} {request.approved_by_user.last_name}
+
+              {/* Level 2 */}
+              <div className="relative pl-6">
+                <div className="absolute -left-2 top-0">
+                  <div className={`w-4 h-4 rounded-full flex items-center justify-center ${
+                    request.level2_status === 'approved' ? 'bg-emerald-500' :
+                    request.level2_status === 'rejected' ? 'bg-red-500' :
+                    request.level2_status === 'pending' ? 'bg-amber-500' : 'bg-slate-600'
+                  }`}>
+                    {request.level2_status === 'approved' && <CheckCircle size={10} className="text-white" />}
+                    {request.level2_status === 'rejected' && <XCircle size={10} className="text-white" />}
+                    {request.level2_status === 'pending' && <Clock size={10} className="text-white" />}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm font-semibold text-white">Level 2 Approval</span>
+                    {request.level2_status && (
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${getLevelStatusConfig(request.level2_status).color}`}>
+                        {getLevelStatusConfig(request.level2_status).icon}
+                        {getLevelStatusConfig(request.level2_status).label}
+                      </span>
+                    )}
+                    {!request.level2_status && request.level1_status !== 'approved' && (
+                      <span className="text-xs text-slate-500">(Requires L1 approval)</span>
+                    )}
+                  </div>
+                  {request.level2_reviewer_profile && (
+                    <p className="text-xs text-slate-400">
+                      By: {request.level2_reviewer_profile.first_name} {request.level2_reviewer_profile.last_name}
                     </p>
-                  </div>
-                )}
-                {request.date_approved && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Reviewed On</p>
-                    <p className="text-white font-medium">{formatDateTime(request.date_approved)}</p>
-                  </div>
-                )}
-                {request.rejection_reason && (
-                  <div>
-                    <p className="text-xs text-slate-400 mb-1">Comment</p>
-                    <p className="text-slate-300 bg-slate-900/50 p-3 rounded-lg italic border border-slate-700">
-                      &quot;{request.rejection_reason}&quot;
-                    </p>
-                  </div>
-                )}
+                  )}
+                  {request.level2_date_approved && (
+                    <p className="text-xs text-slate-500">{formatDateTime(request.level2_date_approved)}</p>
+                  )}
+                  {request.level2_comment && (
+                    <p className="text-xs text-slate-400 mt-1 italic">&quot;{request.level2_comment}&quot;</p>
+                  )}
+                </div>
               </div>
             </div>
-          )}
+          </div>
 
-          {/* Action Section (for pending requests) */}
-          {request.status === 'pending' && (
+          {/* Action Section (for requests that can be reviewed) */}
+          {canTakeAction && (
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="text-blue-400" size={18} />
-                <h4 className="font-semibold text-white">Review Action</h4>
+                <h4 className="font-semibold text-white">
+                  {activeLevel === 'level1' ? 'Level 1' : 'Level 2'} Review Action
+                </h4>
               </div>
               <div className="ml-6 space-y-4">
                 <div>
@@ -328,7 +457,7 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
 
         {/* Footer */}
         <div className="p-6 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
-          {request.status === 'pending' ? (
+          {canTakeAction && activeLevel ? (
             <>
               <button
                 onClick={onClose}
@@ -338,28 +467,28 @@ export const CashAdvanceDetailModal: React.FC<CashAdvanceDetailModalProps> = ({
                 Cancel
               </button>
               <button
-                onClick={() => handleAction('reject')}
+                onClick={() => handleAction('reject', activeLevel)}
                 disabled={isProcessing}
                 className="px-6 py-2.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {isProcessing && actionType === 'reject' ? (
+                {isProcessing && actionType === 'reject' && actionLevel === activeLevel ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <XCircle className="w-4 h-4" />
                 )}
-                Reject
+                {activeLevel === 'level1' ? 'L1 Reject' : 'L2 Reject'}
               </button>
               <button
-                onClick={() => handleAction('approve')}
+                onClick={() => handleAction('approve', activeLevel)}
                 disabled={isProcessing}
                 className="px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {isProcessing && actionType === 'approve' ? (
+                {isProcessing && actionType === 'approve' && actionLevel === activeLevel ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <CheckCircle className="w-4 h-4" />
                 )}
-                Approve
+                {activeLevel === 'level1' ? 'L1 Approve' : 'L2 Approve'}
               </button>
             </>
           ) : (

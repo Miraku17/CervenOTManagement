@@ -1,7 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
-import { sendCashAdvanceRequestEmail } from '@/lib/email';
+import { sendCashAdvanceLevel1Email } from '@/lib/email';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -34,7 +34,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Please provide a date.' });
     }
 
-    // Create the cash advance request
+    // Create the cash advance request with level1_status set to pending
     const { data: cashAdvance, error: insertError } = await supabaseAdmin
       .from('cash_advances')
       .insert({
@@ -44,6 +44,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         requested_by: userId,
         date_requested: new Date(date).toISOString(),
         status: 'pending',
+        level1_status: 'pending',
       })
       .select()
       .single();
@@ -60,9 +61,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .eq('id', userId)
       .single();
 
-    // Send email notification (don't block the response on email failure)
+    // Send email notification to Level 1 approvers only (don't block the response on email failure)
     if (userProfile) {
-      sendCashAdvanceRequestEmail({
+      sendCashAdvanceLevel1Email({
         requesterName: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Unknown',
         requesterEmail: userProfile.email || 'No email provided',
         type,
@@ -70,8 +71,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         date: new Date(date).toISOString(),
         purpose: purpose || undefined,
         requestId: cashAdvance.id,
+        level: 'level1',
       }).catch((err) => {
-        console.error('Failed to send cash advance email notification:', err);
+        console.error('Failed to send Level 1 approver email notification:', err);
       });
     }
 
