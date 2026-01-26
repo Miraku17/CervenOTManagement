@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import path from 'path';
+import { getUserEmailsWithPermission } from './permissions';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -195,9 +196,17 @@ export async function sendCashAdvanceRequestEmail(data: CashAdvanceEmailData) {
 </html>
   `;
 
+  // Get all users with manage_cash_flow permission
+  const recipientEmails = await getUserEmailsWithPermission('manage_cash_flow');
+
+  if (recipientEmails.length === 0) {
+    console.error('No users found with manage_cash_flow permission');
+    return { success: false, error: 'No recipients found' };
+  }
+
   const mailOptions = {
     from: `"CervenTech HR Portal" <${process.env.EMAIL_USER}>`,
-    to: process.env.EMAIL_RECIPIENT || 'zrv.valles@gmail.com',
+    to: recipientEmails.join(', '),
     subject: `Cash Advance Request - ${typeLabel} - ${formattedAmount}`,
     html: htmlContent,
     attachments: [
@@ -211,7 +220,7 @@ export async function sendCashAdvanceRequestEmail(data: CashAdvanceEmailData) {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log('Cash advance request email sent successfully');
+    console.log(`Cash advance request email sent successfully to ${recipientEmails.length} recipient(s)`);
     return { success: true };
   } catch (error) {
     console.error('Error sending cash advance email:', error);
