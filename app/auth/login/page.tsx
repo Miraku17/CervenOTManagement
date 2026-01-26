@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/services/supabase";
 import Aurora from "@/components/react_bits/Aurora";
 
 function LoginPageContent() {
@@ -15,7 +15,6 @@ function LoginPageContent() {
   const [error, setError] = useState<string | null>(null);
   const [displayedMessage, setDisplayedMessage] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const { login } = useAuth();
 
   // Handle messages from query parameters
   useEffect(() => {
@@ -34,13 +33,53 @@ function LoginPageContent() {
     setDisplayedMessage(null);
 
     try {
-      await login({ email, password });
+      // Sign in with email and password
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      // Give a moment for the session to sync to cookies
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (signInError) {
+        throw signInError;
+      }
 
-      // Navigate to dashboard - middleware will redirect to correct role-based dashboard
+      if (!data.user) {
+        throw new Error("Failed to sign in");
+      }
+
+      console.log('Login successful, checking MFA status...');
+
+      // Check the Authenticator Assurance Level
+      const { data: aalData, error: aalError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+
+      if (aalError) {
+        console.error('AAL check error:', aalError);
+        // If AAL check fails, just redirect to dashboard and let middleware handle it
+        window.location.href = '/dashboard';
+        return;
+      }
+
+      console.log('AAL data:', aalData);
+
+      // Check if MFA verification is needed
+      if (aalData.nextLevel === 'aal2' && aalData.nextLevel !== aalData.currentLevel) {
+        // User has MFA enrolled but needs to verify
+        console.log('MFA verification required');
+        window.location.href = '/auth/mfa/verify';
+        return;
+      }
+
+      if (aalData.currentLevel === 'aal1' && aalData.nextLevel === 'aal1') {
+        // User doesn't have MFA enrolled, redirect to setup
+        console.log('MFA not enrolled, redirecting to setup');
+        window.location.href = '/auth/mfa/setup';
+        return;
+      }
+
+      // User is fully authenticated (aal2), proceed to dashboard
+      console.log('Fully authenticated, redirecting to dashboard');
       window.location.href = '/dashboard';
+
     } catch (err: any) {
       console.error('[Login Page] Login error:', err);
       setError(err.message || "An unexpected error occurred");

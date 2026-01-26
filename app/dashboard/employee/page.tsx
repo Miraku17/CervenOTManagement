@@ -14,7 +14,7 @@ import FileCashAdvanceModal from '@/components/employee_dashboard/FileCashAdvanc
 import FileLiquidationModal from '@/components/employee_dashboard/FileLiquidationModal';
 import { ToastContainer, ToastProps } from '@/components/Toast';
 import { ConfirmModal } from '@/components/ConfirmModal';
-import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard, Receipt } from 'lucide-react';
+import { LogOut, Loader2, Shield, CalendarDays, Calendar as CalendarIcon, Menu, X, ChevronDown, Ticket, AlertTriangle, Clock, BookOpen, LayoutDashboard, Receipt, Settings } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { supabase } from '@/services/supabase';
@@ -850,6 +850,17 @@ const EmployeeDashboard: React.FC = () => {
                           <span>{userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess ? 'Assets' : 'Ticketing'}</span>
                         </button>
                       )}
+                      <div className="border-t border-slate-700 my-1"></div>
+                      <button
+                        onClick={() => {
+                          router.push('/dashboard/settings');
+                          setIsActionsMenuOpen(false);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors text-left"
+                      >
+                        <Settings className="w-4 h-4 text-slate-400" />
+                        <span>Settings</span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -968,6 +979,17 @@ const EmployeeDashboard: React.FC = () => {
                   <span className="font-medium text-sm">{userPosition === 'asset' || userPosition === 'assets' || hasAssetEditAccess ? 'Assets' : 'Ticketing'}</span>
                 </button>
               )}
+
+              <button
+                onClick={() => {
+                  router.push('/dashboard/settings');
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-900 rounded-lg transition-colors"
+              >
+                <Settings size={18} />
+                <span className="font-medium text-sm">Settings</span>
+              </button>
 
               {isAdmin && (
                 <button
