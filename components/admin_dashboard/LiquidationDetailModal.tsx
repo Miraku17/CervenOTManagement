@@ -76,6 +76,7 @@ interface LiquidationDetailModalProps {
   liquidation: Liquidation | null;
   adminId: string;
   onActionSuccess: () => void;
+  canApproveLiquidation?: boolean;
 }
 
 export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
@@ -84,6 +85,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
   liquidation,
   adminId,
   onActionSuccess,
+  canApproveLiquidation = false,
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'reject' | null>(null);
@@ -500,8 +502,8 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
             </div>
           )}
 
-          {/* Action Section (for pending requests) */}
-          {liquidation.status === 'pending' && (
+          {/* Action Section (for pending requests - only show if user can approve) */}
+          {liquidation.status === 'pending' && canApproveLiquidation && (
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <div className="flex items-center gap-2 mb-3">
                 <AlertCircle className="text-blue-400" size={18} />
@@ -534,7 +536,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
 
         {/* Footer */}
         <div className="p-6 bg-slate-800 border-t border-slate-700 flex justify-end gap-3 shrink-0">
-          {liquidation.status === 'pending' ? (
+          {liquidation.status === 'pending' && canApproveLiquidation ? (
             <>
               <button
                 onClick={onClose}

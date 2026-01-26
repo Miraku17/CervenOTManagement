@@ -663,6 +663,271 @@ export async function sendCashAdvanceLevel2Email(data: CashAdvanceLevelApprovalE
 /**
  * Send email notification to the requester about the final status of their cash advance
  */
+interface LiquidationSubmittedEmailData {
+  requesterName: string;
+  requesterEmail: string;
+  cashAdvanceAmount: number;
+  totalExpenses: number;
+  returnToCompany: number;
+  reimbursement: number;
+  liquidationDate: string;
+  storeName?: string;
+  ticketReference?: string;
+  requestId: string;
+}
+
+/**
+ * Send email notification to users with approve_liquidations permission when a new liquidation is submitted
+ */
+export async function sendLiquidationSubmittedEmail(data: LiquidationSubmittedEmailData) {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+
+  const formattedDate = new Date(data.liquidationDate).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New Liquidation Request</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+
+          <!-- Top Accent Bar -->
+          <tr>
+            <td style="height: 6px; background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%);"></td>
+          </tr>
+
+          <!-- Header with Logo -->
+          <tr>
+            <td style="padding: 32px 40px; background-color: #ffffff; border-bottom: 1px solid #e5e7eb;">
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <img src="cid:cerventech-logo" alt="CervenTech" style="height: 45px; width: auto; display: block;" />
+                  </td>
+                  <td style="vertical-align: middle; text-align: right;">
+                    <span style="display: inline-block; padding: 8px 16px; background-color: #ede9fe; color: #7c3aed; font-size: 12px; font-weight: 600; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Approval Required
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Title Section -->
+          <tr>
+            <td style="padding: 32px 40px 24px;">
+              <h1 style="margin: 0 0 8px; color: #111827; font-size: 26px; font-weight: 700;">
+                Liquidation Request Submitted
+              </h1>
+              <p style="margin: 0; color: #6b7280; font-size: 15px; line-height: 1.5;">
+                A new liquidation has been submitted and requires your review.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Request Details Card -->
+          <tr>
+            <td style="padding: 0 40px 32px;">
+              <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 10px; border: 1px solid #e2e8f0;">
+                <!-- Amount Summary -->
+                <tr>
+                  <td style="padding: 24px 24px 20px; border-bottom: 1px solid #e2e8f0;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="width: 50%; padding-right: 12px;">
+                          <p style="margin: 0 0 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Cash Advance</p>
+                          <p style="margin: 0; color: #111827; font-size: 24px; font-weight: 700;">${formatCurrency(data.cashAdvanceAmount)}</p>
+                        </td>
+                        <td style="width: 50%; padding-left: 12px; border-left: 1px solid #e2e8f0;">
+                          <p style="margin: 0 0 4px; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Total Expenses</p>
+                          <p style="margin: 0; color: #111827; font-size: 24px; font-weight: 700;">${formatCurrency(data.totalExpenses)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Balance Info -->
+                <tr>
+                  <td style="padding: 16px 24px; border-bottom: 1px solid #e2e8f0;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        ${data.returnToCompany > 0 ? `
+                        <td style="text-align: center;">
+                          <span style="display: inline-block; padding: 8px 16px; background-color: #dcfce7; color: #166534; font-size: 14px; font-weight: 600; border-radius: 8px;">
+                            Return to Company: ${formatCurrency(data.returnToCompany)}
+                          </span>
+                        </td>
+                        ` : ''}
+                        ${data.reimbursement > 0 ? `
+                        <td style="text-align: center;">
+                          <span style="display: inline-block; padding: 8px 16px; background-color: #fef3c7; color: #b45309; font-size: 14px; font-weight: 600; border-radius: 8px;">
+                            Reimbursement: ${formatCurrency(data.reimbursement)}
+                          </span>
+                        </td>
+                        ` : ''}
+                        ${data.returnToCompany === 0 && data.reimbursement === 0 ? `
+                        <td style="text-align: center;">
+                          <span style="display: inline-block; padding: 8px 16px; background-color: #dbeafe; color: #1d4ed8; font-size: 14px; font-weight: 600; border-radius: 8px;">
+                            Exact Amount Used
+                          </span>
+                        </td>
+                        ` : ''}
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Details -->
+                <tr>
+                  <td style="padding: 20px 24px;">
+                    <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                              <td style="color: #6b7280; font-size: 14px;">Submitted By</td>
+                              <td style="color: #111827; font-size: 14px; font-weight: 600; text-align: right;">${data.requesterName}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0; border-bottom: 1px solid #e2e8f0;">
+                          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                              <td style="color: #6b7280; font-size: 14px;">Email</td>
+                              <td style="color: #111827; font-size: 14px; text-align: right;">${data.requesterEmail}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 10px 0;${data.storeName || data.ticketReference ? ' border-bottom: 1px solid #e2e8f0;' : ''}">
+                          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                              <td style="color: #6b7280; font-size: 14px;">Liquidation Date</td>
+                              <td style="color: #111827; font-size: 14px; text-align: right;">${formattedDate}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ${data.storeName ? `
+                      <tr>
+                        <td style="padding: 10px 0;${data.ticketReference ? ' border-bottom: 1px solid #e2e8f0;' : ''}">
+                          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                              <td style="color: #6b7280; font-size: 14px;">Store</td>
+                              <td style="color: #111827; font-size: 14px; text-align: right;">${data.storeName}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                      ${data.ticketReference ? `
+                      <tr>
+                        <td style="padding: 10px 0;">
+                          <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                            <tr>
+                              <td style="color: #6b7280; font-size: 14px;">Related Ticket</td>
+                              <td style="color: #111827; font-size: 14px; text-align: right;">${data.ticketReference}</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      ` : ''}
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- CTA Section -->
+          <tr>
+            <td style="padding: 0 40px 32px; text-align: center;">
+              <a href="https://erp.cerventech.com/dashboard/admin/liquidation-requests" target="_blank" style="display: inline-block; padding: 14px 32px; background-color: #7c3aed; color: #ffffff; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(124, 58, 237, 0.3);">
+                Review Liquidation
+              </a>
+              <p style="margin: 16px 0 0; color: #9ca3af; font-size: 13px;">
+                Click the button above to review and process this liquidation
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding: 24px 40px; background-color: #f8fafc; border-top: 1px solid #e5e7eb;">
+              <table role="presentation" style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="text-align: center;">
+                    <p style="margin: 0 0 6px; color: #9ca3af; font-size: 12px;">
+                      This is an automated notification from CervenTech HR Portal
+                    </p>
+                    <p style="margin: 0; color: #d1d5db; font-size: 11px;">
+                      Request ID: ${data.requestId}
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  // Get all users with approve_liquidations permission
+  const recipientEmails = await getUserEmailsWithPermission('approve_liquidations');
+
+  if (recipientEmails.length === 0) {
+    console.error('No users found with approve_liquidations permission');
+    return { success: false, error: 'No recipients found' };
+  }
+
+  const mailOptions = {
+    from: `"CervenTech HR Portal" <${process.env.EMAIL_USER}>`,
+    to: recipientEmails.join(', '),
+    subject: `Liquidation Request - ${data.requesterName} - ${formatCurrency(data.totalExpenses)}`,
+    html: htmlContent,
+    attachments: [
+      {
+        filename: 'logo.png',
+        path: path.join(process.cwd(), 'public', 'logo.png'),
+        cid: 'cerventech-logo',
+      },
+    ],
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Liquidation submitted email sent successfully to ${recipientEmails.length} recipient(s)`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending liquidation submitted email:', error);
+    return { success: false, error };
+  }
+}
+
 export async function sendCashAdvanceStatusEmail(data: CashAdvanceStatusEmailData) {
   const formattedAmount = new Intl.NumberFormat('en-PH', {
     style: 'currency',

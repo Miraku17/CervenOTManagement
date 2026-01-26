@@ -96,9 +96,9 @@ export default function AdminLayout({
     return hasPermission('manage_cash_flow');
   };
 
-  // Check if user has access to liquidation management
+  // Check if user has access to liquidation management or approval
   const hasLiquidationAccess = () => {
-    return hasPermission('manage_liquidation');
+    return hasPermission('manage_liquidation') || hasPermission('approve_liquidations');
   };
 
   const handleNavigate = (path: string) => {
