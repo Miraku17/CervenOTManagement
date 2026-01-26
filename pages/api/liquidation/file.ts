@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
+import { sendLiquidationSubmittedEmail } from '@/lib/email';
 
 // Increase body size limit for this API route
 export const config = {
@@ -175,6 +176,61 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       await supabaseAdmin.from('liquidations').delete().eq('id', liquidation.id);
       throw new Error('Failed to create liquidation items');
     }
+
+    // Send email notification to approvers (async, non-blocking)
+    (async () => {
+      try {
+        // Fetch user info
+        const { data: userProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('first_name, last_name, email')
+          .eq('id', userId)
+          .single();
+
+        // Fetch store name if store_id is provided
+        let storeName: string | undefined;
+        if (store_id) {
+          const { data: store } = await supabaseAdmin
+            .from('stores')
+            .select('store_name, store_code')
+            .eq('id', store_id)
+            .single();
+          if (store) {
+            storeName = `${store.store_name} (${store.store_code})`;
+          }
+        }
+
+        // Fetch ticket reference if ticket_id is provided
+        let ticketReference: string | undefined;
+        if (ticket_id) {
+          const { data: ticket } = await supabaseAdmin
+            .from('tickets')
+            .select('rcc_reference_number')
+            .eq('id', parseInt(ticket_id))
+            .single();
+          if (ticket) {
+            ticketReference = ticket.rcc_reference_number;
+          }
+        }
+
+        if (userProfile) {
+          await sendLiquidationSubmittedEmail({
+            requesterName: `${userProfile.first_name} ${userProfile.last_name}`,
+            requesterEmail: userProfile.email,
+            cashAdvanceAmount: cashAdvance.amount,
+            totalExpenses: totalAmount,
+            returnToCompany,
+            reimbursement,
+            liquidationDate: liquidation_date,
+            storeName,
+            ticketReference,
+            requestId: liquidation.id,
+          });
+        }
+      } catch (emailError) {
+        console.error('Failed to send liquidation notification email:', emailError);
+      }
+    })();
 
     return res.status(201).json({
       message: 'Liquidation submitted successfully',

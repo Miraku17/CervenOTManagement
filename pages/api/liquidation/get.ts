@@ -25,10 +25,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Check if user has manage_liquidation permission
-    const hasPermission = await userHasPermission(userId, 'manage_liquidation');
+    // Check if user has manage_liquidation or approve_liquidations permission
+    const canManage = await userHasPermission(userId, 'manage_liquidation');
+    const canApprove = await userHasPermission(userId, 'approve_liquidations');
 
-    if (!hasPermission) {
+    if (!canManage && !canApprove) {
       return res.status(403).json({
         error: 'Forbidden: You do not have permission to view liquidations',
       });
@@ -147,4 +148,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);

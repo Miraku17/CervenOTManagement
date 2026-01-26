@@ -26,8 +26,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    // Check if user has manage_liquidation permission
-    const hasPermission = await userHasPermission(userId, 'manage_liquidation');
+    // Check if user has approve_liquidations permission
+    const hasPermission = await userHasPermission(userId, 'approve_liquidations');
 
     if (!hasPermission) {
       return res.status(403).json({

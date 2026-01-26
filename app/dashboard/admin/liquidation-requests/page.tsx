@@ -142,6 +142,7 @@ export default function LiquidationRequestsPage() {
   const [liquidationToDelete, setLiquidationToDelete] = useState<Liquidation | null>(null);
 
   const canManageLiquidation = hasPermission('manage_liquidation');
+  const canApproveLiquidation = hasPermission('approve_liquidations');
 
   // Export states
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -462,7 +463,7 @@ export default function LiquidationRequestsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-liquidations', currentPage, pageLimit, statusFilter],
     queryFn: () => fetchLiquidations(currentPage, pageLimit, statusFilter),
-    enabled: canManageLiquidation,
+    enabled: canManageLiquidation || canApproveLiquidation,
   });
 
   const liquidations = data?.liquidations || [];
@@ -556,14 +557,14 @@ export default function LiquidationRequestsPage() {
     );
   }
 
-  // Show access denied if no permission
-  if (!canManageLiquidation) {
+  // Show access denied if no permission (need either manage or approve permission)
+  if (!canManageLiquidation && !canApproveLiquidation) {
     return (
       <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 flex items-center gap-3">
         <AlertTriangle size={24} />
         <div>
           <h2 className="font-bold text-lg">Access Denied</h2>
-          <p>You do not have permission to manage liquidation requests.</p>
+          <p>You do not have permission to view liquidation requests.</p>
         </div>
       </div>
     );
@@ -769,6 +770,7 @@ export default function LiquidationRequestsPage() {
         liquidation={selectedLiquidation}
         adminId={user?.id || ''}
         onActionSuccess={handleActionSuccess}
+        canApproveLiquidation={canApproveLiquidation}
       />
 
       {/* Edit Modal */}
