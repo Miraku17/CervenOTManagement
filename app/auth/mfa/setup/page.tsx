@@ -2,15 +2,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Loader2, CheckCircle, Copy, Check, AlertCircle } from 'lucide-react';
+import { Shield, Loader2, CheckCircle, Copy, Check, AlertCircle, Smartphone, KeyRound, LogOut } from 'lucide-react';
 import { supabase } from '@/services/supabase';
-import Aurora from '@/components/react_bits/Aurora';
 
 export default function MFASetupPage() {
   const router = useRouter();
 
   const [factorId, setFactorId] = useState('');
-  const [qr, setQR] = useState(''); // holds the QR code SVG from Supabase
+  const [qr, setQR] = useState('');
   const [secret, setSecret] = useState('');
   const [verificationCode, setVerificationCode] = useState(['', '', '', '', '', '']);
   const [error, setError] = useState<string | null>(null);
@@ -19,68 +18,46 @@ export default function MFASetupPage() {
   const [copied, setCopied] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Enroll MFA on component mount
   useEffect(() => {
     const enrollMFA = async () => {
       try {
-        console.log('=== MFA Setup: Starting ===');
-
-        // First check if user is authenticated
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
-        console.log('Current user:', user?.id, userError);
+        const { data: { user } } = await supabase.auth.getUser();
 
         if (!user) {
-          console.log('No user found, redirecting to login');
           router.push('/auth/login');
           return;
         }
 
-        // Check if user already has a verified factor
-        console.log('Checking existing factors...');
         const { data: factorsData, error: factorsError } = await supabase.auth.mfa.listFactors();
-        console.log('Factors data:', factorsData, 'Error:', factorsError);
 
         if (factorsError) {
-          console.error('Error listing factors:', factorsError);
           setError(`Failed to check MFA status: ${factorsError.message}`);
           setStep('error');
           return;
         }
 
         const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
-        const unverifiedFactor = factorsData?.totp?.find(f => (f.status as string) === 'unverified');
-
-        console.log('Verified factor:', verifiedFactor);
-        console.log('Unverified factor:', unverifiedFactor);
 
         if (verifiedFactor) {
-          // Already enrolled, redirect to dashboard
-          console.log('User already has MFA enrolled, redirecting...');
           router.push('/dashboard');
           return;
         }
 
-        // If there's an unverified factor, we can use that (user started but didn't finish)
-        if (unverifiedFactor) {
-          console.log('Found unverified factor, using existing enrollment');
-          // We need to re-enroll because we can't get the QR code again
-          // First unenroll the unverified factor
-          const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId: unverifiedFactor.id });
-          if (unenrollError) {
-            console.warn('Could not unenroll unverified factor:', unenrollError);
+        const unverifiedFactors = factorsData?.totp?.filter(f => (f.status as string) === 'unverified') || [];
+
+        if (unverifiedFactors.length > 0) {
+          for (const factor of unverifiedFactors) {
+            await supabase.auth.mfa.unenroll({ factorId: factor.id });
           }
+          await new Promise(resolve => setTimeout(resolve, 500));
         }
 
-        // Enroll new TOTP factor
-        console.log('Enrolling new TOTP factor...');
         const { data, error: enrollError } = await supabase.auth.mfa.enroll({
           factorType: 'totp',
+          friendlyName: `Authenticator-${Date.now()}`,
         });
 
-        console.log('Enroll response - data:', data, 'error:', enrollError);
-
         if (enrollError) {
-          console.error('MFA enrollment error:', enrollError);
           setError(enrollError.message);
           setStep('error');
           return;
@@ -92,18 +69,11 @@ export default function MFASetupPage() {
           return;
         }
 
-        console.log('MFA enrollment successful!');
-        console.log('Factor ID:', data.id);
-        console.log('QR Code length:', data.totp.qr_code?.length);
-        console.log('Secret:', data.totp.secret);
-
         setFactorId(data.id);
-        // Supabase returns an SVG QR code that can be used directly as img src
         setQR(data.totp.qr_code);
         setSecret(data.totp.secret);
         setStep('qrcode');
       } catch (err: any) {
-        console.error('MFA setup error:', err);
         setError(err.message || 'An unexpected error occurred');
         setStep('error');
       }
@@ -113,19 +83,16 @@ export default function MFASetupPage() {
   }, [router]);
 
   const handleCodeChange = (index: number, value: string) => {
-    // Only allow digits
     if (value && !/^\d$/.test(value)) return;
 
     const newCode = [...verificationCode];
     newCode[index] = value;
     setVerificationCode(newCode);
 
-    // Auto-focus next input
     if (value && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit when all 6 digits are entered
     if (newCode.every(digit => digit !== '') && newCode.join('').length === 6) {
       handleVerify(newCode.join(''));
     }
@@ -154,7 +121,6 @@ export default function MFASetupPage() {
     setLoading(true);
 
     try {
-      // Create a challenge
       const challenge = await supabase.auth.mfa.challenge({ factorId });
       if (challenge.error) {
         setError(challenge.error.message);
@@ -164,12 +130,9 @@ export default function MFASetupPage() {
         return;
       }
 
-      const challengeId = challenge.data.id;
-
-      // Verify the code
       const verify = await supabase.auth.mfa.verify({
         factorId,
-        challengeId,
+        challengeId: challenge.data.id,
         code,
       });
 
@@ -181,13 +144,11 @@ export default function MFASetupPage() {
         return;
       }
 
-      // Success!
       setStep('success');
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 2000);
     } catch (err: any) {
-      console.error('Verification error:', err);
       setError(err.message || 'Verification failed');
       setLoading(false);
       setVerificationCode(['', '', '', '', '', '']);
@@ -214,186 +175,227 @@ export default function MFASetupPage() {
     window.location.reload();
   };
 
+  // Loading state
   if (step === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto" />
-          <p className="mt-4 text-slate-400">Setting up two-factor authentication...</p>
+          <div className="relative">
+            <div className="w-16 h-16 rounded-full bg-blue-500/10 flex items-center justify-center mx-auto">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+            </div>
+            <div className="absolute inset-0 w-16 h-16 rounded-full border-2 border-blue-500/20 animate-ping mx-auto" />
+          </div>
+          <p className="mt-6 text-slate-400 font-medium">Setting up two-factor authentication...</p>
         </div>
       </div>
     );
   }
 
+  // Error state
   if (step === 'error') {
     return (
-      <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="fixed inset-0 -z-10 w-full h-full">
-          <Aurora
-            colorStops={['#EF4444', '#DC2626', '#B91C1C']}
-            blend={1}
-            amplitude={1.0}
-            speed={1}
-          />
-        </div>
-        <div className="w-full max-w-md p-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white mb-2">MFA Setup Failed</h1>
-          <p className="text-slate-400 mb-4">{error}</p>
-          <div className="flex gap-3 justify-center">
-            <button
-              onClick={handleRetry}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-colors"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors"
-            >
-              Sign Out
-            </button>
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="w-full max-w-md">
+          <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-red-500 to-rose-500" />
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertCircle className="w-8 h-8 text-red-500" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">Setup Failed</h1>
+              <p className="text-slate-400 mb-6">{error}</p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={handleRetry}
+                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all duration-200 shadow-lg shadow-blue-500/20"
+                >
+                  Try Again
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium rounded-lg transition-colors border border-slate-700"
+                >
+                  Sign Out
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
+  // Success state
   if (step === 'success') {
     return (
-      <div className="relative min-h-screen flex items-center justify-center p-4">
-        <div className="fixed inset-0 -z-10 w-full h-full">
-          <Aurora
-            colorStops={['#22C55E', '#16A34A', '#15803D']}
-            blend={1}
-            amplitude={1.0}
-            speed={1}
-          />
-        </div>
-        <div className="w-full max-w-md p-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl text-center">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-500" />
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+        <div className="w-full max-w-md">
+          <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+            <div className="h-1 bg-gradient-to-r from-emerald-500 to-green-500" />
+            <div className="p-8 text-center">
+              <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+                <CheckCircle className="w-8 h-8 text-emerald-500" />
+                <div className="absolute inset-0 rounded-full border-2 border-emerald-500/30 animate-ping" />
+              </div>
+              <h1 className="text-2xl font-bold text-white mb-2">MFA Enabled</h1>
+              <p className="text-slate-400 mb-4">
+                Your account is now protected with two-factor authentication.
+              </p>
+              <div className="flex items-center justify-center gap-2 text-slate-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span className="text-sm">Redirecting to dashboard...</span>
+              </div>
+            </div>
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">MFA Enabled Successfully!</h1>
-          <p className="text-slate-400 mb-4">
-            Your account is now protected with two-factor authentication.
-          </p>
-          <p className="text-sm text-slate-500">Redirecting to dashboard...</p>
         </div>
       </div>
     );
   }
 
+  // Main setup view - Horizontal layout
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4">
-      <div className="fixed inset-0 -z-10 w-full h-full">
-        <Aurora
-          colorStops={['#3B82F6', '#1D4ED8', '#1E3A8A']}
-          blend={1}
-          amplitude={1.0}
-          speed={1}
-        />
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      {/* Background pattern */}
+      <div className="fixed inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDI5M2EiIGZpbGwtb3BhY2l0eT0iMC4zIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTJoMnYyem0wLTRoLTJ2LTJoMnYyem0tNC00aC0ydi0yaDJ2MnoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50 pointer-events-none" />
 
-      <div className="w-full max-w-md p-6 sm:p-8 bg-slate-800/80 backdrop-blur-xl rounded-2xl shadow-xl">
-        {/* Header */}
-        <div className="text-center mb-6">
-          <div className="w-14 h-14 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-7 h-7 text-blue-500" />
-          </div>
-          <h1 className="text-2xl font-bold text-white">Set Up Two-Factor Authentication</h1>
-          <p className="mt-2 text-sm text-slate-400">
-            Scan the QR code with your authenticator app
-          </p>
-        </div>
+      <div className="w-full max-w-4xl relative">
+        {/* Main Card */}
+        <div className="bg-slate-900/80 backdrop-blur-xl rounded-2xl border border-slate-800 shadow-2xl overflow-hidden">
+          {/* Accent bar */}
+          <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
 
-        {/* QR Code - Using SVG from Supabase directly */}
-        <div className="bg-white p-4 rounded-xl mx-auto w-fit mb-6">
-          <img src={qr} alt="QR Code for MFA setup" className="w-[180px] h-[180px]" />
-        </div>
-
-        {/* Manual Entry Option */}
-        <div className="mb-6">
-          <p className="text-xs text-slate-500 text-center mb-2">
-            Can't scan? Enter this code manually:
-          </p>
-          <div className="flex items-center justify-center gap-2 bg-slate-900/50 rounded-lg px-4 py-2">
-            <code className="text-sm text-slate-300 font-mono break-all">
-              {secret}
-            </code>
+          {/* Header */}
+          <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500/20 to-indigo-500/20 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-white">Two-Factor Authentication</h1>
+                <p className="text-xs text-slate-400">Add an extra layer of security</p>
+              </div>
+            </div>
             <button
-              onClick={copySecret}
-              className="shrink-0 p-1.5 text-slate-400 hover:text-white transition-colors"
-              title="Copy to clipboard"
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors px-3 py-1.5 rounded-lg hover:bg-slate-800"
             >
-              {copied ? (
-                <Check className="w-4 h-4 text-green-500" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
-        </div>
 
-        {/* Verification Code Input */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-400 mb-3 text-center">
-            Enter the 6-digit code from your app
-          </label>
-          <div className="flex justify-center gap-2" onPaste={handlePaste}>
-            {verificationCode.map((digit, index) => (
-              <input
-                key={index}
-                ref={el => { inputRefs.current[index] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={e => handleCodeChange(index, e.target.value)}
-                onKeyDown={e => handleKeyDown(index, e)}
-                className="w-11 h-14 text-center text-xl font-bold bg-slate-900 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={loading}
-              />
-            ))}
+          {/* Horizontal Content */}
+          <div className="p-6 flex flex-col lg:flex-row gap-6">
+            {/* Left Side - QR Code */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Smartphone className="w-4 h-4 text-blue-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Step 1: Scan QR Code</h3>
+                  <p className="text-xs text-slate-400">Use your authenticator app</p>
+                </div>
+              </div>
+
+              <div className="flex-1 flex items-center justify-center bg-slate-800/30 rounded-xl p-4 border border-slate-700/30">
+                <div className="bg-white p-3 rounded-xl shadow-lg">
+                  <img src={qr} alt="QR Code" className="w-36 h-36" />
+                </div>
+              </div>
+
+              {/* Manual Entry */}
+              <div className="mt-4 bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                  <span className="text-xs text-slate-400">Manual entry code</span>
+                </div>
+                <div className="flex items-center gap-2 bg-slate-900/80 rounded-md px-3 py-2 border border-slate-700/50">
+                  <code className="text-xs text-slate-300 font-mono flex-1 break-all">
+                    {secret}
+                  </code>
+                  <button
+                    onClick={copySecret}
+                    className="shrink-0 p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded transition-colors"
+                    title="Copy"
+                  >
+                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div className="hidden lg:flex flex-col items-center justify-center">
+              <div className="w-px h-full bg-slate-700" />
+            </div>
+            <div className="lg:hidden h-px w-full bg-slate-700" />
+
+            {/* Right Side - Verification */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                  <span className="text-sm font-bold text-indigo-400">2</span>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Step 2: Enter Code</h3>
+                  <p className="text-xs text-slate-400">From your authenticator app</p>
+                </div>
+              </div>
+
+              <div className="flex-1 flex flex-col justify-center">
+                {/* Verification Code Input */}
+                <div className="mb-4">
+                  <div className="flex justify-center gap-2" onPaste={handlePaste}>
+                    {verificationCode.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={el => { inputRefs.current[index] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={e => handleCodeChange(index, e.target.value)}
+                        onKeyDown={e => handleKeyDown(index, e)}
+                        className="w-11 h-14 text-center text-xl font-bold bg-slate-800 border-2 border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 disabled:opacity-50"
+                        disabled={loading}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-center text-xs text-slate-500 mt-3">
+                    Enter the 6-digit code from your app
+                  </p>
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="flex items-center gap-2 text-red-400 text-sm justify-center bg-red-500/10 rounded-lg px-4 py-2.5 border border-red-500/20 mb-4">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                {/* Loading State */}
+                {loading && (
+                  <div className="flex items-center justify-center gap-2 text-blue-400 bg-blue-500/10 rounded-lg px-4 py-2.5 border border-blue-500/20 mb-4">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span className="text-sm font-medium">Verifying...</span>
+                  </div>
+                )}
+
+                {/* Supported Apps */}
+                <div className="bg-slate-800/30 rounded-lg p-3 border border-slate-700/30">
+                  <p className="text-xs text-slate-400 mb-2">Supported apps:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="text-xs bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Google Authenticator</span>
+                    <span className="text-xs bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Microsoft Authenticator</span>
+                    <span className="text-xs bg-slate-700/50 text-slate-300 px-2 py-1 rounded">Authy</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="flex items-center gap-2 text-red-400 text-sm mb-4 justify-center">
-            <AlertCircle className="w-4 h-4" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="flex items-center justify-center gap-2 text-blue-400 mb-4">
-            <Loader2 className="w-4 h-4 animate-spin" />
-            <span className="text-sm">Verifying...</span>
-          </div>
-        )}
-
-        {/* Instructions */}
-        <div className="bg-slate-900/50 rounded-lg p-4 text-sm text-slate-400">
-          <p className="font-medium text-slate-300 mb-2">Recommended apps:</p>
-          <ul className="list-disc list-inside space-y-1">
-            <li>Google Authenticator</li>
-            <li>Microsoft Authenticator</li>
-            <li>Authy</li>
-          </ul>
-        </div>
-
-        {/* Logout option */}
-        <div className="mt-6 text-center">
-          <button
-            onClick={handleLogout}
-            className="text-sm text-slate-500 hover:text-slate-300 transition-colors"
-          >
-            Sign out and try later
-          </button>
         </div>
       </div>
     </div>
