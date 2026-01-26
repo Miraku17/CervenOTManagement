@@ -34,6 +34,24 @@ interface CashAdvance {
     first_name: string;
     last_name: string;
   } | null;
+  level1_status: 'pending' | 'approved' | 'rejected' | null;
+  level1_approved_by: string | null;
+  level1_date_approved: string | null;
+  level1_comment: string | null;
+  level2_status: 'pending' | 'approved' | 'rejected' | null;
+  level2_approved_by: string | null;
+  level2_date_approved: string | null;
+  level2_comment: string | null;
+  level1_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+  level2_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 interface CashAdvanceResponse {
@@ -97,6 +115,8 @@ export default function CashFlowRequestsPage() {
   const [showExportSection, setShowExportSection] = useState(false);
 
   const canManageCashFlow = hasPermission('manage_cash_flow');
+  const canApproveLevel1 = hasPermission('approve_cash_advance_level1');
+  const canApproveLevel2 = hasPermission('approve_cash_advance_level2');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['cash-advances', currentPage, pageLimit, statusFilter, typeFilter],
@@ -404,6 +424,41 @@ export default function CashFlowRequestsPage() {
     }
   };
 
+  const getLevelStatusBadge = (status: 'pending' | 'approved' | 'rejected' | null, level: 'L1' | 'L2') => {
+    if (status === null) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-slate-700/50 text-slate-500 border border-slate-600/50">
+          {level}: -
+        </span>
+      );
+    }
+    switch (status) {
+      case 'pending':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+            <Clock size={10} />
+            {level}
+          </span>
+        );
+      case 'approved':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
+            <CheckCircle size={10} />
+            {level}
+          </span>
+        );
+      case 'rejected':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-red-500/10 text-red-400 border border-red-500/20">
+            <XCircle size={10} />
+            {level}
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-PH', {
       style: 'currency',
@@ -626,6 +681,7 @@ export default function CashFlowRequestsPage() {
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Amount</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date Requested</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Purpose</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Approval</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -664,6 +720,12 @@ export default function CashFlowRequestsPage() {
                       <span className="text-sm text-slate-400 max-w-xs truncate block">
                         {request.purpose || '-'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5">
+                        {getLevelStatusBadge(request.level1_status, 'L1')}
+                        {getLevelStatusBadge(request.level2_status, 'L2')}
+                      </div>
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(request.status)}</td>
                     <td className="px-6 py-4">
@@ -728,6 +790,8 @@ export default function CashFlowRequestsPage() {
         request={selectedRequest}
         adminId={user?.id || ''}
         onActionSuccess={handleActionSuccess}
+        canApproveLevel1={canApproveLevel1}
+        canApproveLevel2={canApproveLevel2}
       />
 
       {/* Edit Modal */}

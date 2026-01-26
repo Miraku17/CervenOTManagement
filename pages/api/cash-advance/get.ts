@@ -48,6 +48,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           id,
           first_name,
           last_name
+        ),
+        level1_reviewer_profile:level1_approved_by (
+          id,
+          first_name,
+          last_name
+        ),
+        level2_reviewer_profile:level2_approved_by (
+          id,
+          first_name,
+          last_name
         )
       `, { count: 'exact' })
       .is('deleted_at', null) // Exclude soft-deleted records

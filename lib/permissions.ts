@@ -99,3 +99,61 @@ export async function getUserPermissions(userId: string): Promise<string[]> {
     return [];
   }
 }
+
+/**
+ * Get all user emails that have a specific permission
+ */
+export async function getUserEmailsWithPermission(permissionKey: string): Promise<string[]> {
+  try {
+    if (!supabaseAdmin) {
+      console.error('Supabase admin client not available');
+      return [];
+    }
+
+    // Get the permission ID for the given key
+    const { data: permission, error: permissionError } = await supabaseAdmin
+      .from('permissions')
+      .select('id')
+      .eq('key', permissionKey)
+      .single();
+
+    if (permissionError || !permission) {
+      console.error('Error fetching permission:', permissionError);
+      return [];
+    }
+
+    // Get all position IDs that have this permission
+    const { data: positionPermissions, error: posPermError } = await supabaseAdmin
+      .from('position_permissions')
+      .select('position_id')
+      .eq('permission_id', permission.id);
+
+    if (posPermError || !positionPermissions?.length) {
+      console.error('Error fetching position permissions:', posPermError);
+      return [];
+    }
+
+    const positionIds = positionPermissions.map(pp => pp.position_id);
+
+    // Get all user emails with those positions
+    const { data: profiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .in('position_id', positionIds)
+      .not('email', 'is', null);
+
+    if (profilesError) {
+      console.error('Error fetching profiles:', profilesError);
+      return [];
+    }
+
+    const emails = profiles
+      .map((p: { email: string | null }) => p.email)
+      .filter((email): email is string => !!email);
+
+    return emails;
+  } catch (error) {
+    console.error('Error getting user emails with permission:', error);
+    return [];
+  }
+}

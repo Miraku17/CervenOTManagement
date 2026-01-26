@@ -21,6 +21,24 @@ interface CashAdvance {
     first_name: string;
     last_name: string;
   } | null;
+  level1_status: 'pending' | 'approved' | 'rejected' | null;
+  level1_approved_by: string | null;
+  level1_date_approved: string | null;
+  level1_comment: string | null;
+  level2_status: 'pending' | 'approved' | 'rejected' | null;
+  level2_approved_by: string | null;
+  level2_date_approved: string | null;
+  level2_comment: string | null;
+  level1_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
+  level2_reviewer_profile: {
+    id: string;
+    first_name: string;
+    last_name: string;
+  } | null;
 }
 
 interface CashAdvanceResponse {
@@ -208,32 +226,91 @@ const CashAdvanceHistory: React.FC = () => {
                 </div>
               )}
 
-              {/* Review Info */}
-              {selectedRequest.status !== 'pending' && (
-                <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
-                  <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Review Information</label>
-                  <div className="mt-2 space-y-2">
-                    {selectedRequest.approved_by_user && (
-                      <p className="text-sm text-slate-300">
-                        <span className="text-slate-400">Reviewed by:</span>{' '}
-                        {selectedRequest.approved_by_user.first_name} {selectedRequest.approved_by_user.last_name}
-                      </p>
-                    )}
-                    {selectedRequest.date_approved && (
-                      <p className="text-sm text-slate-300">
-                        <span className="text-slate-400">Reviewed on:</span>{' '}
-                        {formatDateTime(selectedRequest.date_approved)}
-                      </p>
-                    )}
-                    {selectedRequest.rejection_reason && (
-                      <div className="mt-3 p-3 bg-slate-900/50 rounded border border-slate-700">
-                        <p className="text-xs text-slate-400 mb-1">Comment:</p>
-                        <p className="text-sm text-slate-300 italic">&quot;{selectedRequest.rejection_reason}&quot;</p>
+              {/* Approval Progress */}
+              <div className="p-4 bg-slate-800 rounded-lg border border-slate-700">
+                <label className="text-xs text-slate-400 uppercase font-semibold tracking-wider">Approval Progress</label>
+                <div className="mt-3 space-y-3">
+                  {/* Level 1 */}
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedRequest.level1_status === 'approved' ? 'bg-emerald-500' :
+                      selectedRequest.level1_status === 'rejected' ? 'bg-red-500' :
+                      selectedRequest.level1_status === 'pending' ? 'bg-amber-500' : 'bg-slate-600'
+                    }`}>
+                      {selectedRequest.level1_status === 'approved' && <CheckCircle size={12} className="text-white" />}
+                      {selectedRequest.level1_status === 'rejected' && <XCircle size={12} className="text-white" />}
+                      {selectedRequest.level1_status === 'pending' && <Clock size={12} className="text-white" />}
+                      {!selectedRequest.level1_status && <span className="text-slate-400 text-xs">1</span>}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">Level 1</span>
+                        {selectedRequest.level1_status && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            selectedRequest.level1_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                            selectedRequest.level1_status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                            'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {selectedRequest.level1_status.charAt(0).toUpperCase() + selectedRequest.level1_status.slice(1)}
+                          </span>
+                        )}
                       </div>
-                    )}
+                      {selectedRequest.level1_reviewer_profile && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {selectedRequest.level1_reviewer_profile.first_name} {selectedRequest.level1_reviewer_profile.last_name}
+                          {selectedRequest.level1_date_approved && ` • ${formatDateTime(selectedRequest.level1_date_approved)}`}
+                        </p>
+                      )}
+                      {selectedRequest.level1_comment && (
+                        <p className="text-xs text-slate-500 mt-1 italic">&quot;{selectedRequest.level1_comment}&quot;</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Connector */}
+                  <div className="ml-2.5 h-2 border-l-2 border-slate-600"></div>
+
+                  {/* Level 2 */}
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                      selectedRequest.level2_status === 'approved' ? 'bg-emerald-500' :
+                      selectedRequest.level2_status === 'rejected' ? 'bg-red-500' :
+                      selectedRequest.level2_status === 'pending' ? 'bg-amber-500' : 'bg-slate-600'
+                    }`}>
+                      {selectedRequest.level2_status === 'approved' && <CheckCircle size={12} className="text-white" />}
+                      {selectedRequest.level2_status === 'rejected' && <XCircle size={12} className="text-white" />}
+                      {selectedRequest.level2_status === 'pending' && <Clock size={12} className="text-white" />}
+                      {!selectedRequest.level2_status && <span className="text-slate-400 text-xs">2</span>}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">Level 2</span>
+                        {selectedRequest.level2_status && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded ${
+                            selectedRequest.level2_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                            selectedRequest.level2_status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                            'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            {selectedRequest.level2_status.charAt(0).toUpperCase() + selectedRequest.level2_status.slice(1)}
+                          </span>
+                        )}
+                        {!selectedRequest.level2_status && selectedRequest.level1_status !== 'approved' && (
+                          <span className="text-xs text-slate-500">(Awaiting L1)</span>
+                        )}
+                      </div>
+                      {selectedRequest.level2_reviewer_profile && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {selectedRequest.level2_reviewer_profile.first_name} {selectedRequest.level2_reviewer_profile.last_name}
+                          {selectedRequest.level2_date_approved && ` • ${formatDateTime(selectedRequest.level2_date_approved)}`}
+                        </p>
+                      )}
+                      {selectedRequest.level2_comment && (
+                        <p className="text-xs text-slate-500 mt-1 italic">&quot;{selectedRequest.level2_comment}&quot;</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="p-4 bg-slate-900 border-t border-slate-800 flex justify-end">
@@ -323,8 +400,25 @@ const CashAdvanceHistory: React.FC = () => {
                   )}
                 </div>
 
-                {/* Right: Status and View */}
+                {/* Right: Approval Progress, Status, and View */}
                 <div className="flex items-center gap-3">
+                  {/* Mini approval progress */}
+                  <div className="hidden sm:flex items-center gap-1">
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${
+                      request.level1_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                      request.level1_status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                      request.level1_status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-500'
+                    }`}>
+                      L1
+                    </span>
+                    <span className={`inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-medium ${
+                      request.level2_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                      request.level2_status === 'rejected' ? 'bg-red-500/20 text-red-400' :
+                      request.level2_status === 'pending' ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-700 text-slate-500'
+                    }`}>
+                      L2
+                    </span>
+                  </div>
                   <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(request.status)}`}>
                     {getStatusIcon(request.status)}
                     <span className="capitalize">{request.status}</span>
