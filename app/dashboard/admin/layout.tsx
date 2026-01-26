@@ -133,9 +133,9 @@ export default function AdminLayout({
   };
 
   return (
-    <div className="flex h-screen bg-slate-950 text-slate-200 overflow-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-200 overflow-hidden">
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex flex-col w-56 bg-slate-900 border-r border-slate-800 transition-all duration-300">
+      <aside className="hidden md:flex flex-col w-56 bg-gradient-to-b from-slate-900 to-slate-900/95 border-r border-slate-700/50 transition-all duration-300 shadow-xl shadow-slate-950/50">
         <div className="p-4 flex items-center gap-3 border-b border-slate-800/50">
           <img
             src="/cerventech.png"
@@ -328,7 +328,7 @@ export default function AdminLayout({
 
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/95 md:hidden flex flex-col">
+        <div className="fixed inset-0 z-50 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 md:hidden flex flex-col">
           <div className="flex justify-between items-center p-4 mb-4 border-b border-slate-800">
             <div className="flex items-center gap-3">
               <img
@@ -497,9 +497,9 @@ export default function AdminLayout({
       )}
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden relative">
+      <main className="flex-1 flex flex-col overflow-hidden relative bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-slate-800/20 via-transparent to-transparent">
         {/* Top Bar */}
-        <header className="h-16 border-b border-slate-800 bg-slate-900/50 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 sticky top-0 z-20">
+        <header className="h-16 border-b border-slate-700/50 bg-slate-900/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 sticky top-0 z-20 shadow-lg shadow-slate-950/20">
           <div className="flex items-center gap-4">
             <button
               className="md:hidden p-2 text-slate-400 hover:text-white"
@@ -527,8 +527,9 @@ export default function AdminLayout({
         </header>
 
         {/* View Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8 relative">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMyMDI5M2EiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRoLTJ2LTJoMnYyem0wLTRoLTJ2LTJoMnYyem0tNC00aC0ydi0yaDJ2MnoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-50 pointer-events-none" />
+          <div className="max-w-7xl mx-auto relative">
             {children}
           </div>
         </div>
