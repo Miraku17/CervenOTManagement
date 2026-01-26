@@ -90,7 +90,14 @@ interface TicketAttachment {
 
 const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string) => void }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value || '');
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Sync inputValue with value prop when it changes externally
+  useEffect(() => {
+    setInputValue(value || '');
+  }, [value]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -109,22 +116,81 @@ const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string
     if (isOpen && containerRef.current) {
       const selectedHour = containerRef.current.querySelector('[data-selected="true"][data-type="hour"]');
       const selectedMinute = containerRef.current.querySelector('[data-selected="true"][data-type="minute"]');
-      
+
       if (selectedHour) selectedHour.scrollIntoView({ block: 'center' });
       if (selectedMinute) selectedMinute.scrollIntoView({ block: 'center' });
     }
   }, [isOpen]);
 
+  // Handle direct text input
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let newValue = e.target.value;
+
+    // Allow only digits and colon
+    newValue = newValue.replace(/[^\d:]/g, '');
+
+    // Auto-insert colon after 2 digits if user is typing
+    if (newValue.length === 2 && !newValue.includes(':') && inputValue.length < newValue.length) {
+      newValue = newValue + ':';
+    }
+
+    // Limit to HH:MM format (5 characters max)
+    if (newValue.length > 5) {
+      newValue = newValue.substring(0, 5);
+    }
+
+    setInputValue(newValue);
+
+    // Validate and call onChange if it's a valid time
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
+    if (timeRegex.test(newValue)) {
+      // Normalize to HH:MM format
+      const [h, m] = newValue.split(':');
+      const normalizedTime = `${h.padStart(2, '0')}:${m}`;
+      onChange(normalizedTime);
+    }
+  };
+
+  // Handle blur - validate and format
+  const handleBlur = () => {
+    if (!inputValue) {
+      onChange('');
+      return;
+    }
+
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9])$/;
+    if (timeRegex.test(inputValue)) {
+      const [h, m] = inputValue.split(':');
+      const normalizedTime = `${h.padStart(2, '0')}:${m}`;
+      setInputValue(normalizedTime);
+      onChange(normalizedTime);
+    } else {
+      // Reset to previous valid value if invalid
+      setInputValue(value || '');
+    }
+  };
+
   return (
     <div className="relative" ref={containerRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none flex items-center justify-between hover:border-slate-600 transition-colors"
-      >
-        <span>{value || '--:--'}</span>
-        <Clock size={16} className="text-slate-400" />
-      </button>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={inputValue}
+          onChange={handleInputChange}
+          onBlur={handleBlur}
+          placeholder="HH:MM"
+          className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 pr-10 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none hover:border-slate-600 transition-colors"
+        />
+        <button
+          type="button"
+          onClick={() => setIsOpen(!isOpen)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-200 transition-colors"
+          title="Open time picker"
+        >
+          <Clock size={16} />
+        </button>
+      </div>
 
       {isOpen && (
         <div className="absolute z-50 mt-1 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl flex overflow-hidden h-64 animate-in fade-in zoom-in-95 duration-100">
@@ -140,7 +206,11 @@ const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string
                    type="button"
                    data-type="hour"
                    data-selected={isSelected}
-                   onClick={() => onChange(`${h}:${minutes || '00'}`)}
+                   onClick={() => {
+                     const newTime = `${h}:${minutes || '00'}`;
+                     setInputValue(newTime);
+                     onChange(newTime);
+                   }}
                    className={`w-full text-center py-2 text-sm hover:bg-slate-800 transition-colors ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'text-slate-300'}`}
                  >
                    {h}
@@ -161,7 +231,11 @@ const TimePicker = ({ value, onChange }: { value: string, onChange: (val: string
                    type="button"
                    data-type="minute"
                    data-selected={isSelected}
-                   onClick={() => onChange(`${hours || '00'}:${m}`)}
+                   onClick={() => {
+                     const newTime = `${hours || '00'}:${m}`;
+                     setInputValue(newTime);
+                     onChange(newTime);
+                   }}
                    className={`w-full text-center py-2 text-sm hover:bg-slate-800 transition-colors ${isSelected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'text-slate-300'}`}
                  >
                    {m}
