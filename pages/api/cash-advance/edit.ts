@@ -32,13 +32,43 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Check if the cash advance request exists and is not deleted
     const { data: existingRequest, error: fetchError } = await supabaseAdmin
       .from('cash_advances')
-      .select('*')
+      .select('*, requester:requested_by (position_id)')
       .eq('id', id)
       .is('deleted_at', null)
       .single();
 
     if (fetchError || !existingRequest) {
       return res.status(404).json({ error: 'Cash advance request not found' });
+    }
+
+    // Check if this is an Operations Manager's cash advance (confidential)
+    const requesterPositionId = (existingRequest.requester as any)?.position_id;
+    if (requesterPositionId) {
+      // Get Operations Manager position ID
+      const { data: opsManagerPosition } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .eq('name', 'Operations Manager')
+        .single();
+
+      if (opsManagerPosition && requesterPositionId === opsManagerPosition.id) {
+        // Check if current user is HR or Accounting
+        const { data: currentUserProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('position_id, positions:position_id (name)')
+          .eq('id', req.user?.id || '')
+          .single();
+
+        const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+        const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
+                                     currentUserPosition.toLowerCase().includes('accounting') ||
+                                     currentUserPosition.toLowerCase().includes('operations manager');
+        if (!canViewConfidential) {
+          return res.status(403).json({
+            error: 'Forbidden: Operations Manager cash advances are confidential and can only be edited by HR or Accounting'
+          });
+        }
+      }
     }
 
     // Build the update payload with only provided fields

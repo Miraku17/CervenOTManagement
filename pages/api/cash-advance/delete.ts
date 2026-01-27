@@ -32,7 +32,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Check if the cash advance request exists and is not already deleted
     const { data: request, error: fetchError } = await supabaseAdmin
       .from('cash_advances')
-      .select('id, deleted_at')
+      .select('id, deleted_at, requester:requested_by (position_id)')
       .eq('id', id)
       .single();
 
@@ -42,6 +42,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (request.deleted_at) {
       return res.status(400).json({ error: 'Cash advance request is already deleted' });
+    }
+
+    // Check if this is an Operations Manager's cash advance (confidential)
+    const requesterPositionId = (request.requester as any)?.position_id;
+    if (requesterPositionId) {
+      // Get Operations Manager position ID
+      const { data: opsManagerPosition } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .eq('name', 'Operations Manager')
+        .single();
+
+      if (opsManagerPosition && requesterPositionId === opsManagerPosition.id) {
+        // Check if current user is HR or Accounting
+        const { data: currentUserProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('position_id, positions:position_id (name)')
+          .eq('id', req.user?.id || '')
+          .single();
+
+        const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+        const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
+                                     currentUserPosition.toLowerCase().includes('accounting') ||
+                                     currentUserPosition.toLowerCase().includes('operations manager');
+        if (!canViewConfidential) {
+          return res.status(403).json({
+            error: 'Forbidden: Operations Manager cash advances are confidential and can only be deleted by HR or Accounting'
+          });
+        }
+      }
     }
 
     // Soft delete the cash advance request

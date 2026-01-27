@@ -26,6 +26,46 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to view cash flow requests' });
     }
 
+    // Get current user's position to check if they can view Operations Manager cash advances
+    const { data: currentUserProfile } = await supabaseAdmin
+      .from('profiles')
+      .select(`
+        position_id,
+        positions:position_id (name)
+      `)
+      .eq('id', userId)
+      .single();
+
+    const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+    // Check if position contains HR, Accounting, or Operations Manager (case-insensitive)
+    const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
+                                 currentUserPosition.toLowerCase().includes('accounting') ||
+                                 currentUserPosition.toLowerCase().includes('operations manager');
+
+    console.log('Cash Advance Get - User position:', currentUserPosition, 'Can view confidential:', canViewConfidential);
+
+    // Get Operations Manager position ID to filter confidential requests
+    let operationsManagerUserIds: string[] = [];
+    if (!canViewConfidential) {
+      // Get the Operations Manager position ID
+      const { data: opsManagerPosition } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .eq('name', 'Operations Manager')
+        .single();
+
+      if (opsManagerPosition) {
+        // Get all user IDs with Operations Manager position
+        const { data: opsManagerUsers } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('position_id', opsManagerPosition.id);
+
+        operationsManagerUserIds = (opsManagerUsers || []).map(u => u.id);
+        console.log('Cash Advance Get - Operations Manager user IDs to exclude:', operationsManagerUserIds);
+      }
+    }
+
     // Get query parameters
     const { status, type, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string, 10);
@@ -72,10 +112,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.eq('type', type);
     }
 
+    // Filter out Operations Manager cash advances if user is not HR or Accounting
+    if (!canViewConfidential && operationsManagerUserIds.length > 0) {
+      // Exclude cash advances requested by Operations Managers using filter
+      query = query.filter('requested_by', 'not.in', `(${operationsManagerUserIds.join(',')})`);
+      console.log('Cash Advance Get - Applied filter to exclude Ops Manager requests');
+    }
+
     // Apply pagination
     query = query.range(offset, offset + limitNum - 1);
 
     const { data: cashAdvances, error, count } = await query;
+
+    console.log('Cash Advance Get - Query result count:', count, 'Error:', error?.message || 'none');
 
     if (error) {
       console.error('Error fetching cash advances:', error);
