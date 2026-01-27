@@ -7,8 +7,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  if (req.method !== 'DELETE') {
-    res.setHeader('Allow', ['DELETE']);
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
@@ -19,36 +19,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // 1. Update profile status to 'disabled' (terminated) instead of deleting
+    // 1. Update profile status to 'active'
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .update({ status: 'disabled' })
+      .update({ status: 'active' })
       .eq('id', employeeId);
 
     if (profileError) {
-      console.error('Profile terminate error:', profileError);
-      throw new Error(`Failed to terminate profile: ${profileError.message}`);
+      console.error('Profile enable error:', profileError);
+      throw new Error(`Failed to enable profile: ${profileError.message}`);
     }
 
-    // 2. Ban the user in Supabase Auth (prevents login)
+    // 2. Unban the user in Supabase Auth (allows login)
     const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(employeeId, {
-      ban_duration: '876600h' // ~100 years
+      ban_duration: 'none'
     });
 
     if (authError) {
-      console.error('Auth ban error:', authError);
-      throw new Error(`Failed to terminate user authentication: ${authError.message}`);
+      console.error('Auth unban error:', authError);
+      throw new Error(`Failed to enable user authentication: ${authError.message}`);
     }
 
     return res.status(200).json({
-      message: 'Employee terminated successfully',
+      message: 'Employee enabled successfully',
       employeeId
     });
 
   } catch (error: any) {
-    console.error('Terminate-employee error:', error.message);
+    console.error('Enable-employee error:', error.message);
     return res.status(500).json({
-      error: error.message || 'An unexpected error occurred while terminating employee.'
+      error: error.message || 'An unexpected error occurred while enabling employee.'
     });
   }
 }

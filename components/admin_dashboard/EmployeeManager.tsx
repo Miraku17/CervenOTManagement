@@ -9,6 +9,7 @@ import {
   Briefcase,
   Ban,
   AlertTriangle,
+  UserCheck,
 } from "lucide-react";
 import * as XLSX from 'xlsx';
 import { Employee, Position } from "@/types";
@@ -20,6 +21,7 @@ interface EmployeeManagerProps {
   onSelectEmployee: (id: string) => void;
   onAddEmployee: (employee: Employee) => void;
   onDeleteEmployee?: (id: string) => void;
+  onUpdateEmployee?: (id: string, updates: Partial<Employee>) => void;
   positions: Position[];
 }
 
@@ -28,16 +30,18 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
   onSelectEmployee,
   onAddEmployee,
   onDeleteEmployee,
+  onUpdateEmployee,
   positions,
 }) => {
   const { user } = useUser();
   const [isCreating, setIsCreating] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [deleteModal, setDeleteModal] = useState<{
+  const [statusModal, setStatusModal] = useState<{
     isOpen: boolean;
     employee: Employee | null;
-  }>({ isOpen: false, employee: null });
-  const [isDeleting, setIsDeleting] = useState(false);
+    action: 'enable' | 'disable';
+  }>({ isOpen: false, employee: null, action: 'disable' });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Check if current user is Operations Manager
   const isOperationsManager = user?.position === 'Operations Manager';
@@ -106,44 +110,53 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
     XLSX.writeFile(workbook, filename);
   };
 
-  const handleDeleteClick = (e: React.MouseEvent, employee: Employee) => {
+  const handleStatusClick = (e: React.MouseEvent, employee: Employee) => {
     e.stopPropagation();
-    setDeleteModal({ isOpen: true, employee });
+    const action = employee.status === 'Terminated' ? 'enable' : 'disable';
+    setStatusModal({ isOpen: true, employee, action });
   };
 
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.employee || !onDeleteEmployee) return;
+  const handleConfirmStatusChange = async () => {
+    if (!statusModal.employee) return;
 
-    setIsDeleting(true);
+    setIsProcessing(true);
     try {
-      const response = await fetch('/api/delete-employee', {
-        method: 'DELETE',
+      const isEnabling = statusModal.action === 'enable';
+      const endpoint = isEnabling ? '/api/enable-employee' : '/api/delete-employee';
+      const method = isEnabling ? 'POST' : 'DELETE';
+
+      const response = await fetch(endpoint, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ employeeId: deleteModal.employee.id }),
+        body: JSON.stringify({ employeeId: statusModal.employee.id }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to disable employee');
+        throw new Error(data.error || `Failed to ${statusModal.action} employee`);
       }
 
-      // Call the parent's delete handler to update the state
-      onDeleteEmployee(deleteModal.employee.id);
+      // Update the employee status in the list
+      if (onUpdateEmployee) {
+        onUpdateEmployee(statusModal.employee.id, {
+          status: isEnabling ? 'Active' : 'Terminated'
+        });
+      }
 
       // Close the modal
-      setDeleteModal({ isOpen: false, employee: null });
+      setStatusModal({ isOpen: false, employee: null, action: 'disable' });
     } catch (error: any) {
-      alert(`Error disabling employee: ${error.message}`);
+      alert(`Error ${statusModal.action === 'enable' ? 'enabling' : 'disabling'} employee: ${error.message}`);
     } finally {
-      setIsDeleting(false);
+      setIsProcessing(false);
     }
   };
 
-  const handleCancelDelete = () => {
-    setDeleteModal({ isOpen: false, employee: null });
+  const handleCancelStatusChange = () => {
+    setStatusModal({ isOpen: false, employee: null, action: 'disable' });
   };
 
   if (isCreating) {
@@ -219,7 +232,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                     className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-slate-900 ${
                       employee.status === "Active"
                         ? "bg-emerald-500"
-                        : "bg-amber-500"
+                        : "bg-red-500"
                     }`}
                   ></span>
                 </div>
@@ -233,11 +246,15 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
               </div>
               {isOperationsManager && (
                 <button
-                  onClick={(e) => handleDeleteClick(e, employee)}
-                  className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                  title="Disable employee"
+                  onClick={(e) => handleStatusClick(e, employee)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    employee.status === 'Terminated'
+                      ? 'text-slate-500 hover:text-emerald-500 hover:bg-emerald-500/10'
+                      : 'text-slate-500 hover:text-red-500 hover:bg-red-500/10'
+                  }`}
+                  title={employee.status === 'Terminated' ? 'Enable employee' : 'Terminate employee'}
                 >
-                  <Ban size={18} />
+                  {employee.status === 'Terminated' ? <UserCheck size={18} /> : <Ban size={18} />}
                 </button>
               )}
             </div>
@@ -267,51 +284,73 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
         )}
       </div>
 
-      {/* Delete Confirmation Modal */}
-      {deleteModal.isOpen && deleteModal.employee && (
+      {/* Status Change Confirmation Modal */}
+      {statusModal.isOpen && statusModal.employee && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl">
             <div className="flex items-start gap-4 mb-4">
-              <div className="p-3 bg-red-500/10 rounded-full">
-                <AlertTriangle className="text-red-500" size={24} />
+              <div className={`p-3 rounded-full ${
+                statusModal.action === 'enable' ? 'bg-emerald-500/10' : 'bg-red-500/10'
+              }`}>
+                {statusModal.action === 'enable' ? (
+                  <UserCheck className="text-emerald-500" size={24} />
+                ) : (
+                  <AlertTriangle className="text-red-500" size={24} />
+                )}
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-white mb-2">
-                  Disable Employee
+                  {statusModal.action === 'enable' ? 'Enable Employee' : 'Terminate Employee'}
                 </h3>
                 <p className="text-slate-400 text-sm">
-                  Are you sure you want to disable{" "}
-                  <span className="font-semibold text-white">
-                    {deleteModal.employee.fullName}
-                  </span>
-                  ? This will prevent the employee from logging in and mark their
-                  account as disabled.
+                  {statusModal.action === 'enable' ? (
+                    <>
+                      Are you sure you want to enable{" "}
+                      <span className="font-semibold text-white">
+                        {statusModal.employee.fullName}
+                      </span>
+                      ? This will allow the employee to log in again.
+                    </>
+                  ) : (
+                    <>
+                      Are you sure you want to terminate{" "}
+                      <span className="font-semibold text-white">
+                        {statusModal.employee.fullName}
+                      </span>
+                      ? This will prevent the employee from logging in and mark their
+                      account as terminated.
+                    </>
+                  )}
                 </p>
               </div>
             </div>
 
             <div className="flex gap-3 justify-end mt-6">
               <button
-                onClick={handleCancelDelete}
-                disabled={isDeleting}
+                onClick={handleCancelStatusChange}
+                disabled={isProcessing}
                 className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
-                onClick={handleConfirmDelete}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                onClick={handleConfirmStatusChange}
+                disabled={isProcessing}
+                className={`px-4 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+                  statusModal.action === 'enable'
+                    ? 'bg-emerald-600 hover:bg-emerald-500'
+                    : 'bg-red-600 hover:bg-red-500'
+                }`}
               >
-                {isDeleting ? (
+                {isProcessing ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Disabling...</span>
+                    <span>{statusModal.action === 'enable' ? 'Enabling...' : 'Terminating...'}</span>
                   </>
                 ) : (
                   <>
-                    <Ban size={16} />
-                    <span>Disable</span>
+                    {statusModal.action === 'enable' ? <UserCheck size={16} /> : <Ban size={16} />}
+                    <span>{statusModal.action === 'enable' ? 'Enable' : 'Terminate'}</span>
                   </>
                 )}
               </button>

@@ -66,7 +66,16 @@ export default function EmployeesPage() {
   };
 
   const handleDeleteEmployee = (employeeId: string) => {
-    setEmployees(prev => prev.filter(e => e.id !== employeeId));
+    // No longer remove from list - just update status
+    setEmployees(prev => prev.map(e =>
+      e.id === employeeId ? { ...e, status: 'Terminated' } : e
+    ));
+  };
+
+  const handleUpdateEmployee = (employeeId: string, updates: Partial<Employee>) => {
+    setEmployees(prev => prev.map(e =>
+      e.id === employeeId ? { ...e, ...updates } : e
+    ));
   };
 
   return (
@@ -75,6 +84,7 @@ export default function EmployeesPage() {
       onSelectEmployee={handleSelectEmployee}
       onAddEmployee={handleAddEmployee}
       onDeleteEmployee={handleDeleteEmployee}
+      onUpdateEmployee={handleUpdateEmployee}
       positions={positions}
     />
   );

@@ -39,7 +39,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       department: emp.department || 'N/A',
       joinDate: emp.created_at ? new Date(emp.created_at).toLocaleDateString() : 'N/A',
       avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${emp.first_name}+${emp.last_name}`,
-      status: 'Active', // Default status
+      status: emp.status === 'disabled' ? 'Terminated' : 'Active',
       role: emp.role,
       leave_credits: emp.leave_credits || 0,
     }));

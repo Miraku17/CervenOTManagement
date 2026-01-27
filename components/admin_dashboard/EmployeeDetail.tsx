@@ -421,7 +421,11 @@ const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onBack, onUpd
 
             {!isEditMode && (
               <div className="flex flex-row md:flex-col gap-3 justify-center md:justify-start w-full md:w-auto">
-                  <span className="px-3 sm:px-4 py-1.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs sm:text-sm font-medium text-center">
+                  <span className={`px-3 sm:px-4 py-1.5 rounded-full text-xs sm:text-sm font-medium text-center ${
+                    employee.status === 'Terminated'
+                      ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  }`}>
                       {employee.status}
                   </span>
                   {/* <span className="text-slate-500 text-sm">Joined {employee.joinDate}</span> */}
