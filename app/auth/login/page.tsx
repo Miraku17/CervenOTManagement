@@ -82,7 +82,12 @@ function LoginPageContent() {
 
     } catch (err: any) {
       console.error('[Login Page] Login error:', err);
-      setError(err.message || "An unexpected error occurred");
+      // Show user-friendly message for banned/disabled accounts
+      if (err.message?.toLowerCase().includes('banned')) {
+        setError("Account is terminated");
+      } else {
+        setError(err.message || "An unexpected error occurred");
+      }
       setLoading(false);
     }
   };

@@ -7,7 +7,7 @@ import {
   Phone,
   Mail,
   Briefcase,
-  Trash2,
+  Ban,
   AlertTriangle,
 } from "lucide-react";
 import * as XLSX from 'xlsx';
@@ -127,7 +127,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete employee');
+        throw new Error(data.error || 'Failed to disable employee');
       }
 
       // Call the parent's delete handler to update the state
@@ -136,7 +136,7 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
       // Close the modal
       setDeleteModal({ isOpen: false, employee: null });
     } catch (error: any) {
-      alert(`Error deleting employee: ${error.message}`);
+      alert(`Error disabling employee: ${error.message}`);
     } finally {
       setIsDeleting(false);
     }
@@ -235,9 +235,9 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                 <button
                   onClick={(e) => handleDeleteClick(e, employee)}
                   className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                  title="Delete employee"
+                  title="Disable employee"
                 >
-                  <Trash2 size={18} />
+                  <Ban size={18} />
                 </button>
               )}
             </div>
@@ -277,15 +277,15 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-white mb-2">
-                  Delete Employee
+                  Disable Employee
                 </h3>
                 <p className="text-slate-400 text-sm">
-                  Are you sure you want to delete{" "}
+                  Are you sure you want to disable{" "}
                   <span className="font-semibold text-white">
                     {deleteModal.employee.fullName}
                   </span>
-                  ? This action cannot be undone and will remove the employee from
-                  both the system and authentication.
+                  ? This will prevent the employee from logging in and mark their
+                  account as disabled.
                 </p>
               </div>
             </div>
@@ -306,12 +306,12 @@ const EmployeeManager: React.FC<EmployeeManagerProps> = ({
                 {isDeleting ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Deleting...</span>
+                    <span>Disabling...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 size={16} />
-                    <span>Delete</span>
+                    <Ban size={16} />
+                    <span>Disable</span>
                   </>
                 )}
               </button>

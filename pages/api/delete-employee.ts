@@ -19,34 +19,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // 1. Delete the profile from the 'profiles' table first
+    // 1. Update profile status to 'disabled' instead of deleting
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
-      .delete()
+      .update({ status: 'disabled' })
       .eq('id', employeeId);
 
     if (profileError) {
-      console.error('Profile deletion error:', profileError);
-      throw new Error(`Failed to delete profile: ${profileError.message}`);
+      console.error('Profile disable error:', profileError);
+      throw new Error(`Failed to disable profile: ${profileError.message}`);
     }
 
-    // 2. Delete the user from Supabase Auth
-    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(employeeId);
+    // 2. Ban the user in Supabase Auth (prevents login)
+    const { error: authError } = await supabaseAdmin.auth.admin.updateUserById(employeeId, {
+      ban_duration: '876600h' // ~100 years
+    });
 
     if (authError) {
-      console.error('Auth deletion error:', authError);
-      throw new Error(`Failed to delete user from authentication: ${authError.message}`);
+      console.error('Auth ban error:', authError);
+      throw new Error(`Failed to disable user authentication: ${authError.message}`);
     }
 
     return res.status(200).json({
-      message: 'Employee deleted successfully',
+      message: 'Employee disabled successfully',
       employeeId
     });
 
   } catch (error: any) {
-    console.error('Delete-employee error:', error.message);
+    console.error('Disable-employee error:', error.message);
     return res.status(500).json({
-      error: error.message || 'An unexpected error occurred while deleting employee.'
+      error: error.message || 'An unexpected error occurred while disabling employee.'
     });
   }
 }
