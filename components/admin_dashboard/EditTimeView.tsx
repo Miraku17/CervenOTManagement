@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Clock, Save, User, AlertCircle, CheckCircle } from "lucide-react";
+import { Search, Calendar, Clock, Save, User, AlertCircle, CheckCircle, Plus, X } from "lucide-react";
 import { Employee } from "@/types";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/useUser";
@@ -51,6 +51,17 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     overtimeStatus: 'pending' | 'approved' | 'rejected';
     isMarkedAsOvertime: boolean;
   }>>(new Map());
+
+  // State for adding new session
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [isAddingSaving, setIsAddingSaving] = useState(false);
+  const [newSession, setNewSession] = useState({
+    timeIn: "",
+    timeOut: "",
+    overtimeComment: "",
+    overtimeStatus: 'pending' as 'pending' | 'approved' | 'rejected',
+    isMarkedAsOvertime: false
+  });
 
   // Filter employees based on search
   const filteredEmployees = employees.filter(
@@ -221,6 +232,73 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
     }
   };
 
+  const resetNewSessionForm = () => {
+    // Set default time to 8 AM for time in and 5 PM for time out on selected date
+    const defaultTimeIn = `${selectedDate}T08:00`;
+    const defaultTimeOut = `${selectedDate}T17:00`;
+
+    setNewSession({
+      timeIn: defaultTimeIn,
+      timeOut: defaultTimeOut,
+      overtimeComment: "",
+      overtimeStatus: 'pending',
+      isMarkedAsOvertime: false
+    });
+  };
+
+  const handleOpenAddForm = () => {
+    resetNewSessionForm();
+    setShowAddForm(true);
+    setMessage(null);
+  };
+
+  const handleCloseAddForm = () => {
+    setShowAddForm(false);
+    resetNewSessionForm();
+  };
+
+  const handleAddSession = async () => {
+    if (!selectedEmployee || !newSession.timeIn || !newSession.timeOut) {
+      setMessage({ type: "error", text: "Please fill in both Time In and Time Out" });
+      return;
+    }
+
+    setIsAddingSaving(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/attendance/add-time", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: selectedEmployee.id,
+          timeIn: newSession.timeIn,
+          timeOut: newSession.timeOut,
+          isMarkedAsOvertime: newSession.isMarkedAsOvertime,
+          overtimeComment: newSession.isMarkedAsOvertime ? (newSession.overtimeComment || null) : null,
+          overtimeStatus: newSession.isMarkedAsOvertime ? newSession.overtimeStatus : null,
+          adminId: user?.id || null,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to add attendance record");
+      }
+
+      setMessage({ type: "success", text: "Session added successfully!" });
+      setShowAddForm(false);
+      resetNewSessionForm();
+      fetchAttendance(); // Refresh data
+    } catch (error: any) {
+      console.error("Error adding attendance:", error);
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setIsAddingSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -314,7 +392,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
                 <p className="text-slate-400">Loading attendance data...</p>
               </div>
-            ) : !attendance ? (
+            ) : !attendance && !showAddForm ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-500">
                 <AlertCircle className="w-16 h-16 mb-4 opacity-30" />
                 <p className="text-lg">
@@ -324,31 +402,53 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                   Employee may not have clocked in on{" "}
                   {format(new Date(selectedDate), "MMM dd, yyyy")}
                 </p>
+                <button
+                  onClick={handleOpenAddForm}
+                  className="mt-6 bg-blue-600 hover:bg-blue-500 text-white font-medium px-6 py-3 rounded-xl transition-colors flex items-center gap-2"
+                >
+                  <Plus className="w-5 h-5" />
+                  Add Time Entry
+                </button>
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="border-b border-slate-800 pb-4">
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-blue-400" />
-                    Edit Attendance
-                  </h2>
-                  <p className="text-slate-400 mt-1">
-                    {selectedEmployee.fullName} •{" "}
-                    {format(new Date(selectedDate), "MMMM dd, yyyy")}
-                  </p>
-                  <div className="flex gap-4 mt-3 text-sm">
-                    <span className="text-slate-300">
-                      <span className="text-slate-500">Total Hours:</span> {attendance.totalHours || '--'} hrs
-                    </span>
-                    <span className="text-slate-300">
-                      <span className="text-slate-500">Sessions:</span> {attendance.sessionCount}
-                    </span>
-                    <span className={`font-medium ${
-                      attendance.status === 'In Progress' ? 'text-blue-400' : 'text-emerald-400'
-                    }`}>
-                      {attendance.status}
-                    </span>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-blue-400" />
+                        {showAddForm && !attendance ? 'Add Time Entry' : 'Edit Attendance'}
+                      </h2>
+                      <p className="text-slate-400 mt-1">
+                        {selectedEmployee.fullName} •{" "}
+                        {format(new Date(selectedDate), "MMMM dd, yyyy")}
+                      </p>
+                    </div>
+                    {!showAddForm && (
+                      <button
+                        onClick={handleOpenAddForm}
+                        className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Add Session
+                      </button>
+                    )}
                   </div>
+                  {attendance && (
+                    <div className="flex gap-4 mt-3 text-sm">
+                      <span className="text-slate-300">
+                        <span className="text-slate-500">Total Hours:</span> {attendance.totalHours || '--'} hrs
+                      </span>
+                      <span className="text-slate-300">
+                        <span className="text-slate-500">Sessions:</span> {attendance.sessionCount}
+                      </span>
+                      <span className={`font-medium ${
+                        attendance.status === 'In Progress' ? 'text-blue-400' : 'text-emerald-400'
+                      }`}>
+                        {attendance.status}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {message && (
@@ -363,7 +463,146 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                   </div>
                 )}
 
+                {/* Add New Session Form */}
+                {showAddForm && (
+                  <div className="bg-emerald-950/30 border border-emerald-500/20 rounded-xl p-5">
+                    <div className="flex items-center justify-between mb-4 pb-3 border-b border-emerald-500/20">
+                      <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                        <Plus className="w-5 h-5 text-emerald-400" />
+                        New Session
+                      </h3>
+                      <button
+                        onClick={handleCloseAddForm}
+                        className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Time In */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Time In
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={newSession.timeIn}
+                          onChange={(e) => setNewSession(prev => ({ ...prev, timeIn: e.target.value }))}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none [color-scheme:dark]"
+                        />
+                      </div>
+
+                      {/* Time Out */}
+                      <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                          Time Out
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={newSession.timeOut}
+                          onChange={(e) => setNewSession(prev => ({ ...prev, timeOut: e.target.value }))}
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none [color-scheme:dark]"
+                        />
+                      </div>
+
+                      {/* Mark as Overtime Toggle */}
+                      <div className="bg-slate-900 border border-slate-700 rounded-xl p-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Clock className="w-4 h-4 text-amber-400" />
+                              <h4 className="text-sm font-semibold text-white">Mark as Overtime</h4>
+                            </div>
+                            <p className="text-xs text-slate-400">
+                              Mark this session as overtime
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setNewSession(prev => ({ ...prev, isMarkedAsOvertime: !prev.isMarkedAsOvertime }))}
+                            className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-950 ${
+                              newSession.isMarkedAsOvertime ? 'bg-amber-500' : 'bg-slate-700'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                                newSession.isMarkedAsOvertime ? 'translate-x-7' : 'translate-x-1'
+                              }`}
+                            >
+                              {newSession.isMarkedAsOvertime && (
+                                <CheckCircle className="w-4 h-4 text-amber-500 m-1" />
+                              )}
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Overtime Status */}
+                      {newSession.isMarkedAsOvertime && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Overtime Status
+                          </label>
+                          <select
+                            value={newSession.overtimeStatus}
+                            onChange={(e) => setNewSession(prev => ({ ...prev, overtimeStatus: e.target.value as 'pending' | 'approved' | 'rejected' }))}
+                            className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none appearance-none cursor-pointer bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2394a3b8%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22m6%209%206%206%206-6%22%2F%3E%3C%2Fsvg%3E')] bg-[length:1.5rem] bg-[right_0.5rem_center] bg-no-repeat pr-12"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="approved">Approved</option>
+                            <option value="rejected">Rejected</option>
+                          </select>
+                        </div>
+                      )}
+
+                      {/* Overtime Comment */}
+                      {newSession.isMarkedAsOvertime && (
+                        <div>
+                          <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Overtime Comment
+                          </label>
+                          <textarea
+                            value={newSession.overtimeComment}
+                            onChange={(e) => setNewSession(prev => ({ ...prev, overtimeComment: e.target.value }))}
+                            placeholder="Add overtime comment..."
+                            rows={3}
+                            className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:ring-2 focus:ring-emerald-500 outline-none resize-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={handleCloseAddForm}
+                          className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium px-6 py-3 rounded-xl transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleAddSession}
+                          disabled={isAddingSaving}
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium px-6 py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+                        >
+                          {isAddingSaving ? (
+                            <>
+                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <Save className="w-5 h-5" />
+                              Add Session
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sessions List */}
+                {attendance && attendance.sessions.length > 0 && (
                 <div className="space-y-4">
                   {attendance.sessions.map((session, index) => {
                     const editedData = editedSessions.get(session.id);
@@ -543,6 +782,7 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                     );
                   })}
                 </div>
+                )}
               </div>
             )}
           </div>
