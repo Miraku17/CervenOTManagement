@@ -29,6 +29,38 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Get current user's position to check if they can view Operations Manager cash advances
+    const { data: currentUserProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('position_id, positions:position_id (name)')
+      .eq('id', req.user?.id || '')
+      .single();
+
+    const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+    // Check if position contains HR, Accounting, or Operations Manager (case-insensitive)
+    const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
+                                 currentUserPosition.toLowerCase().includes('accounting') ||
+                                 currentUserPosition.toLowerCase().includes('operations manager');
+
+    // Get Operations Manager user IDs to filter confidential requests
+    let operationsManagerUserIds: string[] = [];
+    if (!canViewConfidential) {
+      const { data: opsManagerPosition } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .eq('name', 'Operations Manager')
+        .single();
+
+      if (opsManagerPosition) {
+        const { data: opsManagerUsers } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('position_id', opsManagerPosition.id);
+
+        operationsManagerUserIds = (opsManagerUsers || []).map(u => u.id);
+      }
+    }
+
     // Build query
     let query = supabaseAdmin
       .from('cash_advances')
@@ -59,6 +91,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (type && type !== 'all') {
       query = query.eq('type', type);
+    }
+
+    // Filter out Operations Manager cash advances if user is not HR or Accounting
+    if (!canViewConfidential && operationsManagerUserIds.length > 0) {
+      query = query.filter('requested_by', 'not.in', `(${operationsManagerUserIds.join(',')})`);
     }
 
     const { data: cashAdvances, error } = await query;

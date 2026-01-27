@@ -34,7 +34,63 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Please provide a date.' });
     }
 
-    // Create the cash advance request with level1_status set to pending
+    // Check if user is an Operations Manager (auto-approve if so)
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select(`
+        first_name,
+        last_name,
+        email,
+        position_id,
+        positions:position_id (name)
+      `)
+      .eq('id', userId)
+      .single();
+
+    const positionName = (userProfile?.positions as any)?.name || '';
+    const isOperationsManager = positionName === 'Operations Manager';
+
+    if (isOperationsManager) {
+      // Auto-approve for Operations Manager - no emails sent
+      const now = new Date().toISOString();
+      const { data: cashAdvance, error: insertError } = await supabaseAdmin
+        .from('cash_advances')
+        .insert({
+          type,
+          amount: parseFloat(amount),
+          purpose: purpose || null,
+          requested_by: userId,
+          date_requested: new Date(date).toISOString(),
+          status: 'approved',
+          level1_status: 'approved',
+          level1_approved_by: userId,
+          level1_date_approved: now,
+          level1_comment: 'Auto-approved (Operations Manager)',
+          level2_status: 'approved',
+          level2_approved_by: userId,
+          level2_date_approved: now,
+          level2_comment: 'Auto-approved (Operations Manager)',
+          approved_by: userId,
+          date_approved: now,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating cash advance request:', insertError);
+        throw insertError;
+      }
+
+      console.log('Cash advance auto-approved for Operations Manager:', userId);
+
+      return res.status(201).json({
+        message: 'Cash advance request auto-approved successfully',
+        cashAdvance,
+        autoApproved: true,
+      });
+    }
+
+    // Standard flow for non-Operations Manager users
     const { data: cashAdvance, error: insertError } = await supabaseAdmin
       .from('cash_advances')
       .insert({
@@ -53,13 +109,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       console.error('Error creating cash advance request:', insertError);
       throw insertError;
     }
-
-    // Fetch user profile for email
-    const { data: userProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('first_name, last_name, email')
-      .eq('id', userId)
-      .single();
 
     // Send email notification to Level 1 approvers only (don't block the response on email failure)
     if (userProfile) {
