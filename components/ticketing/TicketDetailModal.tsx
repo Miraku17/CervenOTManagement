@@ -782,21 +782,34 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       setIsSaving(true);
   
       // Validate that Date Resolved is not before Date Reported
+      // Supports overnight resolution (e.g., reported at 22:00, resolved at 02:00 next day)
       if (editData.date_resolved) {
         const dateReported = ticket.date_reported;
         const timeReported = ticket.time_reported;
         const dateResolved = editData.date_resolved;
         const timeResolved = editData.time_resolved;
-  
+
         if (dateReported && timeReported && dateResolved && timeResolved) {
           const reportedDate = new Date(dateReported);
           const [reportedHours, reportedMinutes] = timeReported.split(':');
           reportedDate.setHours(parseInt(reportedHours), parseInt(reportedMinutes), 0, 0);
-  
+
           const resolvedDate = new Date(dateResolved);
           const [resolvedHours, resolvedMinutes] = timeResolved.split(':');
           resolvedDate.setHours(parseInt(resolvedHours), parseInt(resolvedMinutes), 0, 0);
-  
+
+          // Handle overnight resolution: if dates are the same but resolved time is earlier,
+          // assume it's the next day (overnight work)
+          if (dateReported === dateResolved) {
+            const reportedTotalMinutes = parseInt(reportedHours) * 60 + parseInt(reportedMinutes);
+            const resolvedTotalMinutes = parseInt(resolvedHours) * 60 + parseInt(resolvedMinutes);
+
+            if (resolvedTotalMinutes < reportedTotalMinutes) {
+              // Overnight resolution - add 1 day to resolved date for validation
+              resolvedDate.setDate(resolvedDate.getDate() + 1);
+            }
+          }
+
           if (resolvedDate < reportedDate) {
             showToast('error', 'Invalid Date', 'Date Resolved cannot be earlier than Date Reported.');
             setIsSaving(false);

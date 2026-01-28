@@ -67,7 +67,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch the existing ticket to get current data for SLA calculation
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by, sev, date_reported, time_reported, date_responded, time_responded, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2, sla_count_hrs')
+      .select('id, serviced_by, sev, date_reported, time_reported, date_responded, time_responded, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_start, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2, sla_count_hrs')
       .eq('id', id)
       .single();
 
@@ -85,6 +85,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const timeAck = updateData.time_ack !== undefined ? updateData.time_ack : existingTicket.time_ack;
     const dateAttended = updateData.date_attended !== undefined ? updateData.date_attended : existingTicket.date_attended;
     const workEnd = updateData.work_end !== undefined ? updateData.work_end : existingTicket.work_end;
+    const workStart = updateData.work_start !== undefined ? updateData.work_start : existingTicket.work_start;
     const pauseStart = updateData.pause_time_start !== undefined ? updateData.pause_time_start : existingTicket.pause_time_start;
     const pauseEnd = updateData.pause_time_end !== undefined ? updateData.pause_time_end : existingTicket.pause_time_end;
     const pauseStart2 = updateData.pause_time_start_2 !== undefined ? updateData.pause_time_start_2 : existingTicket.pause_time_start_2;
@@ -157,6 +158,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           });
         }
 
+        // Handle overnight work: if work_end time is earlier than work_start time,
+        // assume work ended the next day
+        if (workStart && timePattern.test(workStart)) {
+          const [workStartHours, workStartMinutes] = workStart.split(':');
+          const workStartTotalMinutes = parseInt(workStartHours) * 60 + parseInt(workStartMinutes);
+          const workEndTotalMinutes = parseInt(workEndHours) * 60 + parseInt(workEndMinutes);
+
+          // If work end time is earlier than work start time, it's overnight work
+          if (workEndTotalMinutes < workStartTotalMinutes) {
+            workEndDate.setDate(workEndDate.getDate() + 1);
+          }
+        }
+
         // Calculate difference in hours
         const diffInMs = workEndDate.getTime() - ackDate.getTime();
 
@@ -178,11 +192,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           let pauseStartMinutes = parseInt(pStartHours) * 60 + parseInt(pStartMinutes);
           let pauseEndMinutes = parseInt(pEndHours) * 60 + parseInt(pEndMinutes);
 
-          // Validate pause end is after pause start (should be same day)
+          // Handle overnight pause: if pause end is earlier than pause start, add 24 hours
           if (pauseEndMinutes <= pauseStartMinutes) {
-            return res.status(400).json({
-              error: 'Pause End must be after Pause Start. Both times should be on the same day.'
-            });
+            pauseEndMinutes += 24 * 60; // Add 24 hours (1440 minutes)
           }
 
           // Calculate pause duration in hours
@@ -215,11 +227,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           let pause2StartMinutes = parseInt(pStart2Hours) * 60 + parseInt(pStart2Minutes);
           let pause2EndMinutes = parseInt(pEnd2Hours) * 60 + parseInt(pEnd2Minutes);
 
-          // Validate pause 2 end is after pause 2 start (should be same day)
+          // Handle overnight pause: if pause 2 end is earlier than pause 2 start, add 24 hours
           if (pause2EndMinutes <= pause2StartMinutes) {
-            return res.status(400).json({
-              error: 'Pause End 2 must be after Pause Start 2. Both times should be on the same day.'
-            });
+            pause2EndMinutes += 24 * 60; // Add 24 hours (1440 minutes)
           }
 
           // Calculate pause 2 duration in hours
