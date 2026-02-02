@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Search, Calendar, Clock, Save, User, AlertCircle, CheckCircle, Plus, X } from "lucide-react";
+import { Search, Calendar, Clock, Save, User, AlertCircle, CheckCircle, Plus, X, Trash2 } from "lucide-react";
 import { Employee } from "@/types";
 import { format } from "date-fns";
 import { useUser } from "@/hooks/useUser";
@@ -55,6 +55,8 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
   // State for adding new session
   const [showAddForm, setShowAddForm] = useState(false);
   const [isAddingSaving, setIsAddingSaving] = useState(false);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [newSession, setNewSession] = useState({
     timeIn: "",
     timeOut: "",
@@ -296,6 +298,38 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
       setMessage({ type: "error", text: error.message });
     } finally {
       setIsAddingSaving(false);
+    }
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!selectedEmployee) return;
+
+    setDeletingSessionId(sessionId);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/attendance/delete-session", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          attendanceId: sessionId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to delete session");
+      }
+
+      setMessage({ type: "success", text: "Session deleted successfully!" });
+      setConfirmDeleteId(null);
+      fetchAttendance(); // Refresh data
+    } catch (error: any) {
+      console.error("Error deleting session:", error);
+      setMessage({ type: "error", text: error.message });
+    } finally {
+      setDeletingSessionId(null);
     }
   };
 
@@ -615,13 +649,47 @@ const EditTimeView: React.FC<EditTimeViewProps> = ({ employees }) => {
                       <div key={session.id} className="bg-slate-950 border border-slate-800 rounded-xl p-5">
                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-800">
                           <h3 className="text-lg font-semibold text-white">Session {index + 1}</h3>
-                          <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-                            hasTimeOut
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                          }`}>
-                            {hasTimeOut ? 'Completed' : 'Active'}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                              hasTimeOut
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            }`}>
+                              {hasTimeOut ? 'Completed' : 'Active'}
+                            </span>
+                            {confirmDeleteId === session.id ? (
+                              <div className="flex items-center gap-1">
+                                <button
+                                  onClick={() => handleDeleteSession(session.id)}
+                                  disabled={deletingSessionId === session.id}
+                                  className="text-xs px-3 py-1 bg-rose-600 hover:bg-rose-500 disabled:bg-slate-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                                >
+                                  {deletingSessionId === session.id ? (
+                                    <>
+                                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                                      Deleting...
+                                    </>
+                                  ) : (
+                                    'Confirm'
+                                  )}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmDeleteId(null)}
+                                  className="text-xs px-3 py-1 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => setConfirmDeleteId(session.id)}
+                                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                                title="Delete session"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
                         </div>
 
                         {!hasTimeOut && (
