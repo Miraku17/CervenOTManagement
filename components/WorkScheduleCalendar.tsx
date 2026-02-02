@@ -612,7 +612,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  {canEditSchedules && !selectedHoliday && !isEditing && (
+                  {canEditSchedules && !isEditing && (
                     <button
                       onClick={() => handleEdit(selectedSchedule, selectedDate)}
                       className="p-2.5 hover:bg-slate-800 rounded-xl text-blue-400 hover:text-blue-300 transition-all hover:scale-105"
@@ -903,7 +903,7 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
                     </div>
                     <h4 className="text-xl font-bold text-slate-400 mb-2">No Schedule Found</h4>
                     <p className="text-slate-500 mb-6">There is no schedule assigned for this date</p>
-                    {canEditSchedules && !selectedHoliday && (
+                    {canEditSchedules && (
                       <button
                         onClick={() => handleEdit(null, selectedDate)}
                         className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-blue-900/30"
