@@ -361,12 +361,35 @@ export default function TicketOverviewPage() {
     }
   };
 
-  const handleStatCardClick = async (type: 'total' | 'top_sev' | 'category' | 'store') => {
+  const handleStatCardClick = async (type: 'total' | 'top_sev' | 'category' | 'store', selectedStore?: { store_id: string; store_name: string; count: number }) => {
+    // Set title immediately based on type
+    let initialTitle = '';
+    switch (type) {
+      case 'total':
+        initialTitle = 'All Tickets';
+        break;
+      case 'top_sev':
+        const topSevInit = stats?.bySeverity.reduce((prev, current) =>
+          (current.count > prev.count) ? current : prev,
+          stats?.bySeverity[0] || { severity: 'N/A', count: 0 }
+        );
+        initialTitle = topSevInit ? `Top Severity Tickets (${topSevInit.severity.toUpperCase()})` : 'Top Severity Tickets';
+        break;
+      case 'category':
+        const topCategoryInit = stats?.byProblemCategory[0];
+        initialTitle = topCategoryInit ? `Tickets - ${topCategoryInit.category}` : 'Tickets by Category';
+        break;
+      case 'store':
+        const targetStoreInit = selectedStore || stats?.byStore[0];
+        initialTitle = targetStoreInit ? `Tickets - ${targetStoreInit.store_name}` : 'Tickets by Store';
+        break;
+    }
+
+    setModalTitle(initialTitle);
+    setModalTickets([]);
     setLoadingModal(true);
     setShowModal(true);
 
-
-    console.log("Handle Star Card Clicked")
     try {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
@@ -380,47 +403,34 @@ export default function TicketOverviewPage() {
       }
 
       let filteredTickets = result.tickets || [];
-      let title = '';
 
       switch (type) {
         case 'total':
-          title = 'All Tickets';
           // No filtering needed
           break;
         case 'top_sev':
-          // Find the top severity dynamically
           const topSev = stats?.bySeverity.reduce((prev, current) =>
             (current.count > prev.count) ? current : prev,
-            stats.bySeverity[0] || { severity: 'N/A', count: 0 }
+            stats?.bySeverity[0] || { severity: 'N/A', count: 0 }
           );
           if (topSev) {
-            title = `Top Severity Tickets (${topSev.severity.toUpperCase()})`;
             filteredTickets = filteredTickets.filter((t: any) => t.sev?.toUpperCase() === topSev.severity.toUpperCase());
           }
           break;
         case 'category':
           const topCategory = stats?.byProblemCategory[0];
           if (topCategory) {
-            title = `Tickets - ${topCategory.category}`;
             filteredTickets = filteredTickets.filter((t: any) => t.problem_category === topCategory.category);
           }
           break;
         case 'store':
-          const topStore = stats?.byStore[0];
-          if (topStore) {
-            title = `Tickets - ${topStore.store_name}`;
-            console.log('Filtering for store:', topStore.store_name, 'ID:', topStore.store_id);
-            console.log('Total tickets before filter:', filteredTickets.length);
-            filteredTickets = filteredTickets.filter((t: any) => {
-              const matches = t.store_id === topStore.store_id;
-              return matches;
-            });
-            console.log('Filtered tickets:', filteredTickets.length);
+          const targetStore = selectedStore || stats?.byStore[0];
+          if (targetStore) {
+            filteredTickets = filteredTickets.filter((t: any) => t.store_id === targetStore.store_id);
           }
           break;
       }
 
-      setModalTitle(title);
       setModalTickets(filteredTickets);
     } catch (error) {
       console.error('Error fetching modal data:', error);
@@ -826,7 +836,7 @@ export default function TicketOverviewPage() {
             {stats.byStore.slice(0, 10).map((store, index) => (
               <div
                 key={store.store_id}
-                onClick={() => handleStatCardClick('store')}
+                onClick={() => handleStatCardClick('store', store)}
                 className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/50 transition-all cursor-pointer group"
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
