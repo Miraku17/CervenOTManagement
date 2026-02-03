@@ -331,6 +331,8 @@ export default function AssetInventoryPage() {
       { wch: 25 }, // Brand
       { wch: 30 }, // Model
       { wch: 30 }, // Serial Number
+      { wch: 35 }, // Store
+      { wch: 20 }, // Ticket
       { wch: 15 }, // Status
       { wch: 15 }, // Under Warranty
       { wch: 15 }, // Warranty Date
