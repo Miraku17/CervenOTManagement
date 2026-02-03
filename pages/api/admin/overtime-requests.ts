@@ -3,6 +3,9 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
 
+// Positions that require Managing Director approval
+const MANAGING_DIRECTOR_ONLY_POSITIONS = ['HR', 'Accounting'];
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
@@ -21,6 +24,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         error: 'Forbidden: You do not have permission to view overtime requests'
       });
     }
+
+    // Get current user's position to check if they are Managing Director
+    const { data: currentUserProfile, error: currentUserError } = await supabase
+      .from('profiles')
+      .select('positions(name)')
+      .eq('id', req.user?.id || '')
+      .single();
+
+    if (currentUserError) {
+      console.error('Error fetching current user profile:', currentUserError);
+    }
+
+    const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+    const isManagingDirector = currentUserPosition === 'Managing Director';
+
     // Fetch all overtime requests from overtime_v2
     const { data: overtimeData, error: overtimeError } = await supabase
       .from('overtime_v2')
@@ -58,7 +76,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const profilesMap = new Map(profilesData?.map(p => [p.id, p]) || []);
 
     // Transform the data
-    const transformedData = overtimeData.map(ot => {
+    let transformedData = overtimeData.map(ot => {
       return {
         ...ot,
         requested_by: profilesMap.get(ot.requested_by) || null,
@@ -66,6 +84,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         level2_reviewer_profile: ot.level2_reviewer ? profilesMap.get(ot.level2_reviewer) : null,
       };
     });
+
+    // Filter out HR/Accounting requests for non-Managing Director users
+    if (!isManagingDirector) {
+      transformedData = transformedData.filter(ot => {
+        const requesterPosition = (ot.requested_by?.positions as any)?.name || '';
+        return !MANAGING_DIRECTOR_ONLY_POSITIONS.includes(requesterPosition);
+      });
+    }
 
     console.log('Overtime requests fetched from overtime_v2:', transformedData.length);
 

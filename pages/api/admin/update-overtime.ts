@@ -3,6 +3,9 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
 
+// Positions that require Managing Director approval
+const MANAGING_DIRECTOR_ONLY_POSITIONS = ['HR', 'Accounting'];
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
@@ -51,6 +54,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     if (fetchError) throw fetchError;
+
+    // Check if requester is HR or Accounting - only Managing Director can approve
+    const { data: requesterProfile, error: requesterError } = await supabase
+      .from('profiles')
+      .select('positions(name)')
+      .eq('id', currentRequest.requested_by)
+      .single();
+
+    if (requesterError) {
+      console.error('Error fetching requester profile:', requesterError);
+    }
+
+    const requesterPosition = (requesterProfile?.positions as any)?.name || '';
+
+    if (MANAGING_DIRECTOR_ONLY_POSITIONS.includes(requesterPosition)) {
+      // Check if approver is Managing Director
+      const { data: approverProfile, error: approverError } = await supabase
+        .from('profiles')
+        .select('positions(name)')
+        .eq('id', actualAdminId)
+        .single();
+
+      if (approverError) {
+        console.error('Error fetching approver profile:', approverError);
+      }
+
+      const approverPosition = (approverProfile?.positions as any)?.name || '';
+
+      if (approverPosition !== 'Managing Director') {
+        return res.status(403).json({
+          error: `Forbidden: Only Managing Director can approve/reject overtime requests from ${requesterPosition} employees`
+        });
+      }
+    }
 
     // Update object
     const updates: any = {
