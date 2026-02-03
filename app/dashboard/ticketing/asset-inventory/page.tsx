@@ -513,10 +513,10 @@ export default function AssetInventoryPage() {
       {deleteId && (() => {
         const assetToDelete = assets.find(a => a.id === deleteId);
         const isInUse = assetToDelete?.status === 'In Use';
-        
+
         return (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-            <div className={`bg-slate-900 rounded-lg shadow-xl w-full max-w-md border ${isInUse ? 'border-amber-500/50' : 'border-slate-700'}`}>
+          <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen bg-black/50 backdrop-blur-sm flex justify-center items-center z-[9999] p-4" style={{ position: 'fixed', inset: 0 }}>
+            <div className={`bg-slate-900 rounded-lg shadow-xl w-full max-w-md border relative z-[10000] ${isInUse ? 'border-amber-500/50' : 'border-slate-700'}`}>
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-4">
                   {isInUse ? <AlertTriangle className="text-amber-500" size={24} /> : <AlertTriangle className="text-red-500" size={24} />}
