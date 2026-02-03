@@ -50,6 +50,18 @@ interface Asset {
     last_name: string;
     email: string;
   } | null;
+  store_info?: {
+    store_name: string;
+    store_code: string;
+    station_name: string | null;
+  } | null;
+  ticket_info?: {
+    id: string;
+    rcc_reference_number: string;
+    status: string;
+    request_type: string;
+    severity: string;
+  } | null;
 }
 
 export default function AssetInventoryPage() {
@@ -302,6 +314,8 @@ export default function AssetInventoryPage() {
       'Brand': asset.brands?.name || 'N/A',
       'Model': asset.models?.name || 'N/A',
       'Serial Number': asset.serial_number || 'N/A',
+      'Store': asset.store_info ? `${asset.store_info.store_name} (${asset.store_info.store_code})` : 'Not assigned',
+      'Ticket': asset.ticket_info?.rcc_reference_number || 'Not used',
       'Status': asset.status || 'Available',
       'Under Warranty': asset.under_warranty ? 'Yes' : 'No',
       'Warranty Date': asset.warranty_date ? new Date(asset.warranty_date).toLocaleDateString() : 'N/A',
@@ -745,6 +759,8 @@ export default function AssetInventoryPage() {
                         <TableHead>Brand</TableHead>
                         <TableHead>Model</TableHead>
                         <TableHead>Serial Number</TableHead>
+                        <TableHead>Store</TableHead>
+                        <TableHead>Ticket</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -752,7 +768,7 @@ export default function AssetInventoryPage() {
                 <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="p-8 text-center">
+                        <TableCell colSpan={8} className="p-8 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <Loader2 className="w-5 h-5 animate-spin" />
                             <span>Loading assets...</span>
@@ -761,7 +777,7 @@ export default function AssetInventoryPage() {
                       </TableRow>
                     ) : filteredAssets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} className="p-8 text-center text-muted-foreground">
+                        <TableCell colSpan={8} className="p-8 text-center text-muted-foreground">
                           {searchTerm ? 'No assets found matching your search.' : 'No assets yet. Click "Add Asset" to create one.'}
                         </TableCell>
                       </TableRow>
@@ -769,7 +785,7 @@ export default function AssetInventoryPage() {
                       filteredAssets.map((asset) => (
                         <TableRow key={asset.id} onClick={() => handleViewDetails(asset)} className="cursor-pointer">
                             <TableCell className="font-medium">
-                                <span className="px-2 py-1 rounded-md bg-muted border text-xs">
+                                <span className="inline-flex items-center px-2 py-1 rounded-md bg-muted border text-xs whitespace-nowrap">
                                   {asset.categories?.name || 'N/A'}
                                 </span>
                             </TableCell>
@@ -779,7 +795,39 @@ export default function AssetInventoryPage() {
                             </TableCell>
                             <TableCell className="font-mono text-sm">{asset.serial_number || '-'}</TableCell>
                             <TableCell>
-                                <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium border ${
+                                {asset.store_info ? (
+                                  <div className="text-sm">
+                                    <p className="font-medium text-white">{asset.store_info.store_name}</p>
+                                    <p className="text-xs text-slate-400">{asset.store_info.store_code}</p>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-500 text-sm">Not assigned</span>
+                                )}
+                            </TableCell>
+                            <TableCell>
+                                {asset.ticket_info ? (
+                                  <div className="space-y-1">
+                                    <p className="font-medium text-blue-400 text-sm">{asset.ticket_info.rcc_reference_number}</p>
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium ${
+                                      asset.ticket_info.status === 'open' || asset.ticket_info.status === 'Open'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                                      asset.ticket_info.status === 'in_progress' || asset.ticket_info.status === 'In Progress'
+                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20' :
+                                      asset.ticket_info.status === 'pending' || asset.ticket_info.status === 'Pending'
+                                        ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
+                                      asset.ticket_info.status === 'resolved' || asset.ticket_info.status === 'Resolved'
+                                        ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                                        'bg-slate-500/10 text-slate-400 border border-slate-500/20'
+                                    }`}>
+                                      {asset.ticket_info.status}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-500 text-sm">Not used</span>
+                                )}
+                            </TableCell>
+                            <TableCell>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border whitespace-nowrap ${
                                   asset.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
                                   asset.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
                                   asset.status === 'Under Repair' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :

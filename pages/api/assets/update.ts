@@ -46,17 +46,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to update assets' });
     }
 
-    const updateData = {
+    // Validate status - prevent "In Use" from being set manually
+    if (status === 'In Use') {
+      return res.status(400).json({
+        error: '"In Use" status cannot be set manually. It is automatically set when the asset is assigned to a store.'
+      });
+    }
+
+    const allowedStatuses = ['Available', 'Under Repair', 'Broken', 'Retired'];
+
+    const updateData: any = {
       category_id,
       brand_id,
       model_id: model_id || null,
       serial_number: serial_number || null,
       under_warranty: under_warranty !== undefined ? under_warranty : false,
       warranty_date: warranty_date || null,
-      status: status || undefined, // Only update if provided
       updated_at: new Date().toISOString(),
       updated_by: userId,
     };
+
+    // Only update status if provided and valid
+    if (status && allowedStatuses.includes(status)) {
+      updateData.status = status;
+    }
 
     console.log('Updating asset with data:', updateData);
 

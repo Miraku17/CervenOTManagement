@@ -57,6 +57,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // First, get the serial number of the item being deleted
+    const { data: itemToDelete } = await supabaseAdmin
+      .from("store_inventory")
+      .select('serial_number')
+      .eq("id", id)
+      .is('deleted_at', null)
+      .single();
+
+    const serialNumber = itemToDelete?.serial_number;
+
     // Soft delete: Update with deleted_at and deleted_by
     const { error: deleteError } = await supabaseAdmin
       .from("store_inventory")
@@ -68,6 +78,40 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .is('deleted_at', null); // Only soft delete if not already deleted
 
     if (deleteError) throw deleteError;
+
+    // Check if this serial number is still being used in other store inventory items
+    if (serialNumber) {
+      const { data: otherUsages, error: countError } = await supabaseAdmin
+        .from("store_inventory")
+        .select('id')
+        .ilike('serial_number', serialNumber.trim())
+        .is('deleted_at', null);
+
+      if (!countError && (!otherUsages || otherUsages.length === 0)) {
+        // No other store inventory items using this serial number
+        // Update asset status back to "Available" only if it's currently "In Use"
+        const { data: asset } = await supabaseAdmin
+          .from('asset_inventory')
+          .select('id, status')
+          .ilike('serial_number', serialNumber.trim())
+          .maybeSingle();
+
+        if (asset && asset.status === 'In Use') {
+          // Only change back to "Available" if it was "In Use"
+          // If it's "Broken", "Under Repair", etc., keep that status
+          await supabaseAdmin
+            .from('asset_inventory')
+            .update({
+              status: 'Available',
+              updated_by: userId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', asset.id);
+
+          console.log(`Updated asset ${asset.id} (Serial: ${serialNumber}) status back to "Available"`);
+        }
+      }
+    }
 
     return res.status(200).json({
       message: "Inventory item deleted successfully",

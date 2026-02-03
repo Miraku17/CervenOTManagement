@@ -577,6 +577,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
           ...formData,
           status: 'open',
           reported_by: currentUserId,
+          serial_number: selectedInventoryItem?.serial_number || null, // Add serial number from selected device
         }),
       });
 

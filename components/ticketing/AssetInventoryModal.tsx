@@ -32,6 +32,18 @@ interface Asset {
     last_name: string;
     email: string;
   } | null;
+  store_info?: {
+    store_name: string;
+    store_code: string;
+    station_name: string | null;
+  } | null;
+  ticket_info?: {
+    id: string;
+    rcc_reference_number: string;
+    status: string;
+    request_type: string;
+    severity: string;
+  } | null;
 }
 
 interface AssetInventoryModalProps {
@@ -60,7 +72,6 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
   const [serialNumber, setSerialNumber] = useState('');
-  
   const [status, setStatus] = useState('Available');
 
   const [underWarranty, setUnderWarranty] = useState<boolean>(false);
@@ -459,31 +470,36 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           <div>
             <label htmlFor="status" className="block text-sm font-medium text-slate-300 mb-1">Status</label>
             {isViewingDetail ? (
-              <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${
-                editItem?.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
-                editItem?.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
-                editItem?.status === 'Under Repair' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
-                editItem?.status === 'Broken' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
-                'bg-slate-700 text-slate-400 border-slate-600'
-              }`}>
-                {editItem?.status || 'Available'}
-              </div>
+              <>
+                <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium border ${
+                  editItem?.status === 'Available' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                  editItem?.status === 'In Use' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                  editItem?.status === 'Under Repair' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                  editItem?.status === 'Broken' ? 'bg-red-500/10 text-red-400 border-red-500/20' :
+                  'bg-slate-700 text-slate-400 border-slate-600'
+                }`}>
+                  {editItem?.status || 'Available'}
+                </div>
+                <p className="text-xs text-slate-500 mt-1">"In Use" status is automatically set when assigned to a store</p>
+              </>
             ) : (
-              <div className="relative">
-                <select
-                  id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                >
-                  <option value="Available">Available</option>
-                  <option value="In Use">In Use</option>
-                  <option value="Under Repair">Under Repair</option>
-                  <option value="Broken">Broken</option>
-                  <option value="Retired">Retired</option>
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-              </div>
+              <>
+                <div className="relative">
+                  <select
+                    id="status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                  >
+                    <option value="Available">Available</option>
+                    <option value="Under Repair">Under Repair</option>
+                    <option value="Broken">Broken</option>
+                    <option value="Retired">Retired</option>
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">"In Use" is automatically set when asset is assigned to a store</p>
+              </>
             )}
           </div>
 
@@ -530,6 +546,56 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                   className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
                 />
               )}
+            </div>
+          )}
+
+          {/* Usage Information */}
+          {isViewingDetail && (
+            <div className="space-y-4 pt-4 border-t border-slate-700 mt-4">
+              <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Usage Information</h3>
+
+              {/* Store Information */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Store Location</label>
+                {editItem?.store_info ? (
+                  <div className="text-white bg-slate-800 p-3 rounded-md border border-slate-700">
+                    <p className="font-medium">{editItem.store_info.store_name}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">Code: {editItem.store_info.store_code}</p>
+                    {editItem.store_info.station_name && (
+                      <p className="text-xs text-slate-400 mt-1">Station: {editItem.store_info.station_name}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-slate-500 bg-slate-800 p-3 rounded-md border border-slate-700">Not assigned to any store</p>
+                )}
+              </div>
+
+              {/* Ticket Information */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Active Ticket</label>
+                {editItem?.ticket_info ? (
+                  <div className="text-white bg-slate-800 p-3 rounded-md border border-blue-500/20">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium text-blue-400">{editItem.ticket_info.rcc_reference_number}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{editItem.ticket_info.request_type}</p>
+                      </div>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium border ${
+                        editItem.ticket_info.status === 'Open' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                        editItem.ticket_info.status === 'In Progress' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                        'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      }`}>
+                        {editItem.ticket_info.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-2">Severity: {editItem.ticket_info.severity}</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-slate-500 bg-slate-800 p-3 rounded-md border border-slate-700">
+                    <span className="text-sm">Not used</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 

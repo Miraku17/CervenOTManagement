@@ -77,6 +77,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Get the current serial number before updating
+    const { data: currentItem } = await supabaseAdmin
+      .from('store_inventory')
+      .select('serial_number')
+      .eq('id', id)
+      .single();
+
+    const oldSerialNumber = currentItem?.serial_number;
+
     const updateData: any = {
       store_id,
       station_id,
@@ -101,6 +110,78 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .eq('id', id);
 
     if (updateError) throw updateError;
+
+    // Handle asset status updates if serial number changed
+    if (oldSerialNumber && serial_number && oldSerialNumber.toLowerCase() !== serial_number.toLowerCase()) {
+      // Check if old serial number is still used elsewhere in store inventory
+      const { data: oldUsages } = await supabaseAdmin
+        .from('store_inventory')
+        .select('id')
+        .ilike('serial_number', oldSerialNumber.trim())
+        .is('deleted_at', null);
+
+      // If old serial number is no longer used, update asset status back to "Available"
+      // Only if it's currently "In Use"
+      if (!oldUsages || oldUsages.length === 0) {
+        const { data: oldAsset } = await supabaseAdmin
+          .from('asset_inventory')
+          .select('id, status')
+          .ilike('serial_number', oldSerialNumber.trim())
+          .maybeSingle();
+
+        if (oldAsset && oldAsset.status === 'In Use') {
+          // Only change back to "Available" if it was "In Use"
+          await supabaseAdmin
+            .from('asset_inventory')
+            .update({ status: 'Available', updated_by: userId, updated_at: new Date().toISOString() })
+            .eq('id', oldAsset.id);
+
+          console.log(`Updated asset ${oldAsset.id} (Serial: ${oldSerialNumber}) status back to "Available"`);
+        }
+      }
+
+      // Check if new serial number exists in asset_inventory
+      const { data: newAsset } = await supabaseAdmin
+        .from('asset_inventory')
+        .select('id, status')
+        .ilike('serial_number', serial_number.trim())
+        .maybeSingle();
+
+      if (newAsset) {
+        // Asset exists - update status to "In Use" if currently "Available"
+        if (newAsset.status === 'Available') {
+          await supabaseAdmin
+            .from('asset_inventory')
+            .update({ status: 'In Use', updated_by: userId, updated_at: new Date().toISOString() })
+            .eq('id', newAsset.id);
+
+          console.log(`Updated asset ${newAsset.id} (Serial: ${serial_number}) status to "In Use"`);
+        }
+      } else {
+        // Asset doesn't exist - create it automatically
+        const { data: createdAsset, error: createAssetError } = await supabaseAdmin
+          .from('asset_inventory')
+          .insert({
+            category_id,
+            brand_id,
+            model_id,
+            serial_number: serial_number.trim(),
+            under_warranty: under_warranty || false,
+            warranty_date: warranty_date || null,
+            status: 'In Use', // Set to "In Use" since it's being assigned to a store
+            created_by: userId,
+          })
+          .select('id')
+          .single();
+
+        if (createAssetError) {
+          console.error('Error auto-creating asset:', createAssetError);
+          throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
+        }
+
+        console.log(`Auto-created asset ${createdAsset?.id} (Serial: ${serial_number}) with status "In Use"`);
+      }
+    }
 
     // Fetch the complete record
     const { data: inventoryItem, error: fetchError } = await supabaseAdmin

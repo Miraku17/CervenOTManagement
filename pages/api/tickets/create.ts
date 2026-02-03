@@ -34,6 +34,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     status,
     reported_by,
     serviced_by,
+    serial_number,
   } = req.body;
 
   // Validation
@@ -128,6 +129,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           status: status || 'open',
           reported_by: reported_by || null,
           serviced_by: serviced_by || null,
+          serial_number: serial_number || null,
         },
       ])
       .select()

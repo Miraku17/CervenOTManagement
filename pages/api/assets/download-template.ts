@@ -17,8 +17,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': 'OptiPlex 7090',
         'Serial Number': 'SN123456789',
         'Under Warranty': 'Yes',
-        'Warranty Date': '12/31/2025',
-        'Status': 'Available'
+        'Warranty Date': '12/31/2025'
       },
       {
         'Category': '',
@@ -26,8 +25,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': '',
         'Serial Number': '',
         'Under Warranty': '',
-        'Warranty Date': '',
-        'Status': ''
+        'Warranty Date': ''
       }
     ];
 
@@ -42,8 +40,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 20 }, // Model
       { wch: 20 }, // Serial Number
       { wch: 15 }, // Under Warranty
-      { wch: 15 }, // Warranty Date
-      { wch: 12 }  // Status
+      { wch: 15 }  // Warranty Date
     ];
 
     // Add worksheet to workbook
@@ -68,7 +65,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Section': 'Warranty Date', 'Information': 'Enter warranty expiration date in MM/DD/YYYY format (e.g., 12/31/2025). Use Excel\'s default date format - NO special formatting needed!' },
       { 'Section': '  - Required when', 'Information': 'Under Warranty is "Yes"' },
       { 'Section': '  - Leave empty when', 'Information': 'Under Warranty is "No"' },
-      { 'Section': 'Status (Required)', 'Information': 'Choose one: Available, In Use, Under Repair, or Broken (case-insensitive)' },
+      { 'Section': '', 'Information': '' },
+      { 'Section': 'STATUS (Auto-managed)', 'Information': 'Status is automatically set to "Available" when importing. It will change to "In Use" when the asset is assigned to a store.' },
       { 'Section': '', 'Information': '' },
       { 'Section': 'IMPORTANT DATE FORMATTING', 'Information': '' },
       { 'Section': '✓ Use MM/DD/YYYY format', 'Information': 'Enter dates like: 12/31/2025, 1/15/2026, 3/5/2025' },
@@ -77,9 +75,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Section': 'Examples', 'Information': '12/31/2025 ✓ | 1/5/2026 ✓ | 03/15/2025 ✓ | 2025-12-31 ✗ (wrong format)' },
       { 'Section': '', 'Information': '' },
       { 'Section': 'COMMON MISTAKES TO AVOID', 'Information': '' },
-      { 'Section': 'X Do not leave required fields empty', 'Information': 'All fields except Warranty Date and Serial Number are required' },
+      { 'Section': 'X Do not leave required fields empty', 'Information': 'Category, Brand, Model, and Under Warranty are required. Serial Number and Warranty Date can be left blank in certain cases.' },
       { 'Section': 'X Do not use wrong date format', 'Information': 'Use MM/DD/YYYY (like 12/31/2025), NOT YYYY-MM-DD or other formats' },
-      { 'Section': 'X Do not use wrong status values', 'Information': 'Only use: Available, In Use, Under Repair, or Broken' },
       { 'Section': 'X Do not duplicate serial numbers', 'Information': 'Each asset must have a unique serial number. Leave blank for auto-generation.' },
       { 'Section': '✓ Auto-generated serial numbers', 'Information': 'If you leave Serial Number blank or enter "NO SERIAL", the system will automatically generate unique IDs like NO-SERIAL-001, NO-SERIAL-002, etc.' },
       { 'Section': 'X Do not add extra columns', 'Information': 'Only use the provided column headers' },
