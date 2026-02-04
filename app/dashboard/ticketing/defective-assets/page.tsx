@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Filter, Monitor, Server, AlertTriangle, CheckCircle, Printer, Loader2, ChevronDown } from 'lucide-react';
+import { Search, Filter, Monitor, Server, AlertTriangle, CheckCircle, Printer, Loader2, ChevronDown, FileSpreadsheet } from 'lucide-react';
 import AssetInventoryModal from '@/components/ticketing/AssetInventoryModal';
+import * as XLSX from 'xlsx';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter } from 'next/navigation';
@@ -246,6 +247,90 @@ export default function DefectiveAssetsPage() {
     setSelectedAssetForDetail(null);
   };
 
+  const handleExport = async () => {
+    // Fetch ALL defective assets for the export
+    let allDefectiveAssets: Asset[] = [];
+    try {
+      const response = await fetch('/api/assets/get-all');
+      const data = await response.json();
+      if (response.ok) {
+        // Filter only Broken or Under Repair assets
+        allDefectiveAssets = (data.assets || []).filter(
+          (asset: Asset) => !asset.deleted_at && (asset.status === 'Broken' || asset.status === 'Under Repair')
+        );
+      }
+    } catch (error) {
+      console.error('Error fetching all defective assets:', error);
+      // Fallback to current assets if fetch fails
+      allDefectiveAssets = filteredAssets;
+    }
+
+    // Sort by category
+    const sortedAssets = allDefectiveAssets.sort((a, b) => {
+      const nameA = a.categories?.name || '';
+      const nameB = b.categories?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+
+    // Prepare data for Excel
+    const excelData = sortedAssets.map((asset) => ({
+      'Category': asset.categories?.name || 'N/A',
+      'Brand': asset.brands?.name || 'N/A',
+      'Model': asset.models?.name || 'N/A',
+      'Serial Number': asset.serial_number || 'N/A',
+      'Store': asset.store_info ? `${asset.store_info.store_name} (${asset.store_info.store_code})` : 'Not assigned',
+      'Ticket': asset.ticket_info?.rcc_reference_number || 'Not used',
+      'Status': asset.status || 'N/A',
+      'Under Warranty': asset.under_warranty ? 'Yes' : 'No',
+      'Warranty Date': asset.warranty_date ? new Date(asset.warranty_date).toLocaleDateString() : 'N/A',
+      'Created At': new Date(asset.created_at).toLocaleDateString(),
+      'Updated At': new Date(asset.updated_at).toLocaleDateString(),
+    }));
+
+    // Create worksheet
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 25 }, // Category
+      { wch: 25 }, // Brand
+      { wch: 30 }, // Model
+      { wch: 30 }, // Serial Number
+      { wch: 35 }, // Store
+      { wch: 20 }, // Ticket
+      { wch: 15 }, // Status
+      { wch: 15 }, // Under Warranty
+      { wch: 15 }, // Warranty Date
+      { wch: 15 }, // Created At
+      { wch: 15 }, // Updated At
+    ];
+
+    // Create workbook
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Defective Assets');
+
+    // Add metadata sheet
+    const today = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    const metaData = [
+      { Field: 'Report Title', Value: 'Defective Assets Report' },
+      { Field: 'Generated Date', Value: today },
+      { Field: 'Total Defective Assets', Value: sortedAssets.length },
+      { Field: 'Broken Assets', Value: sortedAssets.filter(a => a.status === 'Broken').length },
+      { Field: 'Under Repair Assets', Value: sortedAssets.filter(a => a.status === 'Under Repair').length },
+    ];
+    const metaSheet = XLSX.utils.json_to_sheet(metaData);
+    XLSX.utils.book_append_sheet(workbook, metaSheet, 'Report Info');
+
+    // Save file
+    const filename = `Defective_Assets_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+
+    showToast('success', 'Defective assets exported successfully!');
+  };
 
   // Assets are already filtered by the API based on search term
   const filteredAssets = assets;
@@ -273,6 +358,13 @@ export default function DefectiveAssetsPage() {
           <h1 className="text-2xl font-bold text-white">Defective Assets</h1>
           <p className="text-slate-400">View defective assets (Broken or Under Repair).</p>
         </div>
+        <button
+          onClick={handleExport}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95 whitespace-nowrap"
+        >
+          <FileSpreadsheet size={20} />
+          <span>Export Excel</span>
+        </button>
       </div>
 
       {/* Filters & Search */}
