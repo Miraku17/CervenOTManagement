@@ -128,11 +128,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const totalCount = filteredAssets.length;
     const assets = filteredAssets.slice(from, to + 1);
 
-    // Fetch user details separately for created_by and updated_by
+    // Fetch user details, store info, and ticket info separately
     const assetsWithUsers = await Promise.all(
       (assets || []).map(async (asset) => {
         let created_by_user = null;
         let updated_by_user = null;
+        let store_info = null;
+        let ticket_info = null;
 
         if (asset.created_by && supabaseAdmin) {
           const { data: creator } = await supabaseAdmin
@@ -152,10 +154,67 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           updated_by_user = updater;
         }
 
+        // Fetch store information if asset has a serial number
+        if (asset.serial_number && supabaseAdmin) {
+          const { data: storeData } = await supabaseAdmin
+            .from('store_inventory')
+            .select(`
+              id,
+              stores:store_id (
+                id,
+                store_name,
+                store_code
+              ),
+              stations:station_id (
+                id,
+                name
+              )
+            `)
+            .ilike('serial_number', asset.serial_number)
+            .maybeSingle();
+
+          if (storeData && storeData.stores) {
+            store_info = {
+              store_name: (storeData.stores as any).store_name,
+              store_code: (storeData.stores as any).store_code,
+              station_name: storeData.stations ? (storeData.stations as any).name : null
+            };
+          }
+        }
+
+        // Fetch ticket information if asset has a serial number (any status)
+        if (asset.serial_number && supabaseAdmin) {
+          const { data: ticketData } = await supabaseAdmin
+            .from('tickets')
+            .select(`
+              id,
+              rcc_reference_number,
+              status,
+              request_type,
+              severity:sev
+            `)
+            .ilike('serial_number', asset.serial_number)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (ticketData) {
+            ticket_info = {
+              id: ticketData.id,
+              rcc_reference_number: ticketData.rcc_reference_number,
+              status: ticketData.status,
+              request_type: ticketData.request_type,
+              severity: ticketData.severity
+            };
+          }
+        }
+
         return {
           ...asset,
           created_by_user,
           updated_by_user,
+          store_info,
+          ticket_info
         };
       })
     );

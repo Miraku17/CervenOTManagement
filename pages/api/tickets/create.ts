@@ -34,6 +34,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     status,
     reported_by,
     serviced_by,
+    serial_number,
   } = req.body;
 
   // Validation
@@ -106,6 +107,55 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
+    // If serial_number is provided, check if it exists in asset_inventory
+    // If not, create it using data from store_inventory
+    if (serial_number && serial_number.trim() !== '' && serial_number.toUpperCase() !== 'N/A') {
+      const { data: existingAsset } = await supabaseAdmin
+        .from('asset_inventory')
+        .select('id')
+        .ilike('serial_number', serial_number)
+        .is('deleted_at', null)
+        .maybeSingle();
+
+      if (!existingAsset) {
+        // Asset doesn't exist, check if it's in store_inventory
+        const { data: storeInventoryItem } = await supabaseAdmin
+          .from('store_inventory')
+          .select('category_id, brand_id, model_id, serial_number, under_warranty, warranty_date')
+          .ilike('serial_number', serial_number)
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (storeInventoryItem) {
+          // Create asset_inventory record
+          const assetData: any = {
+            serial_number: storeInventoryItem.serial_number,
+            category_id: storeInventoryItem.category_id,
+            brand_id: storeInventoryItem.brand_id,
+            model_id: storeInventoryItem.model_id,
+            status: 'In Use',
+            under_warranty: storeInventoryItem.under_warranty || false,
+          };
+
+          // If under warranty, also save the warranty date
+          if (storeInventoryItem.under_warranty && storeInventoryItem.warranty_date) {
+            assetData.warranty_date = storeInventoryItem.warranty_date;
+          }
+
+          const { error: assetError } = await supabaseAdmin
+            .from('asset_inventory')
+            .insert([assetData]);
+
+          if (assetError) {
+            console.error('Error creating asset inventory:', assetError);
+            // Don't fail the ticket creation if asset creation fails
+          } else {
+            console.log('Created asset inventory for serial number:', storeInventoryItem.serial_number);
+          }
+        }
+      }
+    }
+
     // Create the ticket
     const { data: ticket, error: ticketError } = await supabaseAdmin
       .from('tickets')
@@ -128,6 +178,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           status: status || 'open',
           reported_by: reported_by || null,
           serviced_by: serviced_by || null,
+          serial_number: serial_number || null,
         },
       ])
       .select()

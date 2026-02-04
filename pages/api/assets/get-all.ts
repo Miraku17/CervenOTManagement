@@ -87,12 +87,88 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
-    // Attach user details
+    // Collect all serial numbers for batch fetching
+    const serialNumbers = allAssets
+      .map(asset => asset.serial_number)
+      .filter(Boolean);
+
+    // Fetch store inventory data in batch
+    const storeInventoryMap = new Map();
+    if (serialNumbers.length > 0 && supabaseAdmin) {
+      const { data: storeData, error: storeError } = await supabaseAdmin
+        .from('store_inventory')
+        .select(`
+          serial_number,
+          stores:store_id (
+            id,
+            store_name,
+            store_code
+          ),
+          stations:station_id (
+            id,
+            name
+          )
+        `)
+        .in('serial_number', serialNumbers);
+
+      if (!storeError && storeData) {
+        storeData.forEach(item => {
+          if (item.serial_number && item.stores) {
+            storeInventoryMap.set(item.serial_number.toLowerCase(), {
+              store_name: (item.stores as any).store_name,
+              store_code: (item.stores as any).store_code,
+              station_name: item.stations ? (item.stations as any).name : null
+            });
+          }
+        });
+      }
+    }
+
+    // Fetch ticket data in batch
+    const ticketsMap = new Map();
+    if (serialNumbers.length > 0 && supabaseAdmin) {
+      // Get the most recent ticket for each serial number
+      const { data: ticketData, error: ticketError } = await supabaseAdmin
+        .from('tickets')
+        .select(`
+          serial_number,
+          id,
+          rcc_reference_number,
+          status,
+          request_type,
+          severity:sev,
+          created_at
+        `)
+        .in('serial_number', serialNumbers)
+        .order('created_at', { ascending: false });
+
+      if (!ticketError && ticketData) {
+        // Keep only the most recent ticket for each serial number
+        ticketData.forEach(ticket => {
+          if (ticket.serial_number) {
+            const key = ticket.serial_number.toLowerCase();
+            if (!ticketsMap.has(key)) {
+              ticketsMap.set(key, {
+                id: ticket.id,
+                rcc_reference_number: ticket.rcc_reference_number,
+                status: ticket.status,
+                request_type: ticket.request_type,
+                severity: ticket.severity
+              });
+            }
+          }
+        });
+      }
+    }
+
+    // Attach user details, store info, and ticket info
     const assetsWithUsers = allAssets.map((asset) => ({
       ...asset,
       created_by_user: asset.created_by ? profilesMap.get(asset.created_by) || null : null,
       updated_by_user: asset.updated_by ? profilesMap.get(asset.updated_by) || null : null,
       deleted_by_user: asset.deleted_by ? profilesMap.get(asset.deleted_by) || null : null,
+      store_info: asset.serial_number ? storeInventoryMap.get(asset.serial_number.toLowerCase()) || null : null,
+      ticket_info: asset.serial_number ? ticketsMap.get(asset.serial_number.toLowerCase()) || null : null,
     }));
 
     return res.status(200).json({

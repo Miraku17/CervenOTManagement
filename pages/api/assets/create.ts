@@ -49,6 +49,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    // Validate status - prevent "In Use" from being set manually
+    const allowedStatuses = ['Available', 'Under Repair', 'Broken', 'Retired'];
+    const assetStatus = status && allowedStatuses.includes(status) ? status : 'Available';
+
+    if (status === 'In Use') {
+      return res.status(400).json({
+        error: '"In Use" status cannot be set manually. It is automatically set when the asset is assigned to a store.'
+      });
+    }
+
     const insertData = {
       category_id,
       brand_id,
@@ -56,7 +66,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       serial_number: serial_number || null,
       under_warranty: under_warranty || false,
       warranty_date: warranty_date || null,
-      status: status || 'Available',
+      status: assetStatus,
       created_by: userId,
     };
 

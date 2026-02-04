@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter, usePathname } from 'next/navigation';
@@ -257,6 +257,23 @@ export default function TicketingLayout({
                   <Monitor size={18} className={pathname === '/dashboard/ticketing/asset-inventory' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
                   <span className={`font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 hidden'}`}>
                     Asset Inventory
+                  </span>
+                </button>
+              )}
+
+              {hasAssetInventoryAccess && (
+                <button
+                  onClick={() => handleNavigate('/dashboard/ticketing/defective-assets')}
+                  className={`w-full flex items-center ${isOpen ? 'gap-3 px-3' : 'justify-center px-0'} py-2 rounded-lg transition-all duration-200 group ${
+                    pathname === '/dashboard/ticketing/defective-assets'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title={!isOpen ? "Defective Assets" : undefined}
+                >
+                  <AlertTriangle size={18} className={pathname === '/dashboard/ticketing/defective-assets' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                  <span className={`font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 hidden'}`}>
+                    Defective Assets
                   </span>
                 </button>
               )}

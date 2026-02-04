@@ -409,6 +409,44 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         // Normalize serial number
         const serialNumber = row['Serial Number'].toString().trim();
 
+        // Check if asset exists in asset_inventory, create if it doesn't
+        // Only auto-set to "In Use" if current status is "Available"
+        if (serialNumber) {
+          const { data: existingAsset } = await supabaseAdmin
+            .from('asset_inventory')
+            .select('id, status')
+            .ilike('serial_number', serialNumber)
+            .maybeSingle();
+
+          if (existingAsset) {
+            // Asset exists - update status to "In Use" if currently "Available"
+            if (existingAsset.status === 'Available') {
+              await supabaseAdmin
+                .from('asset_inventory')
+                .update({ status: 'In Use', updated_by: userId, updated_at: new Date().toISOString() })
+                .eq('id', existingAsset.id);
+            }
+          } else {
+            // Asset doesn't exist - create it automatically
+            const { error: createAssetError } = await supabaseAdmin
+              .from('asset_inventory')
+              .insert({
+                category_id: categoryId,
+                brand_id: brandId,
+                model_id: modelId,
+                serial_number: serialNumber,
+                under_warranty: underWarranty,
+                warranty_date: warrantyDate,
+                status: 'In Use', // Set to "In Use" since it's being assigned to a store
+                created_by: userId,
+              });
+
+            if (createAssetError) {
+              throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
+            }
+          }
+        }
+
         // Always create new inventory entry (allows duplicate serial numbers)
         // This is useful for placeholder values like "NO DEVICE" or when importing bulk data
         const { error: inventoryError } = await supabaseAdmin

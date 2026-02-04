@@ -1083,8 +1083,8 @@ export default function StoreInventoryPage() {
 
       {/* Import Errors Modal */}
       {showImportErrors && importErrors.length > 0 && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[80vh] shadow-2xl flex flex-col">
+        <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" style={{ position: 'fixed', inset: 0 }}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[80vh] shadow-2xl flex flex-col relative z-[10000]">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
               <div className="flex items-center gap-3">

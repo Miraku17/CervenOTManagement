@@ -1,6 +1,6 @@
 "use client"
 import React, { useState, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
@@ -90,7 +90,8 @@ const fetchTickets = async (
   statusFilter?: string,
   searchTerm?: string,
   startDate?: string,
-  endDate?: string
+  endDate?: string,
+  sortOrder?: 'asc' | 'desc'
 ): Promise<TicketsResponse> => {
   const params = new URLSearchParams({
     page: page.toString(),
@@ -109,6 +110,9 @@ const fetchTickets = async (
   if (endDate) {
     params.append('endDate', endDate);
   }
+  if (sortOrder) {
+    params.append('sortOrder', sortOrder);
+  }
 
   const response = await fetch(`/api/tickets/get?${params.toString()}`);
   if (!response.ok) {
@@ -121,6 +125,7 @@ export default function TicketsPage() {
   const { user } = useAuth();
   const { hasPermission, loading: permissionsLoading } = usePermissions();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -153,8 +158,8 @@ export default function TicketsPage() {
 
   // Fetch tickets with TanStack Query
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate],
-    queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate),
+    queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate, sortOrder],
+    queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate, sortOrder),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
@@ -323,8 +328,15 @@ export default function TicketsPage() {
     setIsDetailModalOpen(true);
   };
 
-  const handleSuccess = () => {
-    refetch();
+  const handleSuccess = async () => {
+    // Show success toast
+    showToast('success', 'Ticket Created', 'The ticket has been successfully created.');
+
+    // Invalidate and refetch the tickets query to show the new ticket immediately
+    await queryClient.invalidateQueries({ queryKey: ['tickets'] });
+
+    // Force refetch with fresh data
+    await refetch();
   };
 
   const handleDeleteClick = (ticketId: string, e: React.MouseEvent) => {
@@ -541,18 +553,8 @@ export default function TicketsPage() {
     }
   };
 
-  // Filtering is now done server-side, just sort client-side
-  const filteredTickets = React.useMemo(() => {
-    if (!data?.tickets) return [];
-
-    const tickets = [...data.tickets];
-    return tickets.sort((a, b) => {
-      // Combine date and time for accurate sorting
-      const dateTimeA = new Date(`${a.date_reported}T${a.time_reported || '00:00:00'}`).getTime();
-      const dateTimeB = new Date(`${b.date_reported}T${b.time_reported || '00:00:00'}`).getTime();
-      return sortOrder === 'asc' ? dateTimeA - dateTimeB : dateTimeB - dateTimeA;
-    });
-  }, [data?.tickets, sortOrder]);
+  // Filtering and sorting are now done server-side
+  const filteredTickets = data?.tickets || [];
 
   const getStatusColor = (status: string) => {
     switch ((status || '').toLowerCase().replace(/_/g, ' ')) {
@@ -1216,8 +1218,8 @@ export default function TicketsPage() {
 
       {/* Temporarily commented out - Delete Confirmation Modal */}
       {/* {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200">
+        <div className="fixed top-0 left-0 right-0 bottom-0 w-screen h-screen z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200" style={{ position: 'fixed', inset: 0 }}>
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl animate-in zoom-in-95 duration-200 relative z-[10000]">
             <div className="flex items-center justify-between p-6 border-b border-slate-800">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500/10 to-red-600/5 border border-red-500/20 flex items-center justify-center">

@@ -20,7 +20,6 @@ interface ImportRow {
   'Serial Number': string;
   'Under Warranty': string;
   'Warranty Date'?: string;
-  'Status': string;
 }
 
 interface ImportResult {
@@ -198,9 +197,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         if (!row['Under Warranty']) {
           throw new Error('Missing Under Warranty - Please enter "Yes" or "No" to indicate warranty status');
         }
-        if (!row['Status']) {
-          throw new Error('Missing Status - Please select a status: Available, In Use, Under Repair, or Broken');
-        }
 
         // Handle Serial Number - auto-generate if blank or "NO-SERIAL"
         let serialNumber = row['Serial Number'] ? row['Serial Number'].toString().trim() : '';
@@ -269,12 +265,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
           // Save converted date back to row for Phase 2
           row['Warranty Date'] = warrantyDate;
-        }
-
-        // Validate status
-        const validStatuses = ['Available', 'In Use', 'Under Repair', 'Broken', 'available', 'in use', 'under repair', 'broken'];
-        if (!validStatuses.includes(row['Status'])) {
-          throw new Error(`Invalid Status "${row['Status']}" - Please use one of these options: Available, In Use, Under Repair, or Broken`);
         }
 
         // All validations passed for this row
@@ -393,7 +383,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               model_id: modelId,
               under_warranty: underWarranty,
               warranty_date: underWarranty ? warrantyDate : null,
-              status: row['Status'].trim(),
+              // Status is not updated during import - it's auto-managed
               updated_at: new Date().toISOString(),
               updated_by: userId,
             })
@@ -402,7 +392,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           result.updated++;
           console.log(`Row ${rowNumber}: Updated existing asset with serial number ${row['Serial Number']}`);
         } else {
-          // Create new asset
+          // Create new asset - always set status to "Available"
           await supabaseAdmin
             .from('asset_inventory')
             .insert({
@@ -412,7 +402,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               serial_number: row['Serial Number'].toString().trim(),
               under_warranty: underWarranty,
               warranty_date: underWarranty ? warrantyDate : null,
-              status: row['Status'].trim(),
+              status: 'Available', // Always set to Available on import
               created_by: userId,
             });
 

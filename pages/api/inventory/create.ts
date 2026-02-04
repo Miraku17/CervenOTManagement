@@ -78,6 +78,50 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Check if asset exists in asset_inventory, create if it doesn't
+    // Only auto-set to "In Use" if current status is "Available"
+    if (serial_number) {
+      const { data: existingAsset } = await supabaseAdmin
+        .from('asset_inventory')
+        .select('id, status')
+        .ilike('serial_number', serial_number.trim())
+        .maybeSingle();
+
+      if (existingAsset) {
+        // Asset exists - update status to "In Use" if currently "Available"
+        if (existingAsset.status === 'Available') {
+          await supabaseAdmin
+            .from('asset_inventory')
+            .update({ status: 'In Use', updated_by: userId, updated_at: new Date().toISOString() })
+            .eq('id', existingAsset.id);
+
+          console.log(`Updated asset ${existingAsset.id} (Serial: ${serial_number}) status to "In Use"`);
+        }
+      } else {
+        // Asset doesn't exist - create it automatically
+        const { data: newAsset, error: createAssetError } = await supabaseAdmin
+          .from('asset_inventory')
+          .insert({
+            category_id,
+            brand_id,
+            model_id,
+            serial_number: serial_number.trim(),
+            under_warranty: under_warranty || false,
+            warranty_date: warranty_date || null,
+            status: 'In Use', // Set to "In Use" since it's being assigned to a store
+            created_by: userId,
+          })
+          .select('id')
+          .single();
+
+        if (createAssetError) {
+          console.error('Error auto-creating asset:', createAssetError);
+          throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
+        }
+
+        console.log(`Auto-created asset ${newAsset?.id} (Serial: ${serial_number}) with status "In Use"`);
+      }
+    }
 
     // Create the inventory item with foreign keys and audit fields
     const { data: insertedItem, error: insertError } = await supabaseAdmin
