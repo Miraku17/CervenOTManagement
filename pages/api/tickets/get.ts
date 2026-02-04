@@ -32,6 +32,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const searchTerm = req.query.search as string;
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
+    const sortOrder = (req.query.sortOrder as string) || 'desc'; // Default to newest first
 
     // Build the base query for counting
     let countQuery = supabaseAdmin
@@ -143,9 +144,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           id,
           manager_name
         )
-      `)
-      .range(from, to)
-      .order('created_at', { ascending: false });
+      `);
 
     // If user doesn't have manage_tickets permission, filter by tickets they are servicing OR unassigned
     if (!hasManageTickets) {
@@ -171,6 +170,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (endDate) {
       query = query.lte('date_reported', endDate);
     }
+
+    // Apply ordering and pagination AFTER all filters
+    // sortOrder: 'asc' = oldest first, 'desc' = newest first
+    // Sort by date_reported first, then time_reported for accurate chronological ordering
+    query = query
+      .order('date_reported', { ascending: sortOrder === 'asc' })
+      .order('time_reported', { ascending: sortOrder === 'asc' })
+      .range(from, to);
 
     const { data: tickets, error } = await query;
 

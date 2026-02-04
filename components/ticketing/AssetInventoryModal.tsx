@@ -130,7 +130,18 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
         setSelectedModelId(null);
       }
       setSerialNumber(editItem.serial_number || '');
-      setStatus(editItem.status || 'Available');
+
+      // If status is "In Use" but asset is not in a store, default to "Available"
+      const currentStatus = editItem.status || 'Available';
+      if (currentStatus === 'In Use' && !editItem.store_info) {
+        setStatus('Available');
+      } else if (currentStatus === 'In Use') {
+        // Keep "In Use" if it's actually in a store
+        setStatus('In Use');
+      } else {
+        setStatus(currentStatus);
+      }
+
       setUnderWarranty(editItem.under_warranty || false);
       setWarrantyDate(editItem.warranty_date || '');
     } else if (isOpen && !editItem && !isViewingDetail) {
