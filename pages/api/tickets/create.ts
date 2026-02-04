@@ -188,6 +188,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw ticketError;
     }
 
+    // Link the ticket to asset_inventory if serial_number is provided
+    if (ticket && serial_number && serial_number.trim() !== '' && serial_number.toUpperCase() !== 'N/A') {
+      const { error: linkError } = await supabaseAdmin
+        .from('asset_inventory')
+        .update({ ticket_id: ticket.id })
+        .ilike('serial_number', serial_number)
+        .is('deleted_at', null);
+
+      if (linkError) {
+        console.error('Error linking ticket to asset:', linkError);
+        // Don't fail the ticket creation if linking fails
+      } else {
+        console.log('Linked ticket', ticket.id, 'to asset with serial number:', serial_number);
+      }
+    }
+
     return res.status(201).json({ ticket });
   } catch (error: any) {
     console.error('Error creating ticket:', error);

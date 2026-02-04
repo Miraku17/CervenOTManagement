@@ -83,6 +83,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         updated_at,
         created_by,
         updated_by,
+        store_id,
+        ticket_id,
         categories:category_id (
           id,
           name
@@ -97,7 +99,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `)
       .is('deleted_at', null)
-      .order('created_at', { ascending: false })
+      .order('updated_at', { ascending: false })
       .range(0, 99999); // Override Supabase's default 1000 row limit
 
     if (fetchError) throw fetchError;
@@ -154,36 +156,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           updated_by_user = updater;
         }
 
-        // Fetch store information if asset has a serial number
-        if (asset.serial_number && supabaseAdmin) {
+        // Fetch store information if asset has a store_id
+        if (asset.store_id && supabaseAdmin) {
           const { data: storeData } = await supabaseAdmin
-            .from('store_inventory')
+            .from('stores')
             .select(`
               id,
-              stores:store_id (
-                id,
-                store_name,
-                store_code
-              ),
-              stations:station_id (
-                id,
-                name
-              )
+              store_name,
+              store_code
             `)
-            .ilike('serial_number', asset.serial_number)
+            .eq('id', asset.store_id)
+            .is('deleted_at', null)
             .maybeSingle();
 
-          if (storeData && storeData.stores) {
+          if (storeData) {
             store_info = {
-              store_name: (storeData.stores as any).store_name,
-              store_code: (storeData.stores as any).store_code,
-              station_name: storeData.stations ? (storeData.stations as any).name : null
+              store_name: storeData.store_name,
+              store_code: storeData.store_code,
+              station_name: null
             };
           }
         }
 
-        // Fetch ticket information if asset has a serial number (any status)
-        if (asset.serial_number && supabaseAdmin) {
+        // Fetch ticket information if asset has a ticket_id
+        if (asset.ticket_id && supabaseAdmin) {
           const { data: ticketData } = await supabaseAdmin
             .from('tickets')
             .select(`
@@ -193,9 +189,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               request_type,
               severity:sev
             `)
-            .ilike('serial_number', asset.serial_number)
-            .order('created_at', { ascending: false })
-            .limit(1)
+            .eq('id', asset.ticket_id)
             .maybeSingle();
 
           if (ticketData) {

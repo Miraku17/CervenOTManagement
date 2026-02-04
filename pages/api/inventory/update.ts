@@ -111,7 +111,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (updateError) throw updateError;
 
-    // Handle asset status updates if serial number changed
+    // Handle asset linking updates if serial number changed
     if (oldSerialNumber && serial_number && oldSerialNumber.toLowerCase() !== serial_number.toLowerCase()) {
       // Check if old serial number is still used elsewhere in store inventory
       const { data: oldUsages } = await supabaseAdmin
@@ -120,23 +120,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .ilike('serial_number', oldSerialNumber.trim())
         .is('deleted_at', null);
 
-      // If old serial number is no longer used, update asset status back to "Available"
-      // Only if it's currently "In Use"
+      // If old serial number is no longer used, clear store_id from asset
       if (!oldUsages || oldUsages.length === 0) {
         const { data: oldAsset } = await supabaseAdmin
           .from('asset_inventory')
-          .select('id, status')
+          .select('id, store_id')
           .ilike('serial_number', oldSerialNumber.trim())
           .maybeSingle();
 
-        if (oldAsset && oldAsset.status === 'In Use') {
-          // Only change back to "Available" if it was "In Use"
+        if (oldAsset && oldAsset.store_id) {
+          // Clear store_id since it's no longer in any store
           await supabaseAdmin
             .from('asset_inventory')
-            .update({ status: 'Available', updated_by: userId, updated_at: new Date().toISOString() })
+            .update({
+              store_id: null,
+              status: 'Available',
+              updated_by: userId,
+              updated_at: new Date().toISOString()
+            })
             .eq('id', oldAsset.id);
 
-          console.log(`Updated asset ${oldAsset.id} (Serial: ${oldSerialNumber}) status back to "Available"`);
+          console.log(`Cleared store link from asset ${oldAsset.id} (Serial: ${oldSerialNumber})`);
         }
       }
 
@@ -148,15 +152,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .maybeSingle();
 
       if (newAsset) {
-        // Asset exists - update status to "In Use" if currently "Available"
-        if (newAsset.status === 'Available') {
-          await supabaseAdmin
-            .from('asset_inventory')
-            .update({ status: 'In Use', updated_by: userId, updated_at: new Date().toISOString() })
-            .eq('id', newAsset.id);
+        // Asset exists - link it to the store
+        await supabaseAdmin
+          .from('asset_inventory')
+          .update({
+            store_id: store_id,
+            status: 'Available',
+            updated_by: userId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', newAsset.id);
 
-          console.log(`Updated asset ${newAsset.id} (Serial: ${serial_number}) status to "In Use"`);
-        }
+        console.log(`Linked asset ${newAsset.id} (Serial: ${serial_number}) to store ${store_id}`);
       } else {
         // Asset doesn't exist - create it automatically
         const { data: createdAsset, error: createAssetError } = await supabaseAdmin
@@ -168,7 +175,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             serial_number: serial_number.trim(),
             under_warranty: under_warranty || false,
             warranty_date: warranty_date || null,
-            status: 'In Use', // Set to "In Use" since it's being assigned to a store
+            status: 'Available',
+            store_id: store_id, // Link to the store
             created_by: userId,
           })
           .select('id')
@@ -179,7 +187,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
         }
 
-        console.log(`Auto-created asset ${createdAsset?.id} (Serial: ${serial_number}) with status "In Use"`);
+        console.log(`Auto-created asset ${createdAsset?.id} (Serial: ${serial_number}) linked to store ${store_id}`);
       }
     }
 

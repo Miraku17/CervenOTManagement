@@ -34,6 +34,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           created_by,
           updated_by,
           deleted_by,
+          store_id,
+          ticket_id,
           categories:category_id (
             id,
             name
@@ -47,7 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             name
           )
         `)
-        .order('created_at', { ascending: false })
+        .order('updated_at', { ascending: false })
         .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
       if (error) throw error;
@@ -87,76 +89,62 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
-    // Collect all serial numbers for batch fetching
-    const serialNumbers = allAssets
-      .map(asset => asset.serial_number)
+    // Collect all store IDs and ticket IDs for batch fetching
+    const storeIds = allAssets
+      .map(asset => asset.store_id)
       .filter(Boolean);
 
-    // Fetch store inventory data in batch
-    const storeInventoryMap = new Map();
-    if (serialNumbers.length > 0 && supabaseAdmin) {
+    const ticketIds = allAssets
+      .map(asset => asset.ticket_id)
+      .filter(Boolean);
+
+    // Fetch stores data in batch
+    const storesMap = new Map();
+    if (storeIds.length > 0 && supabaseAdmin) {
       const { data: storeData, error: storeError } = await supabaseAdmin
-        .from('store_inventory')
+        .from('stores')
         .select(`
-          serial_number,
-          stores:store_id (
-            id,
-            store_name,
-            store_code
-          ),
-          stations:station_id (
-            id,
-            name
-          )
+          id,
+          store_name,
+          store_code
         `)
-        .in('serial_number', serialNumbers);
+        .in('id', storeIds)
+        .is('deleted_at', null);
 
       if (!storeError && storeData) {
-        storeData.forEach(item => {
-          if (item.serial_number && item.stores) {
-            storeInventoryMap.set(item.serial_number.toLowerCase(), {
-              store_name: (item.stores as any).store_name,
-              store_code: (item.stores as any).store_code,
-              station_name: item.stations ? (item.stations as any).name : null
-            });
-          }
+        storeData.forEach(store => {
+          storesMap.set(store.id, {
+            store_name: store.store_name,
+            store_code: store.store_code,
+            station_name: null
+          });
         });
       }
     }
 
     // Fetch ticket data in batch
     const ticketsMap = new Map();
-    if (serialNumbers.length > 0 && supabaseAdmin) {
-      // Get the most recent ticket for each serial number
+    if (ticketIds.length > 0 && supabaseAdmin) {
       const { data: ticketData, error: ticketError } = await supabaseAdmin
         .from('tickets')
         .select(`
-          serial_number,
           id,
           rcc_reference_number,
           status,
           request_type,
-          severity:sev,
-          created_at
+          severity:sev
         `)
-        .in('serial_number', serialNumbers)
-        .order('created_at', { ascending: false });
+        .in('id', ticketIds);
 
       if (!ticketError && ticketData) {
-        // Keep only the most recent ticket for each serial number
         ticketData.forEach(ticket => {
-          if (ticket.serial_number) {
-            const key = ticket.serial_number.toLowerCase();
-            if (!ticketsMap.has(key)) {
-              ticketsMap.set(key, {
-                id: ticket.id,
-                rcc_reference_number: ticket.rcc_reference_number,
-                status: ticket.status,
-                request_type: ticket.request_type,
-                severity: ticket.severity
-              });
-            }
-          }
+          ticketsMap.set(ticket.id, {
+            id: ticket.id,
+            rcc_reference_number: ticket.rcc_reference_number,
+            status: ticket.status,
+            request_type: ticket.request_type,
+            severity: ticket.severity
+          });
         });
       }
     }
@@ -167,8 +155,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       created_by_user: asset.created_by ? profilesMap.get(asset.created_by) || null : null,
       updated_by_user: asset.updated_by ? profilesMap.get(asset.updated_by) || null : null,
       deleted_by_user: asset.deleted_by ? profilesMap.get(asset.deleted_by) || null : null,
-      store_info: asset.serial_number ? storeInventoryMap.get(asset.serial_number.toLowerCase()) || null : null,
-      ticket_info: asset.serial_number ? ticketsMap.get(asset.serial_number.toLowerCase()) || null : null,
+      store_info: asset.store_id ? storesMap.get(asset.store_id) || null : null,
+      ticket_info: asset.ticket_id ? ticketsMap.get(asset.ticket_id) || null : null,
     }));
 
     return res.status(200).json({

@@ -8,7 +8,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status } = req.body;
+  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status, store_id, ticket_id } = req.body;
 
   // Get user ID from the authenticated request
   let userId = req.user?.id;
@@ -49,15 +49,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    // Validate status - prevent "In Use" from being set manually
-    const allowedStatuses = ['Available', 'Under Repair', 'Broken', 'Retired'];
+    // Validate status
+    const allowedStatuses = ['Available', 'In Use', 'Under Repair', 'Broken', 'Retired'];
     const assetStatus = status && allowedStatuses.includes(status) ? status : 'Available';
-
-    if (status === 'In Use') {
-      return res.status(400).json({
-        error: '"In Use" status cannot be set manually. It is automatically set when the asset is assigned to a store.'
-      });
-    }
 
     const insertData = {
       category_id,
@@ -67,6 +61,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       under_warranty: under_warranty || false,
       warranty_date: warranty_date || null,
       status: assetStatus,
+      store_id: store_id || null,
+      ticket_id: ticket_id || null,
       created_by: userId,
     };
 
