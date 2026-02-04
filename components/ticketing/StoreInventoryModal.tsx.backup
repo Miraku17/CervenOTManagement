@@ -96,6 +96,14 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [showModelDropdown, setShowModelDropdown] = useState(false);
 
+  // Asset selection states - removed entryMode, always manual entry
+  // const [entryMode, setEntryMode] = useState<'select' | 'manual'>('manual');
+  const [assetSearchTerm, setAssetSearchTerm] = useState('');
+  const [availableAssets, setAvailableAssets] = useState<any[]>([]);
+  const [showAssetDropdown, setShowAssetDropdown] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<any>(null);
+  const [isLoadingAssets, setIsLoadingAssets] = useState(false);
+  const assetSearchRef = useRef<HTMLDivElement>(null);
 
   // New states for product details
   const [serialNumber, setSerialNumber] = useState('');
@@ -112,11 +120,11 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     message: string;
   }>({ show: false, type: 'success', message: '' });
 
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const stationRef = useRef<HTMLDivElement>(null);
-  const categoryRef = useRef<HTMLDivElement>(null);
-  const brandRef = useRef<HTMLDivElement>(null);
-  const modelRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null); // For store dropdown
+  const stationRef = useRef<HTMLDivElement>(null); // For station dropdown
+  const categoryRef = useRef<HTMLDivElement>(null); // For category dropdown
+  const brandRef = useRef<HTMLDivElement>(null); // For brand dropdown
+  const modelRef = useRef<HTMLDivElement>(null); // For model dropdown
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -135,6 +143,35 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       fetchModels();
     }
   }, [isOpen]);
+
+  // Search available assets as user types (debounced)
+  useEffect(() => {
+    if (!isOpen || entryMode !== 'select') return;
+
+    const searchAssets = async () => {
+      setIsLoadingAssets(true);
+      try {
+        const query = assetSearchTerm.trim();
+        const response = await fetch(`/api/assets/search-available?q=${encodeURIComponent(query)}&limit=20`);
+        const data = await response.json();
+        if (response.ok) {
+          setAvailableAssets(data.assets || []);
+        } else {
+          console.error('Failed to search assets:', data.error);
+        }
+      } catch (err) {
+        console.error('Error searching assets:', err);
+      } finally {
+        setIsLoadingAssets(false);
+      }
+    };
+
+    const debounce = setTimeout(() => {
+      searchAssets();
+    }, 300);
+
+    return () => clearTimeout(debounce);
+  }, [assetSearchTerm, isOpen, entryMode]);
 
   // Search stores as user types (debounced)
   useEffect(() => {
@@ -211,6 +248,10 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       setStoreSearchTerm('');
       setStation('');
       setSelectedStationId(null);
+      setEntryMode('select');
+      setAssetSearchTerm('');
+      setSelectedAsset(null);
+      setAvailableAssets([]);
       setCategory('');
       setSelectedCategoryId(null);
       setBrand('');
@@ -243,6 +284,9 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
       }
       if (modelRef.current && !modelRef.current.contains(target)) {
         setShowModelDropdown(false);
+      }
+      if (assetSearchRef.current && !assetSearchRef.current.contains(target)) {
+        setShowAssetDropdown(false);
       }
     };
 
@@ -309,6 +353,24 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
     setStoreCode(store.store_code);
     setStoreSearchTerm(store.store_name);
     setShowStoreDropdown(false);
+  };
+
+  const handleAssetSelect = (asset: any) => {
+    setSelectedAsset(asset);
+    setAssetSearchTerm(`${asset.serial_number} - ${asset.categories?.name} ${asset.brands?.name} ${asset.models?.name}`);
+
+    // Auto-populate fields from selected asset
+    setCategory(asset.categories?.name || '');
+    setSelectedCategoryId(asset.categories?.id || null);
+    setBrand(asset.brands?.name || '');
+    setSelectedBrandId(asset.brands?.id || null);
+    setModel(asset.models?.name || '');
+    setSelectedModelId(asset.models?.id || null);
+    setSerialNumber(asset.serial_number || '');
+    setUnderWarranty(asset.under_warranty || false);
+    setWarrantyDate(asset.warranty_date || '');
+
+    setShowAssetDropdown(false);
   };
 
   const handleClearSelection = () => {
@@ -672,8 +734,150 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
           <div className="border-t border-slate-700 pt-4 mt-4">
             <h3 className="text-lg font-semibold text-white mb-4">Product Details</h3>
 
-            {/* Device, Brand, Model Row */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Entry Mode Toggle */}
+            {!isEditMode && (
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Entry Mode</label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEntryMode('select');
+                      setCategory('');
+                      setSelectedCategoryId(null);
+                      setBrand('');
+                      setSelectedBrandId(null);
+                      setModel('');
+                      setSelectedModelId(null);
+                      setSerialNumber('');
+                      setUnderWarranty(false);
+                      setWarrantyDate('');
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+                      entryMode === 'select'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    Select from Available Assets
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEntryMode('manual');
+                      setAssetSearchTerm('');
+                      setSelectedAsset(null);
+                    }}
+                    className={`flex-1 px-4 py-2 rounded-md font-medium transition-colors ${
+                      entryMode === 'manual'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                    }`}
+                  >
+                    Manual Entry (Create New)
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Asset Search (Select Mode) */}
+            {!isEditMode && entryMode === 'select' && (
+              <div ref={assetSearchRef} className="relative mb-4">
+                <label htmlFor="assetSearch" className="block text-sm font-medium text-slate-300 mb-1">
+                  Search Available Assets <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    id="assetSearch"
+                    value={assetSearchTerm}
+                    onChange={(e) => {
+                      setAssetSearchTerm(e.target.value);
+                      setShowAssetDropdown(true);
+                    }}
+                    onFocus={() => setShowAssetDropdown(true)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Search by serial number, category, brand, or model..."
+                    required={entryMode === 'select'}
+                  />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 w-5 h-5 pointer-events-none" />
+                </div>
+
+                {/* Asset Dropdown */}
+                {showAssetDropdown && (
+                  <div className="absolute z-50 w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-60 overflow-y-auto">
+                    {isLoadingAssets ? (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        Searching assets...
+                      </div>
+                    ) : availableAssets.length > 0 ? (
+                      availableAssets.map((asset) => (
+                        <button
+                          key={asset.id}
+                          type="button"
+                          onClick={() => handleAssetSelect(asset)}
+                          className="w-full text-left px-4 py-3 hover:bg-slate-700 transition-colors border-b border-slate-700 last:border-0"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-white">{asset.serial_number}</div>
+                            <div className="text-xs text-slate-400 mt-0.5">
+                              {asset.categories?.name} - {asset.brands?.name} {asset.models?.name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="inline-flex px-2 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                Available
+                              </span>
+                              {asset.under_warranty && (
+                                <span className="text-xs text-blue-400">Under Warranty</span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 text-center">
+                        {assetSearchTerm ? `No available assets found matching "${assetSearchTerm}"` : 'Start typing to search...'}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Selected Asset Display */}
+            {entryMode === 'select' && selectedAsset && (
+              <div className="mb-4 p-4 bg-slate-800 border border-blue-500/20 rounded-md">
+                <h4 className="text-sm font-semibold text-white mb-2">Selected Asset</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-slate-400">Serial Number:</span>
+                    <span className="text-white ml-2 font-medium">{selectedAsset.serial_number}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Category:</span>
+                    <span className="text-white ml-2">{selectedAsset.categories?.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Brand:</span>
+                    <span className="text-white ml-2">{selectedAsset.brands?.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Model:</span>
+                    <span className="text-white ml-2">{selectedAsset.models?.name}</span>
+                  </div>
+                  {selectedAsset.under_warranty && (
+                    <div className="col-span-2">
+                      <span className="text-slate-400">Warranty Until:</span>
+                      <span className="text-blue-400 ml-2">{selectedAsset.warranty_date ? new Date(selectedAsset.warranty_date).toLocaleDateString() : 'N/A'}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Device, Brand, Model Row - Only show in manual mode or edit mode */}
+            {(entryMode === 'manual' || isEditMode) && (
+              <div className="grid grid-cols-3 gap-4">
                 {/* Device Input with Dropdown */}
                 <div ref={categoryRef} className="relative">
                 <label htmlFor="categorySearch" className="block text-sm font-medium text-slate-300 mb-1">
@@ -693,9 +897,14 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                     onBlur={() => {
                       setTimeout(() => setShowCategoryDropdown(false), 200);
                     }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full border rounded-md py-2 px-3 pr-20 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      entryMode === 'select' && selectedAsset
+                        ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-800 border-slate-700 text-white'
+                    }`}
                     placeholder="Enter or search device..."
                     required
+                    readOnly={entryMode === 'select' && !!selectedAsset}
                   />
                   {selectedCategoryId && (
                     <button
@@ -752,9 +961,14 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                     onBlur={() => {
                       setTimeout(() => setShowBrandDropdown(false), 200);
                     }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full border rounded-md py-2 px-3 pr-20 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      entryMode === 'select' && selectedAsset
+                        ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-800 border-slate-700 text-white'
+                    }`}
                     placeholder="Enter or search brand..."
                     required
+                    readOnly={entryMode === 'select' && !!selectedAsset}
                   />
                   {selectedBrandId && (
                     <button
@@ -811,9 +1025,14 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                     onBlur={() => {
                       setTimeout(() => setShowModelDropdown(false), 200);
                     }}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-20 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className={`w-full border rounded-md py-2 px-3 pr-20 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      entryMode === 'select' && selectedAsset
+                        ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-not-allowed'
+                        : 'bg-slate-800 border-slate-700 text-white'
+                    }`}
                     placeholder="Enter or search model..."
                     required
+                    readOnly={entryMode === 'select' && !!selectedAsset}
                   />
                   {selectedModelId && (
                     <button
@@ -851,9 +1070,11 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                 )}
               </div>
             </div>
+            )}
 
-            {/* Serial Number Row */}
-            <div className="mt-4">
+            {/* Serial Number Row - Only show in manual mode or edit mode */}
+            {(entryMode === 'manual' || isEditMode) && (
+              <div className="mt-4">
               <label htmlFor="serialNumber" className="block text-sm font-medium text-slate-300 mb-1">
                 Serial Number <span className="text-red-500">*</span>
               </label>
@@ -862,11 +1083,17 @@ const StoreInventoryModal: React.FC<StoreInventoryModalProps> = ({ isOpen, onClo
                 id="serialNumber"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className={`w-full border rounded-md py-2 px-3 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  entryMode === 'select' && selectedAsset
+                    ? 'bg-slate-900 border-slate-700 text-slate-400 cursor-not-allowed'
+                    : 'bg-slate-800 border-slate-700 text-white'
+                }`}
                 placeholder="Enter serial number..."
                 required
+                readOnly={entryMode === 'select' && !!selectedAsset}
               />
             </div>
+            )}
 
             {/* Status Row */}
             <div className="mt-4">

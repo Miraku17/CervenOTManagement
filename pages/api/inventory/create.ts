@@ -79,7 +79,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     // Check if asset exists in asset_inventory, create if it doesn't
-    // Only auto-set to "In Use" if current status is "Available"
     if (serial_number) {
       const { data: existingAsset } = await supabaseAdmin
         .from('asset_inventory')
@@ -88,15 +87,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .maybeSingle();
 
       if (existingAsset) {
-        // Asset exists - update status to "In Use" if currently "Available"
-        if (existingAsset.status === 'Available') {
-          await supabaseAdmin
-            .from('asset_inventory')
-            .update({ status: 'In Use', updated_by: userId, updated_at: new Date().toISOString() })
-            .eq('id', existingAsset.id);
+        // Asset exists - update store_id to link it to this store
+        await supabaseAdmin
+          .from('asset_inventory')
+          .update({
+            store_id: store_id,
+            status: 'Available',
+            updated_by: userId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingAsset.id);
 
-          console.log(`Updated asset ${existingAsset.id} (Serial: ${serial_number}) status to "In Use"`);
-        }
+        console.log(`Linked asset ${existingAsset.id} (Serial: ${serial_number}) to store ${store_id} with status "Available"`);
       } else {
         // Asset doesn't exist - create it automatically
         const { data: newAsset, error: createAssetError } = await supabaseAdmin
@@ -108,7 +110,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             serial_number: serial_number.trim(),
             under_warranty: under_warranty || false,
             warranty_date: warranty_date || null,
-            status: 'In Use', // Set to "In Use" since it's being assigned to a store
+            status: 'Available', // Set to "Available" since it's in store inventory
+            store_id: store_id, // Link to the store
             created_by: userId,
           })
           .select('id')
@@ -119,7 +122,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
         }
 
-        console.log(`Auto-created asset ${newAsset?.id} (Serial: ${serial_number}) with status "In Use"`);
+        console.log(`Auto-created asset ${newAsset?.id} (Serial: ${serial_number}) linked to store ${store_id} with status "Available"`);
       }
     }
 

@@ -9,10 +9,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status } = req.body;
+  const { id, category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status, store_id, ticket_id } = req.body;
   let userId = req.user?.id;
 
   // Debug logging
+  console.log('=== ASSET UPDATE DEBUG ===');
+  console.log('Received status from frontend:', status);
+  console.log('Full request body:', req.body);
   console.log('Update - Auth user:', req.user);
   console.log('Update - User ID:', userId);
 
@@ -46,20 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to update assets' });
     }
 
-    // Check if asset is currently in store_inventory
-    let isInStore = false;
-    if (serial_number) {
-      const { data: storeItem } = await supabaseAdmin
-        .from('store_inventory')
-        .select('id')
-        .ilike('serial_number', serial_number)
-        .is('deleted_at', null)
-        .maybeSingle();
-
-      isInStore = !!storeItem;
-    }
-
-    const allowedStatuses = ['Available', 'Under Repair', 'Broken', 'Retired'];
+    const allowedStatuses = ['Available', 'In Use', 'Under Repair', 'Broken', 'Retired'];
 
     const updateData: any = {
       category_id,
@@ -68,25 +58,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       serial_number: serial_number || null,
       under_warranty: under_warranty !== undefined ? under_warranty : false,
       warranty_date: warranty_date || null,
+      store_id: store_id || null,
+      ticket_id: ticket_id || null,
       updated_at: new Date().toISOString(),
       updated_by: userId,
     };
 
-    // Determine final status
-    if (isInStore) {
-      // If asset is in store_inventory, force status to "In Use"
-      updateData.status = 'In Use';
-    } else if (status && allowedStatuses.includes(status)) {
-      // If not in store, allow manual status setting
+    // Set status if provided and valid
+    if (status && allowedStatuses.includes(status)) {
       updateData.status = status;
-    } else if (status === 'In Use') {
-      // Prevent manually setting "In Use" when not in store
-      return res.status(400).json({
-        error: '"In Use" status cannot be set manually. It is automatically set when the asset is assigned to a store.'
-      });
     }
 
-    console.log('Updating asset with data:', updateData);
+    console.log('=== UPDATE DATA TO BE SAVED ===');
+    console.log('Status in updateData:', updateData.status);
+    console.log('Full updateData:', updateData);
 
     const { error: updateError } = await supabaseAdmin
       .from('asset_inventory')
@@ -112,7 +97,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw fetchError;
     }
 
-    console.log('Asset updated with full data:', asset);
+    console.log('=== FINAL ASSET DATA FROM DATABASE ===');
+    console.log('Status from database:', asset?.status);
+    console.log('Full asset data:', asset);
 
     return res.status(200).json({
       message: 'Asset updated successfully',

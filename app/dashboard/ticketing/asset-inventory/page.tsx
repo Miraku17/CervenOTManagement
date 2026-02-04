@@ -29,6 +29,8 @@ interface Asset {
   deleted_at?: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  store_id?: string | null;
+  ticket_id?: number | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
@@ -282,6 +284,13 @@ export default function AssetInventoryPage() {
   const handleCloseModal = () => {
     setIsModalOpen(false);
     setEditItem(null);
+  };
+
+  const handleAssetSuccess = () => {
+    // Reset status filter to "All" so user can see the updated asset
+    setStatusFilter('All');
+    // Fetch assets with the new filter
+    fetchAssets();
   };
 
   const handleExport = async () => {
@@ -899,7 +908,7 @@ export default function AssetInventoryPage() {
       <AssetInventoryModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        onSuccess={fetchAssets}
+        onSuccess={handleAssetSuccess}
         editItem={editItem}
       />
 

@@ -15,6 +15,8 @@ interface Asset {
   status: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  store_id?: string | null;
+  ticket_id?: number | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
@@ -74,6 +76,17 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   const [serialNumber, setSerialNumber] = useState('');
   const [status, setStatus] = useState('Available');
 
+  // Store and Ticket fields
+  const [store, setStore] = useState('');
+  const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
+  const [stores, setStores] = useState<AutocompleteOption[]>([]);
+  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
+
+  const [ticket, setTicket] = useState('');
+  const [selectedTicketId, setSelectedTicketId] = useState<number | null>(null);
+  const [tickets, setTickets] = useState<{ id: number; name: string }[]>([]);
+  const [showTicketDropdown, setShowTicketDropdown] = useState(false);
+
   const [underWarranty, setUnderWarranty] = useState<boolean>(false);
   const [warrantyDate, setWarrantyDate] = useState('');
 
@@ -89,6 +102,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
   const categoryRef = useRef<HTMLDivElement>(null);
   const brandRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
+  const storeRef = useRef<HTMLDivElement>(null);
+  const ticketRef = useRef<HTMLDivElement>(null);
 
   // Helper function to show toast
   const showToast = (type: 'success' | 'error', message: string) => {
@@ -130,16 +145,24 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
         setSelectedModelId(null);
       }
       setSerialNumber(editItem.serial_number || '');
+      setStatus(editItem.status || 'Available');
 
-      // If status is "In Use" but asset is not in a store, default to "Available"
-      const currentStatus = editItem.status || 'Available';
-      if (currentStatus === 'In Use' && !editItem.store_info) {
-        setStatus('Available');
-      } else if (currentStatus === 'In Use') {
-        // Keep "In Use" if it's actually in a store
-        setStatus('In Use');
+      // Set store if available
+      if (editItem.store_id && editItem.store_info) {
+        setStore(editItem.store_info.store_name);
+        setSelectedStoreId(editItem.store_id);
       } else {
-        setStatus(currentStatus);
+        setStore('');
+        setSelectedStoreId(null);
+      }
+
+      // Set ticket if available
+      if (editItem.ticket_id && editItem.ticket_info) {
+        setTicket(editItem.ticket_info.rcc_reference_number);
+        setSelectedTicketId(editItem.ticket_id);
+      } else {
+        setTicket('');
+        setSelectedTicketId(null);
       }
 
       setUnderWarranty(editItem.under_warranty || false);
@@ -154,6 +177,10 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setSelectedModelId(null);
       setSerialNumber('');
       setStatus('Available');
+      setStore('');
+      setSelectedStoreId(null);
+      setTicket('');
+      setSelectedTicketId(null);
       setUnderWarranty(false);
       setWarrantyDate('');
     }
@@ -170,6 +197,12 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       }
       if (modelRef.current && !modelRef.current.contains(event.target as Node)) {
         setShowModelDropdown(false);
+      }
+      if (storeRef.current && !storeRef.current.contains(event.target as Node)) {
+        setShowStoreDropdown(false);
+      }
+      if (ticketRef.current && !ticketRef.current.contains(event.target as Node)) {
+        setShowTicketDropdown(false);
       }
     };
 
@@ -190,6 +223,30 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       }
     } catch (error) {
       console.error('Error fetching autocomplete data:', error);
+    }
+  };
+
+  const fetchStores = async (searchTerm: string = '') => {
+    try {
+      const response = await fetch(`/api/stores/search?q=${encodeURIComponent(searchTerm)}&limit=30`);
+      const data = await response.json();
+      if (response.ok) {
+        setStores(data.stores?.map((s: any) => ({ id: s.id, name: `${s.store_name} (${s.store_code})` })) || []);
+      }
+    } catch (error) {
+      console.error('Error fetching stores:', error);
+    }
+  };
+
+  const fetchTickets = async (searchTerm: string = '') => {
+    try {
+      const response = await fetch(`/api/tickets/search?q=${encodeURIComponent(searchTerm)}&limit=30`);
+      const data = await response.json();
+      if (response.ok) {
+        setTickets(data.tickets?.map((t: any) => ({ id: t.id, name: t.rcc_reference_number })) || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
     }
   };
 
@@ -238,6 +295,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           model_id: modelId,
           serial_number: serialNumber || null,
           status,
+          store_id: selectedStoreId || null,
+          ticket_id: selectedTicketId || null,
           under_warranty: underWarranty,
           warranty_date: warrantyDate || null,
         }),
@@ -258,6 +317,10 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setSelectedModelId(null);
       setSerialNumber('');
       setStatus('Available');
+      setStore('');
+      setSelectedStoreId(null);
+      setTicket('');
+      setSelectedTicketId(null);
       setUnderWarranty(false);
       setWarrantyDate('');
 
@@ -333,7 +396,16 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                     setCategory(e.target.value);
                     setSelectedCategoryId(null);
                   }}
-                  onFocus={() => setShowCategoryDropdown(true)}
+                  onFocus={() => {
+                    setShowCategoryDropdown(true);
+                    setShowBrandDropdown(false);
+                    setShowModelDropdown(false);
+                    setShowStoreDropdown(false);
+                    setShowTicketDropdown(false);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowCategoryDropdown(false), 200);
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Type or select category..."
                   required
@@ -381,7 +453,16 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                     setBrand(e.target.value);
                     setSelectedBrandId(null);
                   }}
-                  onFocus={() => setShowBrandDropdown(true)}
+                  onFocus={() => {
+                    setShowBrandDropdown(true);
+                    setShowCategoryDropdown(false);
+                    setShowModelDropdown(false);
+                    setShowStoreDropdown(false);
+                    setShowTicketDropdown(false);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowBrandDropdown(false), 200);
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Type or select brand..."
                   required
@@ -429,7 +510,16 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                     setModel(e.target.value);
                     setSelectedModelId(null);
                   }}
-                  onFocus={() => setShowModelDropdown(true)}
+                  onFocus={() => {
+                    setShowModelDropdown(true);
+                    setShowCategoryDropdown(false);
+                    setShowBrandDropdown(false);
+                    setShowStoreDropdown(false);
+                    setShowTicketDropdown(false);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowModelDropdown(false), 200);
+                  }}
                   className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Type or select model..."
                 />
@@ -491,7 +581,6 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                 }`}>
                   {editItem?.status || 'Available'}
                 </div>
-                <p className="text-xs text-slate-500 mt-1">"In Use" status is automatically set when assigned to a store</p>
               </>
             ) : (
               <>
@@ -503,14 +592,132 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
                     className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
                   >
                     <option value="Available">Available</option>
+                    <option value="In Use">In Use</option>
                     <option value="Under Repair">Under Repair</option>
                     <option value="Broken">Broken</option>
                     <option value="Retired">Retired</option>
                   </select>
                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">"In Use" is automatically set when asset is assigned to a store</p>
               </>
+            )}
+          </div>
+
+          {/* Store Autocomplete (Optional) */}
+          <div ref={storeRef} className="relative">
+            <label htmlFor="store" className="block text-sm font-medium text-slate-300 mb-1">Store (Optional)</label>
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.store_info ? `${editItem.store_info.store_name} (${editItem.store_info.store_code})` : 'N/A'}</p>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  id="store"
+                  value={store}
+                  onChange={(e) => {
+                    setStore(e.target.value);
+                    setSelectedStoreId(null);
+                    fetchStores(e.target.value);
+                  }}
+                  onFocus={() => {
+                    setShowStoreDropdown(true);
+                    setShowCategoryDropdown(false);
+                    setShowBrandDropdown(false);
+                    setShowModelDropdown(false);
+                    setShowTicketDropdown(false);
+                    if (stores.length === 0) fetchStores('');
+                  }}
+                  onBlur={() => {
+                    // Delay closing to allow clicking on dropdown items
+                    setTimeout(() => setShowStoreDropdown(false), 200);
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type or select store..."
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            )}
+            {showStoreDropdown && !isViewingDetail && (
+              <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+                {stores
+                  .filter(s => !store || s.name.toLowerCase().includes(store.toLowerCase()))
+                  .map((st) => (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => {
+                        setStore(st.name);
+                        setSelectedStoreId(st.id);
+                        setShowStoreDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
+                    >
+                      {st.name}
+                    </button>
+                  ))}
+                {stores.filter(s => !store || s.name.toLowerCase().includes(store.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2 text-sm text-slate-500">No stores found</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Ticket Autocomplete (Optional) */}
+          <div ref={ticketRef} className="relative">
+            <label htmlFor="ticket" className="block text-sm font-medium text-slate-300 mb-1">Ticket (Optional)</label>
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.ticket_info?.rcc_reference_number || 'N/A'}</p>
+            ) : (
+              <div className="relative">
+                <input
+                  type="text"
+                  id="ticket"
+                  value={ticket}
+                  onChange={(e) => {
+                    setTicket(e.target.value);
+                    setSelectedTicketId(null);
+                    fetchTickets(e.target.value);
+                  }}
+                  onFocus={() => {
+                    setShowTicketDropdown(true);
+                    setShowCategoryDropdown(false);
+                    setShowBrandDropdown(false);
+                    setShowModelDropdown(false);
+                    setShowStoreDropdown(false);
+                    if (tickets.length === 0) fetchTickets('');
+                  }}
+                  onBlur={() => {
+                    // Delay closing to allow clicking on dropdown items
+                    setTimeout(() => setShowTicketDropdown(false), 200);
+                  }}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 pr-10 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Type or select ticket..."
+                />
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              </div>
+            )}
+            {showTicketDropdown && !isViewingDetail && (
+              <div className="absolute z-[9999] w-full mt-1 bg-slate-800 border border-slate-700 rounded-md shadow-xl max-h-40 overflow-y-auto">
+                {tickets
+                  .filter(t => !ticket || t.name.toLowerCase().includes(ticket.toLowerCase()))
+                  .map((tk) => (
+                    <button
+                      key={tk.id}
+                      type="button"
+                      onClick={() => {
+                        setTicket(tk.name);
+                        setSelectedTicketId(tk.id);
+                        setShowTicketDropdown(false);
+                      }}
+                      className="w-full text-left px-4 py-2 hover:bg-slate-700 transition-colors text-sm text-white"
+                    >
+                      {tk.name}
+                    </button>
+                  ))}
+                {tickets.filter(t => !ticket || t.name.toLowerCase().includes(ticket.toLowerCase())).length === 0 && (
+                  <div className="px-4 py-2 text-sm text-slate-500">No tickets found</div>
+                )}
+              </div>
             )}
           </div>
 

@@ -311,6 +311,42 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw updateError;
     }
 
+    // Handle asset_inventory linking if serial_number is in the update
+    if (updateData.serial_number !== undefined) {
+      // If serial_number was removed or cleared, clear the ticket_id from the old asset
+      if (!updateData.serial_number || updateData.serial_number.trim() === '' || updateData.serial_number.toUpperCase() === 'N/A') {
+        // Clear ticket_id from any asset that was linked to this ticket
+        await supabaseAdmin
+          .from('asset_inventory')
+          .update({ ticket_id: null })
+          .eq('ticket_id', id)
+          .is('deleted_at', null);
+
+        console.log('Cleared ticket_id from assets for ticket:', id);
+      } else {
+        // Serial number was added or changed
+        // First, clear the ticket_id from any previously linked asset
+        await supabaseAdmin
+          .from('asset_inventory')
+          .update({ ticket_id: null })
+          .eq('ticket_id', id)
+          .is('deleted_at', null);
+
+        // Then link to the new asset by serial_number
+        const { error: linkError } = await supabaseAdmin
+          .from('asset_inventory')
+          .update({ ticket_id: id })
+          .ilike('serial_number', updateData.serial_number)
+          .is('deleted_at', null);
+
+        if (linkError) {
+          console.error('Error linking ticket to new asset:', linkError);
+        } else {
+          console.log('Linked ticket', id, 'to asset with serial number:', updateData.serial_number);
+        }
+      }
+    }
+
     return res.status(200).json({ ticket });
   } catch (error: any) {
     console.error('Error updating ticket:', error);
