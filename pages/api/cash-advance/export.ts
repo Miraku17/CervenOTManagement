@@ -37,10 +37,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-    // Check if position contains HR, Accounting, or Operations Manager (case-insensitive)
+    // Check if position contains HR, Accounting, Operations Manager, or Managing Director (case-insensitive)
     const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
                                  currentUserPosition.toLowerCase().includes('accounting') ||
-                                 currentUserPosition.toLowerCase().includes('operations manager');
+                                 currentUserPosition.toLowerCase().includes('operations manager') ||
+                                 currentUserPosition.toLowerCase().includes('managing director');
 
     // Get Operations Manager user IDs to filter confidential requests
     let operationsManagerUserIds: string[] = [];
