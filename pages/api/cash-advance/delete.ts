@@ -65,10 +65,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
         const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
                                      currentUserPosition.toLowerCase().includes('accounting') ||
-                                     currentUserPosition.toLowerCase().includes('operations manager');
+                                     currentUserPosition.toLowerCase().includes('operations manager') ||
+                                     currentUserPosition.toLowerCase().includes('managing director');
         if (!canViewConfidential) {
           return res.status(403).json({
-            error: 'Forbidden: Operations Manager cash advances are confidential and can only be deleted by HR or Accounting'
+            error: 'Forbidden: Operations Manager cash advances are confidential and can only be deleted by HR, Accounting, or Managing Director'
           });
         }
       }

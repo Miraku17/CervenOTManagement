@@ -1,6 +1,7 @@
 import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
+import { userHasPermission } from '@/lib/permissions';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabaseAdmin) {
@@ -19,6 +20,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
+    // Check if user has permission to manage employee status
+    const hasPermission = await userHasPermission(req.user?.id || '', 'manage_employee_status');
+
+    if (!hasPermission) {
+      return res.status(403).json({
+        error: 'Forbidden: You do not have permission to block employees'
+      });
+    }
     // 1. Update profile status to 'disabled' (terminated) instead of deleting
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
