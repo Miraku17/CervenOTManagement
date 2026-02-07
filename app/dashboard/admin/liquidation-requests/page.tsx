@@ -35,6 +35,7 @@ interface LiquidationItem {
   others: number;
   total: number;
   remarks: string;
+  liquidation_item_attachments?: LiquidationAttachment[];
 }
 
 interface LiquidationAttachment {
@@ -44,6 +45,7 @@ interface LiquidationAttachment {
   file_type: string;
   file_size: number;
   created_at: string;
+  liquidation_item_id?: string | null;
 }
 
 interface Liquidation {
