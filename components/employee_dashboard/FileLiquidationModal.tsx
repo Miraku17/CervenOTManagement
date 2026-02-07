@@ -27,6 +27,7 @@ interface LiquidationItemData {
   others: number;
   total: number;
   remarks: string;
+  liquidation_item_attachments?: LiquidationAttachment[];
 }
 
 interface LiquidationAttachment {
@@ -99,6 +100,10 @@ interface LiquidationItem {
   lodging: string;
   others: string;
   remarks: string;
+  files?: File[];
+  filePreviews?: string[];
+  existingAttachments?: LiquidationAttachment[];
+  attachmentsToRemove?: string[];
 }
 
 interface LiquidationFormData {
@@ -123,6 +128,10 @@ const emptyItem = (): LiquidationItem => ({
   lodging: '',
   others: '',
   remarks: '',
+  files: [],
+  filePreviews: [],
+  existingAttachments: [],
+  attachmentsToRemove: [],
 });
 
 // Image compression utility
@@ -353,9 +362,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     items: [emptyItem()],
   });
   const [error, setError] = useState<string | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [filePreviews, setFilePreviews] = useState<{ [key: number]: string }>({});
-  const [attachmentsToRemove, setAttachmentsToRemove] = useState<string[]>([]);
   const [hasPopulatedForm, setHasPopulatedForm] = useState(false);
 
   // Search states for store and ticket
@@ -367,10 +373,14 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const [showTicketDropdown, setShowTicketDropdown] = useState(false);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   // Refs for dropdown click outside handling
   const storeDropdownRef = useRef<HTMLDivElement>(null);
   const ticketDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Track all blob URLs for cleanup
+  const blobUrlsRef = useRef<Set<string>>(new Set());
 
   // Debounce search inputs
   useEffect(() => {
@@ -456,16 +466,17 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     });
   };
 
-  // Helper function to prepare files for upload
-  const prepareFilesForUpload = async () => {
+  // Helper function to prepare files for upload with item association
+  const prepareFilesForUpload = async (itemId: string, files: File[]) => {
     return Promise.all(
-      selectedFiles.map(async (file) => {
+      files.map(async (file) => {
         const base64 = await fileToBase64(file);
         return {
           fileName: file.name,
           fileType: file.type,
           fileSize: file.size,
           fileData: base64,
+          liquidation_item_id: itemId,
         };
       })
     );
@@ -474,13 +485,22 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const createMutation = useMutation({
     mutationFn: submitLiquidation,
     onSuccess: async (result) => {
-      // Upload files if any
-      if (selectedFiles.length > 0 && result.liquidation?.id) {
-        const filesData = await prepareFilesForUpload();
-        await uploadMutation.mutateAsync({
-          liquidation_id: result.liquidation.id,
-          files: filesData,
+      // Upload files for each item if any
+      if (result.liquidation?.id && result.liquidation?.items) {
+        const uploadPromises = formData.items.map(async (item, index) => {
+          if (item.files && item.files.length > 0) {
+            // Get the created item ID from the result
+            const createdItemId = result.liquidation.items[index]?.id;
+            if (createdItemId) {
+              const filesData = await prepareFilesForUpload(createdItemId, item.files);
+              return uploadMutation.mutateAsync({
+                liquidation_id: result.liquidation.id,
+                files: filesData,
+              });
+            }
+          }
         });
+        await Promise.all(uploadPromises.filter(Boolean));
       }
 
       queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
@@ -496,13 +516,22 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const updateMutation = useMutation({
     mutationFn: updateLiquidation,
     onSuccess: async (result) => {
-      // Upload files if any
-      if (selectedFiles.length > 0 && result.liquidation?.id) {
-        const filesData = await prepareFilesForUpload();
-        await uploadMutation.mutateAsync({
-          liquidation_id: result.liquidation.id,
-          files: filesData,
+      // Collect all attachments to remove from all items
+      const allAttachmentsToRemove = formData.items
+        .flatMap(item => item.attachmentsToRemove || []);
+
+      // Upload new files for each item if any
+      if (result.liquidation?.id) {
+        const uploadPromises = formData.items.map(async (item) => {
+          if (item.files && item.files.length > 0 && item.id) {
+            const filesData = await prepareFilesForUpload(item.id, item.files);
+            return uploadMutation.mutateAsync({
+              liquidation_id: result.liquidation.id,
+              files: filesData,
+            });
+          }
         });
+        await Promise.all(uploadPromises.filter(Boolean));
       }
 
       queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
@@ -515,22 +544,22 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     },
   });
 
-  // Clean up preview URLs when modal closes
+  // Clean up all blob URLs when component unmounts
   useEffect(() => {
     return () => {
-      // Revoke all object URLs to prevent memory leaks
-      Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url));
+      // Revoke all tracked blob URLs to prevent memory leaks
+      blobUrlsRef.current.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      blobUrlsRef.current.clear();
     };
-  }, [filePreviews]);
+  }, []);
 
   // Reset state when modal closes
   useEffect(() => {
     if (!isOpen) {
       setHasPopulatedForm(false);
       setError(null);
-      setSelectedFiles([]);
-      setFilePreviews({});
-      setAttachmentsToRemove([]);
       setStoreSearch('');
       setTicketSearch('');
       setSelectedStore(null);
@@ -582,6 +611,10 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
           lodging: item.lodging > 0 ? String(item.lodging) : '',
           others: item.others > 0 ? String(item.others) : '',
           remarks: item.remarks || '',
+          files: [],
+          filePreviews: [],
+          existingAttachments: item.liquidation_item_attachments || [],
+          attachmentsToRemove: [],
         })),
       });
 
@@ -639,15 +672,19 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     console.log('Validation passed, calling mutation');
 
     if (isEditMode && editingLiquidation) {
+      // Collect all attachments to remove from all items
+      const allAttachmentsToRemove = formData.items
+        .flatMap(item => item.attachmentsToRemove || []);
+
       console.log('Calling updateMutation with:', {
         ...formData,
         liquidation_id: editingLiquidation.id,
-        attachments_to_remove: attachmentsToRemove,
+        attachments_to_remove: allAttachmentsToRemove,
       });
       updateMutation.mutate({
         ...formData,
         liquidation_id: editingLiquidation.id,
-        attachments_to_remove: attachmentsToRemove.length > 0 ? attachmentsToRemove : undefined,
+        attachments_to_remove: allAttachmentsToRemove.length > 0 ? allAttachmentsToRemove : undefined,
       });
     } else {
       createMutation.mutate({
@@ -658,8 +695,11 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   };
 
   const handleClose = () => {
-    // Revoke all object URLs before clearing
-    Object.values(filePreviews).forEach((url) => URL.revokeObjectURL(url));
+    // Revoke all tracked blob URLs
+    blobUrlsRef.current.forEach((url) => {
+      URL.revokeObjectURL(url);
+    });
+    blobUrlsRef.current.clear();
 
     // Reset form to initial state
     setFormData({
@@ -682,77 +722,167 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     onClose();
   };
 
-  const [isCompressing, setIsCompressing] = useState(false);
+  const [isCompressing, setIsCompressing] = useState<{ [key: string]: boolean }>({});
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (itemId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
       const newFiles = Array.from(files);
-      const startIndex = selectedFiles.length;
 
-      setIsCompressing(true);
+      // Validate that all files are images
+      const nonImageFiles = newFiles.filter(file => !file.type.startsWith('image/'));
+      if (nonImageFiles.length > 0) {
+        setError(`Only image files are allowed. Please remove: ${nonImageFiles.map(f => f.name).join(', ')}`);
+        e.target.value = '';
+        return;
+      }
+
+      setIsCompressing((prev) => ({ ...prev, [itemId]: true }));
 
       try {
         // Compress images before adding
         const processedFiles = await Promise.all(
-          newFiles.map(async (file) => {
-            if (file.type.startsWith('image/')) {
-              return await compressImage(file);
-            }
-            return file;
-          })
+          newFiles.map(async (file) => await compressImage(file))
         );
 
-        // Create preview URLs for image files
-        const newPreviews: { [key: number]: string } = {};
-        processedFiles.forEach((file, index) => {
-          if (file.type.startsWith('image/')) {
-            newPreviews[startIndex + index] = URL.createObjectURL(file);
-          }
-        });
+        // Create preview URLs for each processed file
+        const newPreviews: string[] = [];
+        for (const file of processedFiles) {
+          const previewUrl = URL.createObjectURL(file);
+          blobUrlsRef.current.add(previewUrl); // Track for cleanup
+          newPreviews.push(previewUrl);
+        }
 
-        setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
-        setSelectedFiles((prev) => [...prev, ...processedFiles]);
+        console.log('Adding previews:', newPreviews.length, 'files:', processedFiles.length);
+
+        // Update the specific item
+        setFormData((prev) => ({
+          ...prev,
+          items: prev.items.map((item) => {
+            if (item.id === itemId) {
+              const updatedFiles = [...(item.files || []), ...processedFiles];
+              const updatedPreviews = [...(item.filePreviews || []), ...newPreviews];
+              console.log('Updated item:', {
+                totalFiles: updatedFiles.length,
+                totalPreviews: updatedPreviews.length,
+              });
+              return {
+                ...item,
+                files: updatedFiles,
+                filePreviews: updatedPreviews,
+              };
+            }
+            return item;
+          }),
+        }));
       } catch (error) {
         console.error('Error processing files:', error);
+        setError('Failed to process images. Please try again.');
+
         // Fallback to original files if compression fails
-        const newPreviews: { [key: number]: string } = {};
-        newFiles.forEach((file, index) => {
-          if (file.type.startsWith('image/')) {
-            newPreviews[startIndex + index] = URL.createObjectURL(file);
-          }
-        });
-        setFilePreviews((prev) => ({ ...prev, ...newPreviews }));
-        setSelectedFiles((prev) => [...prev, ...newFiles]);
+        const newPreviews: string[] = [];
+        for (const file of newFiles) {
+          const previewUrl = URL.createObjectURL(file);
+          blobUrlsRef.current.add(previewUrl); // Track for cleanup
+          newPreviews.push(previewUrl);
+        }
+
+        setFormData((prev) => ({
+          ...prev,
+          items: prev.items.map((item) =>
+            item.id === itemId
+              ? {
+                  ...item,
+                  files: [...(item.files || []), ...newFiles],
+                  filePreviews: [...(item.filePreviews || []), ...newPreviews],
+                }
+              : item
+          ),
+        }));
       } finally {
-        setIsCompressing(false);
+        setIsCompressing((prev) => ({ ...prev, [itemId]: false }));
       }
     }
     e.target.value = '';
   };
 
-  const removeFile = (index: number) => {
-    // Revoke the object URL if it exists to prevent memory leaks
-    if (filePreviews[index]) {
-      URL.revokeObjectURL(filePreviews[index]);
-    }
+  const removeFile = (itemId: string, fileIndex: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) => {
+        if (item.id === itemId) {
+          // Revoke the object URL if it exists to prevent memory leaks
+          if (item.filePreviews?.[fileIndex]) {
+            const urlToRevoke = item.filePreviews[fileIndex];
+            URL.revokeObjectURL(urlToRevoke);
+            blobUrlsRef.current.delete(urlToRevoke); // Remove from tracked URLs
+          }
 
-    // Remove the file
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-
-    // Re-index the previews after removal
-    setFilePreviews((prev) => {
-      const newPreviews: { [key: number]: string } = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        const keyNum = parseInt(key);
-        if (keyNum < index) {
-          newPreviews[keyNum] = value;
-        } else if (keyNum > index) {
-          newPreviews[keyNum - 1] = value;
+          return {
+            ...item,
+            files: item.files?.filter((_, i) => i !== fileIndex) || [],
+            filePreviews: item.filePreviews?.filter((_, i) => i !== fileIndex) || [],
+          };
         }
-      });
-      return newPreviews;
+        return item;
+      }),
+    }));
+  };
+
+  const removeExistingAttachment = (itemId: string, attachmentId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              attachmentsToRemove: [...(item.attachmentsToRemove || []), attachmentId],
+            }
+          : item
+      ),
+    }));
+  };
+
+  const undoRemoveAttachment = (itemId: string, attachmentId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      items: prev.items.map((item) =>
+        item.id === itemId
+          ? {
+              ...item,
+              attachmentsToRemove: (item.attachmentsToRemove || []).filter((id) => id !== attachmentId),
+            }
+          : item
+      ),
+    }));
+  };
+
+  const handlePreviewNewFile = (itemId: string, fileIndex: number) => {
+    const item = formData.items.find(i => i.id === itemId);
+    console.log('Preview request:', {
+      itemId,
+      fileIndex,
+      totalFiles: item?.files?.length,
+      totalPreviews: item?.filePreviews?.length,
+      previewUrl: item?.filePreviews?.[fileIndex],
+      fileName: item?.files?.[fileIndex]?.name,
     });
+
+    if (item?.filePreviews?.[fileIndex]) {
+      setPreviewImage({
+        url: item.filePreviews[fileIndex],
+        name: item.files?.[fileIndex]?.name || 'Image',
+      });
+    } else {
+      console.error('No preview available at index', fileIndex);
+    }
+  };
+
+  const handlePreviewExistingAttachment = async (attachmentId: string, fileName: string) => {
+    const url = await fetchAttachmentUrl(attachmentId);
+    if (url) {
+      setPreviewImage({ url, name: fileName });
+    }
   };
 
   const formatFileSize = (bytes: number) => {
@@ -1125,6 +1255,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                     <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
                       Remarks
                     </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Attachments
+                    </th>
                     <th rowSpan={2} className="px-3 py-2 text-center border-b border-slate-700 align-bottom">
 
                     </th>
@@ -1276,6 +1409,113 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                           className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[100px]"
                         />
                       </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <div className="flex flex-col gap-1 min-w-[120px] max-h-[200px] overflow-y-auto">
+                          {/* File Upload Button */}
+                          <label
+                            htmlFor={`file-upload-${item.id}`}
+                            className={`flex items-center justify-center gap-1 px-2 py-1 text-xs rounded cursor-pointer transition-colors ${
+                              isCompressing[item.id]
+                                ? 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                                : 'bg-orange-600/20 text-orange-400 hover:bg-orange-600/30'
+                            }`}
+                          >
+                            {isCompressing[item.id] ? (
+                              <>
+                                <Loader2 size={12} className="animate-spin" />
+                                <span>Processing...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload size={12} />
+                                <span>Upload</span>
+                              </>
+                            )}
+                          </label>
+                          <input
+                            type="file"
+                            id={`file-upload-${item.id}`}
+                            multiple
+                            accept="image/*"
+                            onChange={(e) => handleFileSelect(item.id, e)}
+                            className="hidden"
+                            disabled={isCompressing[item.id]}
+                          />
+
+                          {/* File Count Display */}
+                          {((item.files && item.files.length > 0) || (item.existingAttachments && item.existingAttachments.length > 0)) && (
+                            <div className="text-xs text-slate-400 text-center">
+                              {((item.files?.length || 0) + ((item.existingAttachments?.length || 0) - (item.attachmentsToRemove?.length || 0)))} file(s)
+                            </div>
+                          )}
+
+                          {/* Existing Attachments */}
+                          {isEditMode && item.existingAttachments && item.existingAttachments.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {item.existingAttachments
+                                .filter((att) => !(item.attachmentsToRemove || []).includes(att.id))
+                                .map((att, attIndex) => (
+                                  <div
+                                    key={att.id}
+                                    className="flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-xs group hover:bg-blue-500/20 transition-colors cursor-pointer"
+                                    title={`Click to preview: ${att.file_name}`}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => handlePreviewExistingAttachment(att.id, att.file_name)}
+                                      className="flex items-center gap-1"
+                                    >
+                                      <FileImage size={10} className="text-blue-400" />
+                                      <span className="text-blue-400 max-w-[60px] truncate">
+                                        {att.file_name}
+                                      </span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => removeExistingAttachment(item.id, att.id)}
+                                      className="text-red-400 hover:text-red-300"
+                                      title="Remove attachment"
+                                    >
+                                      <XCircle size={10} />
+                                    </button>
+                                  </div>
+                                ))}
+                            </div>
+                          )}
+
+                          {/* New Files */}
+                          {item.files && item.files.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {item.files.map((file, fileIndex) => (
+                                <div
+                                  key={`${item.id}-file-${fileIndex}`}
+                                  className="flex items-center gap-1 px-1.5 py-0.5 bg-green-500/10 border border-green-500/20 rounded text-xs group hover:bg-green-500/20 transition-colors cursor-pointer"
+                                  title={`Click to preview: ${file.name}`}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePreviewNewFile(item.id, fileIndex)}
+                                    className="flex items-center gap-1"
+                                  >
+                                    <FileImage size={10} className="text-green-400" />
+                                    <span className="text-green-400 max-w-[60px] truncate">
+                                      #{fileIndex + 1}: {file.name}
+                                    </span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeFile(item.id, fileIndex)}
+                                    className="text-red-400 hover:text-red-300"
+                                    title="Remove file"
+                                  >
+                                    <XCircle size={10} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-1 text-center">
                         <button
                           type="button"
@@ -1363,198 +1603,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
             </div>
           </div>
 
-          {/* Existing Attachments (Edit Mode) */}
-          {isEditMode && editingLiquidation?.liquidation_attachments && editingLiquidation.liquidation_attachments.length > 0 && (
-            <div className="space-y-3">
-              <label className="block text-sm font-medium text-slate-400 flex items-center gap-2">
-                Existing Attachments
-                {loadingExistingAttachments && <Loader2 size={14} className="animate-spin" />}
-                {attachmentsToRemove.length > 0 && (
-                  <span className="text-xs text-red-400">
-                    ({attachmentsToRemove.length} marked for removal)
-                  </span>
-                )}
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto">
-                {editingLiquidation.liquidation_attachments
-                  .filter((attachment) => !attachmentsToRemove.includes(attachment.id))
-                  .map((attachment) => {
-                    const signedUrl = existingAttachmentUrls[attachment.id];
-                    const isImage = attachment.file_type?.startsWith('image/');
-                    return (
-                      <div
-                        key={attachment.id}
-                        className="relative group bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden"
-                      >
-                        {/* Image Preview or File Icon */}
-                        {isImage ? (
-                          <a
-                            href={signedUrl || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => !signedUrl && e.preventDefault()}
-                            className="block aspect-square"
-                          >
-                            {signedUrl ? (
-                              <img
-                                src={signedUrl}
-                                alt={attachment.file_name}
-                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center bg-slate-900">
-                                <Loader2 size={24} className="text-slate-500 animate-spin" />
-                              </div>
-                            )}
-                          </a>
-                        ) : (
-                          <a
-                            href={signedUrl || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={(e) => !signedUrl && e.preventDefault()}
-                            className="aspect-square flex items-center justify-center bg-slate-900"
-                          >
-                            <File size={32} className="text-slate-400" />
-                          </a>
-                        )}
-
-                        {/* File Info Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-2 pointer-events-none">
-                          <p className="text-xs text-white truncate font-medium flex items-center gap-1">
-                            {isImage ? (
-                              <FileImage size={12} className="text-blue-400 shrink-0" />
-                            ) : (
-                              <File size={12} className="text-slate-400 shrink-0" />
-                            )}
-                            <span className="truncate">{attachment.file_name}</span>
-                          </p>
-                        </div>
-
-                        {/* Remove Button */}
-                        <button
-                          type="button"
-                          onClick={() => setAttachmentsToRemove((prev) => [...prev, attachment.id])}
-                          className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full hover:bg-red-500"
-                          title="Remove attachment"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      </div>
-                    );
-                  })}
-              </div>
-              {/* Show removed attachments with undo option */}
-              {attachmentsToRemove.length > 0 && (
-                <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-700">
-                  <span className="text-xs text-slate-500">Removed:</span>
-                  {editingLiquidation.liquidation_attachments
-                    .filter((attachment) => attachmentsToRemove.includes(attachment.id))
-                    .map((attachment) => (
-                      <button
-                        key={attachment.id}
-                        type="button"
-                        onClick={() => setAttachmentsToRemove((prev) => prev.filter((id) => id !== attachment.id))}
-                        className="inline-flex items-center gap-1 px-2 py-1 bg-red-500/10 border border-red-500/20 rounded text-xs text-red-400 hover:bg-red-500/20 transition-colors"
-                        title="Click to undo removal"
-                      >
-                        <span className="truncate max-w-[100px]">{attachment.file_name}</span>
-                        <span className="text-red-300">↩</span>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Receipt Attachments */}
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-slate-400">
-              {isEditMode ? 'Add More Receipts' : 'Receipt Attachments'}
-            </label>
-
-            {/* File Input */}
-            <div className={`border-2 border-dashed border-slate-700 rounded-xl p-6 text-center transition-colors ${isCompressing ? 'opacity-50 cursor-not-allowed' : 'hover:border-orange-500/50'}`}>
-              <input
-                type="file"
-                id="receipt-upload"
-                multiple
-                accept="image/*,.pdf"
-                onChange={handleFileSelect}
-                className="hidden"
-                disabled={isCompressing}
-              />
-              <label
-                htmlFor="receipt-upload"
-                className={`flex flex-col items-center gap-2 ${isCompressing ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                <div className="p-3 bg-slate-800 rounded-full">
-                  {isCompressing ? (
-                    <Loader2 size={24} className="text-orange-400 animate-spin" />
-                  ) : (
-                    <Upload size={24} className="text-orange-400" />
-                  )}
-                </div>
-                <div>
-                  <p className="text-sm text-white font-medium">
-                    {isCompressing ? 'Compressing images...' : 'Click to upload receipts'}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    PNG, JPG, or PDF (max 10MB each) - Images auto-compressed
-                  </p>
-                </div>
-              </label>
-            </div>
-
-            {/* Selected Files List with Previews */}
-            {selectedFiles.length > 0 && (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-400">
-                  {selectedFiles.length} file(s) selected
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 max-h-60 overflow-y-auto">
-                  {selectedFiles.map((file, index) => (
-                    <div
-                      key={index}
-                      className="relative group bg-slate-800/50 border border-slate-700 rounded-lg overflow-hidden"
-                    >
-                      {/* Image Preview or File Icon */}
-                      {filePreviews[index] ? (
-                        <div className="aspect-square">
-                          <img
-                            src={filePreviews[index]}
-                            alt={file.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="aspect-square flex items-center justify-center bg-slate-900">
-                          <File size={32} className="text-slate-400" />
-                        </div>
-                      )}
-
-                      {/* File Info Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent flex flex-col justify-end p-2">
-                        <p className="text-xs text-white truncate font-medium">{file.name}</p>
-                        <p className="text-xs text-slate-400">
-                          {formatFileSize(file.size)}
-                        </p>
-                      </div>
-
-                      {/* Remove Button */}
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="absolute top-1 right-1 p-1 bg-red-500/80 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500"
-                      >
-                        <XCircle size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
             </>
           )}
         </form>
@@ -1572,7 +1620,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isPending || isUploadingFiles || isLoadingData || isCompressing || (!isEditMode && cashAdvances.length === 0)}
+            disabled={isPending || isUploadingFiles || isLoadingData || Object.values(isCompressing).some(Boolean) || (!isEditMode && cashAdvances.length === 0)}
             className="w-full sm:flex-1 px-4 py-2.5 bg-orange-600 text-white hover:bg-orange-500 rounded-xl transition-colors shadow-lg shadow-orange-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isPending || isUploadingFiles ? (
@@ -1589,6 +1637,42 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/50">
+              <h3 className="text-white font-medium truncate flex items-center gap-2">
+                <FileImage size={20} className="text-orange-400" />
+                {previewImage.name}
+              </h3>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Image */}
+            <div className="p-4 flex items-center justify-center bg-slate-950">
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

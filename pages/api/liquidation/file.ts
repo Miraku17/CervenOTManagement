@@ -166,9 +166,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ...item,
     }));
 
-    const { error: itemsError } = await supabaseAdmin
+    const { data: createdItems, error: itemsError } = await supabaseAdmin
       .from('liquidation_items')
-      .insert(itemsToInsert);
+      .insert(itemsToInsert)
+      .select();
 
     if (itemsError) {
       console.error('Error creating liquidation items:', itemsError);
@@ -178,6 +179,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Send email notification to approvers (async, non-blocking)
+    // COMMENTED OUT FOR TESTING
+    /*
     (async () => {
       try {
         // Fetch user info
@@ -231,12 +234,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         console.error('Failed to send liquidation notification email:', emailError);
       }
     })();
+    */
 
     return res.status(201).json({
       message: 'Liquidation submitted successfully',
       liquidation: {
         ...liquidation,
-        items: processedItems,
+        items: createdItems || processedItems,
       },
     });
   } catch (error: unknown) {

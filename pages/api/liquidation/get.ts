@@ -75,15 +75,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           lodging,
           others,
           total,
-          remarks
+          remarks,
+          liquidation_item_attachments:liquidation_attachments!liquidation_item_id (
+            id,
+            file_name,
+            file_path,
+            file_type,
+            file_size,
+            created_at,
+            liquidation_item_id
+          )
         ),
-        liquidation_attachments (
+        liquidation_attachments!liquidation_id (
           id,
           file_name,
           file_path,
           file_type,
           file_size,
-          created_at
+          created_at,
+          liquidation_item_id
         )
       `,
         { count: 'exact' }

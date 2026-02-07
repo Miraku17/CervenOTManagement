@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Receipt, User, CheckCircle, XCircle, Clock, Loader2, AlertCircle, MapPin, Ticket, Paperclip, FileImage, File, ExternalLink } from 'lucide-react';
+import { X, Receipt, User, CheckCircle, XCircle, Clock, Loader2, AlertCircle, MapPin, Ticket, Paperclip, FileImage, File, Eye } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface LiquidationItem {
@@ -19,6 +19,7 @@ interface LiquidationItem {
   others: number;
   total: number;
   remarks: string;
+  liquidation_item_attachments?: LiquidationAttachment[];
 }
 
 interface LiquidationAttachment {
@@ -28,6 +29,7 @@ interface LiquidationAttachment {
   file_type: string;
   file_size: number;
   created_at: string;
+  liquidation_item_id?: string | null;
 }
 
 interface Liquidation {
@@ -93,11 +95,26 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<{ [key: string]: string }>({});
   const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
   // Fetch signed URLs for attachments when viewing a liquidation
   useEffect(() => {
-    if (isOpen && liquidation?.liquidation_attachments?.length) {
-      fetchAttachmentUrls(liquidation.liquidation_attachments);
+    if (isOpen && liquidation) {
+      // Collect all attachments (liquidation-level and item-level)
+      const allAttachments: LiquidationAttachment[] = [
+        ...(liquidation.liquidation_attachments || []),
+      ];
+
+      // Add item-level attachments
+      liquidation.liquidation_items?.forEach((item) => {
+        if (item.liquidation_item_attachments) {
+          allAttachments.push(...item.liquidation_item_attachments);
+        }
+      });
+
+      if (allAttachments.length > 0) {
+        fetchAttachmentUrls(allAttachments);
+      }
     }
     return () => {
       setAttachmentUrls({});
@@ -369,41 +386,147 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
           {liquidation.liquidation_items && liquidation.liquidation_items.length > 0 && (
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
               <h4 className="font-semibold text-white mb-3">Expense Items</h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="bg-slate-900/50 text-slate-400">
-                      <th className="px-2 py-2 text-left">From</th>
-                      <th className="px-2 py-2 text-left">To</th>
-                      <th className="px-2 py-2 text-right">Jeep</th>
-                      <th className="px-2 py-2 text-right">Bus</th>
-                      <th className="px-2 py-2 text-right">FX/Van</th>
-                      <th className="px-2 py-2 text-right">Gas</th>
-                      <th className="px-2 py-2 text-right">Toll</th>
-                      <th className="px-2 py-2 text-right">Meals</th>
-                      <th className="px-2 py-2 text-right">Lodging</th>
-                      <th className="px-2 py-2 text-right">Others</th>
-                      <th className="px-2 py-2 text-right">Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {liquidation.liquidation_items.map((item) => (
-                      <tr key={item.id} className="border-t border-slate-700">
-                        <td className="px-2 py-2 text-white">{item.from_destination || '-'}</td>
-                        <td className="px-2 py-2 text-white">{item.to_destination || '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.jeep > 0 ? formatCurrency(item.jeep) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.bus > 0 ? formatCurrency(item.bus) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.fx_van > 0 ? formatCurrency(item.fx_van) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.gas > 0 ? formatCurrency(item.gas) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.toll > 0 ? formatCurrency(item.toll) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.meals > 0 ? formatCurrency(item.meals) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.lodging > 0 ? formatCurrency(item.lodging) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-slate-300">{item.others > 0 ? formatCurrency(item.others) : '-'}</td>
-                        <td className="px-2 py-2 text-right text-orange-400 font-semibold">{formatCurrency(item.total)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div className="space-y-4">
+                {liquidation.liquidation_items.map((item, index) => (
+                  <div key={item.id} className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+                    {/* Row Header */}
+                    <div className="flex items-center justify-between mb-3">
+                      <h5 className="text-sm font-semibold text-orange-400">
+                        Row #{index + 1}
+                      </h5>
+                      <span className="text-sm font-mono font-bold text-orange-400">
+                        {formatCurrency(item.total)}
+                      </span>
+                    </div>
+
+                    {/* Expense Details Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">From</p>
+                        <p className="text-white text-sm">{item.from_destination || '-'}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">To</p>
+                        <p className="text-white text-sm">{item.to_destination || '-'}</p>
+                      </div>
+                      {item.jeep > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Jeep</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.jeep)}</p>
+                        </div>
+                      )}
+                      {item.bus > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Bus</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.bus)}</p>
+                        </div>
+                      )}
+                      {item.fx_van > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">FX/Van</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.fx_van)}</p>
+                        </div>
+                      )}
+                      {item.gas > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Gas</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.gas)}</p>
+                        </div>
+                      )}
+                      {item.toll > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Toll</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.toll)}</p>
+                        </div>
+                      )}
+                      {item.meals > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Meals</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.meals)}</p>
+                        </div>
+                      )}
+                      {item.lodging > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Lodging</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.lodging)}</p>
+                        </div>
+                      )}
+                      {item.others > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Others</p>
+                          <p className="text-slate-300 text-sm font-mono">{formatCurrency(item.others)}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Remarks */}
+                    {item.remarks && (
+                      <div className="mb-3">
+                        <p className="text-xs text-slate-400 mb-1">Remarks</p>
+                        <p className="text-slate-300 text-sm italic">{item.remarks}</p>
+                      </div>
+                    )}
+
+                    {/* Row Attachments */}
+                    {item.liquidation_item_attachments && item.liquidation_item_attachments.length > 0 && (
+                      <div className="border-t border-slate-700 pt-3">
+                        <p className="text-xs text-slate-400 mb-2 flex items-center gap-1">
+                          <Paperclip size={12} />
+                          Receipts ({item.liquidation_item_attachments.length})
+                        </p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                          {item.liquidation_item_attachments.map((attachment) => {
+                            const signedUrl = attachmentUrls[attachment.id];
+                            return (
+                              <button
+                                key={attachment.id}
+                                type="button"
+                                onClick={() => {
+                                  if (signedUrl) {
+                                    setPreviewImage({ url: signedUrl, name: attachment.file_name });
+                                  }
+                                }}
+                                className={`group block p-2 bg-slate-800 rounded-lg border border-slate-700 hover:border-orange-500/50 transition-all text-left ${!signedUrl ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
+                              >
+                                {isImageFile(attachment.file_type) ? (
+                                  <div className="aspect-square mb-1 rounded overflow-hidden bg-slate-900">
+                                    {signedUrl ? (
+                                      <img
+                                        src={signedUrl}
+                                        alt={attachment.file_name}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Loader2 size={16} className="text-slate-500 animate-spin" />
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <div className="aspect-square mb-1 rounded bg-slate-900 flex items-center justify-center">
+                                    <File size={20} className="text-slate-500" />
+                                  </div>
+                                )}
+                                <div className="space-y-0.5">
+                                  <p className="text-xs text-white truncate flex items-center gap-1">
+                                    {getFileIcon(attachment.file_type)}
+                                    <span className="truncate">{attachment.file_name}</span>
+                                  </p>
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-xs text-slate-500">
+                                      {formatFileSize(attachment.file_size)}
+                                    </p>
+                                    <Eye size={8} className="text-slate-500 group-hover:text-orange-400" />
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -418,63 +541,71 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
             </div>
           )}
 
-          {/* Attachments */}
-          {liquidation.liquidation_attachments && liquidation.liquidation_attachments.length > 0 && (
-            <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
-              <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
-                <Paperclip size={16} />
-                Receipt Attachments ({liquidation.liquidation_attachments.length})
-                {loadingAttachments && <Loader2 size={14} className="animate-spin" />}
-              </h4>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                {liquidation.liquidation_attachments.map((attachment) => {
-                  const signedUrl = attachmentUrls[attachment.id];
-                  return (
-                    <a
-                      key={attachment.id}
-                      href={signedUrl || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`group block p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-orange-500/50 transition-all ${!signedUrl ? 'pointer-events-none opacity-60' : ''}`}
-                      onClick={(e) => !signedUrl && e.preventDefault()}
-                    >
-                      {isImageFile(attachment.file_type) ? (
-                        <div className="aspect-square mb-2 rounded overflow-hidden bg-slate-800">
-                          {signedUrl ? (
-                            <img
-                              src={signedUrl}
-                              alt={attachment.file_name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center">
-                              <Loader2 size={24} className="text-slate-500 animate-spin" />
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="aspect-square mb-2 rounded bg-slate-800 flex items-center justify-center">
-                          <File size={32} className="text-slate-500" />
-                        </div>
-                      )}
-                      <div className="space-y-1">
-                        <p className="text-xs text-white truncate flex items-center gap-1">
-                          {getFileIcon(attachment.file_type)}
-                          <span className="truncate">{attachment.file_name}</span>
-                        </p>
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs text-slate-500">
-                            {formatFileSize(attachment.file_size)}
+          {/* Attachments (only show general/non-item-specific ones) */}
+          {(() => {
+            const generalAttachments = (liquidation.liquidation_attachments || []).filter(
+              (att) => !att.liquidation_item_id
+            );
+            if (generalAttachments.length === 0) return null;
+            return (
+              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-sm">
+                <h4 className="font-semibold text-white mb-3 flex items-center gap-2">
+                  <Paperclip size={16} />
+                  General Attachments ({generalAttachments.length})
+                  {loadingAttachments && <Loader2 size={14} className="animate-spin" />}
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {generalAttachments.map((attachment) => {
+                    const signedUrl = attachmentUrls[attachment.id];
+                    return (
+                      <button
+                        key={attachment.id}
+                        type="button"
+                        onClick={() => {
+                          if (signedUrl) {
+                            setPreviewImage({ url: signedUrl, name: attachment.file_name });
+                          }
+                        }}
+                        className={`group block p-3 bg-slate-900 rounded-lg border border-slate-700 hover:border-orange-500/50 transition-all text-left ${!signedUrl ? 'pointer-events-none opacity-60' : 'cursor-pointer'}`}
+                      >
+                        {isImageFile(attachment.file_type) ? (
+                          <div className="aspect-square mb-2 rounded overflow-hidden bg-slate-800">
+                            {signedUrl ? (
+                              <img
+                                src={signedUrl}
+                                alt={attachment.file_name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Loader2 size={24} className="text-slate-500 animate-spin" />
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="aspect-square mb-2 rounded bg-slate-800 flex items-center justify-center">
+                            <File size={32} className="text-slate-500" />
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <p className="text-xs text-white truncate flex items-center gap-1">
+                            {getFileIcon(attachment.file_type)}
+                            <span className="truncate">{attachment.file_name}</span>
                           </p>
-                          <ExternalLink size={10} className="text-slate-500 group-hover:text-orange-400" />
+                          <div className="flex items-center justify-between">
+                            <p className="text-xs text-slate-500">
+                              {formatFileSize(attachment.file_size)}
+                            </p>
+                            <Eye size={10} className="text-slate-500 group-hover:text-orange-400" />
+                          </div>
                         </div>
-                      </div>
-                    </a>
-                  );
-                })}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Review Information (for non-pending) */}
           {liquidation.status !== 'pending' && (
@@ -580,6 +711,39 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Image Preview Modal */}
+      {previewImage && (
+        <div
+          className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setPreviewImage(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] bg-slate-900 rounded-2xl overflow-hidden shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/50">
+              <h3 className="text-white font-medium truncate flex items-center gap-2">
+                <FileImage size={20} className="text-orange-400" />
+                {previewImage.name}
+              </h3>
+              <button
+                onClick={() => setPreviewImage(null)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <div className="p-4 flex items-center justify-center bg-slate-950">
+              <img
+                src={previewImage.url}
+                alt={previewImage.name}
+                className="max-w-full max-h-[calc(90vh-8rem)] object-contain rounded-lg"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 

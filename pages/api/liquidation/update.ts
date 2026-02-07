@@ -185,11 +185,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Handle attachment deletion if any
     if (attachments_to_remove && attachments_to_remove.length > 0) {
       // First, get the file paths for the attachments to delete
+      // Updated to check for attachments belonging to this liquidation (either via liquidation_id or liquidation_item_id)
+      const { data: liquidationItems } = await supabaseAdmin
+        .from('liquidation_items')
+        .select('id')
+        .eq('liquidation_id', liquidation_id);
+
+      const itemIds = liquidationItems?.map(item => item.id) || [];
+
       const { data: attachmentsToDelete, error: fetchAttachmentsError } = await supabaseAdmin
         .from('liquidation_attachments')
         .select('id, file_path')
         .in('id', attachments_to_remove)
-        .eq('liquidation_id', liquidation_id);
+        .or(`liquidation_id.eq.${liquidation_id},liquidation_item_id.in.(${itemIds.join(',')})`);
 
       if (fetchAttachmentsError) {
         console.error('Error fetching attachments to delete:', fetchAttachmentsError);
@@ -210,8 +218,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const { error: deleteAttachmentsError } = await supabaseAdmin
           .from('liquidation_attachments')
           .delete()
-          .in('id', attachments_to_remove)
-          .eq('liquidation_id', liquidation_id);
+          .in('id', attachments_to_remove);
 
         if (deleteAttachmentsError) {
           console.error('Error deleting attachment records:', deleteAttachmentsError);

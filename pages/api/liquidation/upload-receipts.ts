@@ -15,6 +15,7 @@ interface FileData {
   fileType: string;
   fileSize: number;
   fileData: string; // base64
+  liquidation_item_id?: string; // Optional for backward compatibility
 }
 
 interface UploadRequest {
@@ -113,6 +114,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .from('liquidation_attachments')
           .insert({
             liquidation_id: liquidation_id,
+            liquidation_item_id: file.liquidation_item_id || null,
             file_name: file.fileName,
             file_path: storagePath, // Store the storage path, not public URL
             file_type: file.fileType,
