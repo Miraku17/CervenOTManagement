@@ -311,6 +311,85 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw updateError;
     }
 
+    // Handle defective asset: when ticket is closed and old_parts_serial has a value,
+    // add it to defective assets (status = 'Broken') or create it if it doesn't exist
+    const ticketStatus = updateData.status || ticket.status;
+    const oldPartsSerial = updateData.old_parts_serial !== undefined ? updateData.old_parts_serial : ticket.old_parts_serial;
+
+    if (ticketStatus && ticketStatus.toLowerCase() === 'closed' && oldPartsSerial && oldPartsSerial.trim() !== '' && oldPartsSerial.toUpperCase() !== 'N/A') {
+      try {
+        // Check if an asset with this serial number already exists
+        const { data: existingAsset, error: assetLookupError } = await supabaseAdmin
+          .from('asset_inventory')
+          .select('id, status')
+          .ilike('serial_number', oldPartsSerial.trim())
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (assetLookupError) {
+          console.error('Error looking up old parts serial in assets:', assetLookupError);
+        } else if (existingAsset) {
+          // Asset exists — update its status to Broken
+          const { error: updateAssetError } = await supabaseAdmin
+            .from('asset_inventory')
+            .update({ status: 'Broken', updated_by: req.user!.id })
+            .eq('id', existingAsset.id);
+
+          if (updateAssetError) {
+            console.error('Error updating asset to Broken:', updateAssetError);
+          } else {
+            console.log('Updated asset', existingAsset.id, 'to Broken for old_parts_serial:', oldPartsSerial);
+          }
+        } else {
+          // Asset doesn't exist — create it with status Broken
+          // Try to get category_id and brand_id from the ticket's linked asset (via serial_number)
+          let categoryId = null;
+          let brandId = null;
+          let modelId = null;
+          let storeId = ticket.store_id || null;
+
+          const ticketSerial = updateData.serial_number !== undefined ? updateData.serial_number : ticket.serial_number;
+          if (ticketSerial && ticketSerial.trim() !== '' && ticketSerial.toUpperCase() !== 'N/A') {
+            const { data: linkedAsset } = await supabaseAdmin
+              .from('asset_inventory')
+              .select('category_id, brand_id, model_id, store_id')
+              .ilike('serial_number', ticketSerial.trim())
+              .is('deleted_at', null)
+              .maybeSingle();
+
+            if (linkedAsset) {
+              categoryId = linkedAsset.category_id;
+              brandId = linkedAsset.brand_id;
+              modelId = linkedAsset.model_id;
+              storeId = linkedAsset.store_id || storeId;
+            }
+          }
+
+          const { error: createAssetError } = await supabaseAdmin
+            .from('asset_inventory')
+            .insert({
+              serial_number: oldPartsSerial.trim(),
+              status: 'Broken',
+              category_id: categoryId,
+              brand_id: brandId,
+              model_id: modelId,
+              store_id: storeId,
+              ticket_id: id,
+              created_by: req.user!.id,
+            });
+
+          if (createAssetError) {
+            console.error('Error creating defective asset for old_parts_serial:', createAssetError);
+          } else {
+            console.log('Created defective asset with serial:', oldPartsSerial, 'for ticket:', id);
+          }
+        }
+      } catch (defectiveError) {
+        // Don't fail the ticket update if defective asset handling fails
+        console.error('Error handling defective asset:', defectiveError);
+      }
+    }
+
     // Handle asset_inventory linking if serial_number is in the update
     if (updateData.serial_number !== undefined) {
       // If serial_number was removed or cleared, clear the ticket_id from the old asset
