@@ -34,6 +34,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Please provide a date.' });
     }
 
+    // Check if user has any pending cash advance
+    const { data: pendingCashAdvances, error: pendingCheckError } = await supabaseAdmin
+      .from('cash_advances')
+      .select('id')
+      .eq('requested_by', userId)
+      .eq('status', 'pending')
+      .is('deleted_at', null)
+      .limit(1);
+
+    if (pendingCheckError) {
+      console.error('Error checking for pending cash advances:', pendingCheckError);
+      throw pendingCheckError;
+    }
+
+    if (pendingCashAdvances && pendingCashAdvances.length > 0) {
+      return res.status(400).json({
+        error: 'You cannot file a new cash advance while you have a pending cash advance request.'
+      });
+    }
+
     // Check if user is an Operations Manager (auto-approve if so)
     const { data: userProfile } = await supabaseAdmin
       .from('profiles')
