@@ -26,6 +26,7 @@ interface LiquidationItem {
 
 interface LiquidationAttachment {
   id: string;
+  liquidation_item_id: string | null;
   file_name: string;
   file_path: string;
   file_type: string;
@@ -337,44 +338,152 @@ const LiquidationHistory: React.FC = () => {
 
               {/* Expense Items Table */}
               {selectedLiquidation.liquidation_items && selectedLiquidation.liquidation_items.length > 0 && (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <label className="text-xs text-slate-400 uppercase font-semibold">Expense Items</label>
-                  <div className="overflow-x-auto border border-slate-700 rounded-lg">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="bg-slate-800/50 text-slate-400">
-                          <th className="px-2 py-2 text-left">From</th>
-                          <th className="px-2 py-2 text-left">To</th>
-                          <th className="px-2 py-2 text-right">Jeep</th>
-                          <th className="px-2 py-2 text-right">Bus</th>
-                          <th className="px-2 py-2 text-right">FX/Van</th>
-                          <th className="px-2 py-2 text-right">Gas</th>
-                          <th className="px-2 py-2 text-right">Toll</th>
-                          <th className="px-2 py-2 text-right">Meals</th>
-                          <th className="px-2 py-2 text-right">Lodging</th>
-                          <th className="px-2 py-2 text-right">Others</th>
-                          <th className="px-2 py-2 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {selectedLiquidation.liquidation_items.map((item) => (
-                          <tr key={item.id} className="border-t border-slate-700">
-                            <td className="px-2 py-2 text-white">{item.from_destination || '-'}</td>
-                            <td className="px-2 py-2 text-white">{item.to_destination || '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.jeep > 0 ? formatCurrency(item.jeep) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.bus > 0 ? formatCurrency(item.bus) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.fx_van > 0 ? formatCurrency(item.fx_van) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.gas > 0 ? formatCurrency(item.gas) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.toll > 0 ? formatCurrency(item.toll) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.meals > 0 ? formatCurrency(item.meals) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.lodging > 0 ? formatCurrency(item.lodging) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-slate-300">{item.others > 0 ? formatCurrency(item.others) : '-'}</td>
-                            <td className="px-2 py-2 text-right text-orange-400 font-semibold">{formatCurrency(item.total)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {selectedLiquidation.liquidation_items.map((item, index) => {
+                    // Get attachments for this specific item
+                    const itemAttachments = selectedLiquidation.liquidation_attachments?.filter(
+                      att => att.liquidation_item_id === item.id
+                    ) || [];
+
+                    return (
+                      <div key={item.id} className="border border-slate-700 rounded-lg overflow-hidden bg-slate-800/30">
+                        {/* Row Header */}
+                        <div className="bg-slate-800/50 px-3 py-2 border-b border-slate-700">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold text-slate-400">Row {index + 1}</span>
+                              {(item.from_destination || item.to_destination) && (
+                                <span className="text-xs text-white flex items-center gap-1">
+                                  <MapPin size={12} className="text-slate-500" />
+                                  {item.from_destination || '—'} → {item.to_destination || '—'}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-sm font-semibold text-orange-400">{formatCurrency(item.total)}</span>
+                          </div>
+                        </div>
+
+                        {/* Expenses Grid */}
+                        <div className="p-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
+                            {item.jeep > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Jeep:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.jeep)}</span>
+                              </div>
+                            )}
+                            {item.bus > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Bus:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.bus)}</span>
+                              </div>
+                            )}
+                            {item.fx_van > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">FX/Van:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.fx_van)}</span>
+                              </div>
+                            )}
+                            {item.gas > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Gas:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.gas)}</span>
+                              </div>
+                            )}
+                            {item.toll > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Toll:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.toll)}</span>
+                              </div>
+                            )}
+                            {item.meals > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Meals:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.meals)}</span>
+                              </div>
+                            )}
+                            {item.lodging > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Lodging:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.lodging)}</span>
+                              </div>
+                            )}
+                            {item.others > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Others:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.others)}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Row Remarks */}
+                          {item.remarks && (
+                            <div className="mt-2 text-xs text-slate-300 bg-slate-800 px-2 py-1.5 rounded">
+                              <span className="text-slate-400">Note:</span> {item.remarks}
+                            </div>
+                          )}
+
+                          {/* Row Attachments */}
+                          {itemAttachments.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                              <div className="flex items-center gap-2 text-xs text-slate-400">
+                                <Paperclip size={12} />
+                                <span>Receipts ({itemAttachments.length})</span>
+                              </div>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                {itemAttachments.map((attachment) => {
+                                  const signedUrl = attachmentUrls[attachment.id];
+                                  return (
+                                    <a
+                                      key={attachment.id}
+                                      href={signedUrl || '#'}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className={`group block p-2 bg-slate-800 rounded border border-slate-700 hover:border-orange-500/50 transition-all ${!signedUrl ? 'pointer-events-none opacity-60' : ''}`}
+                                      onClick={(e) => !signedUrl && e.preventDefault()}
+                                    >
+                                      {isImageFile(attachment.file_type) ? (
+                                        <div className="aspect-square mb-1.5 rounded overflow-hidden bg-slate-900">
+                                          {signedUrl ? (
+                                            <img
+                                              src={signedUrl}
+                                              alt={attachment.file_name}
+                                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                                            />
+                                          ) : (
+                                            <div className="w-full h-full flex items-center justify-center">
+                                              <Loader2 size={20} className="text-slate-500 animate-spin" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="aspect-square mb-1.5 rounded bg-slate-900 flex items-center justify-center">
+                                          <File size={24} className="text-slate-500" />
+                                        </div>
+                                      )}
+                                      <div className="space-y-0.5">
+                                        <p className="text-xs text-white truncate flex items-center gap-1">
+                                          {getFileIcon(attachment.file_type)}
+                                          <span className="truncate">{attachment.file_name}</span>
+                                        </p>
+                                        <div className="flex items-center justify-between">
+                                          <p className="text-xs text-slate-500">
+                                            {formatFileSize(attachment.file_size)}
+                                          </p>
+                                          <ExternalLink size={10} className="text-slate-500 group-hover:text-orange-400" />
+                                        </div>
+                                      </div>
+                                    </a>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -388,16 +497,20 @@ const LiquidationHistory: React.FC = () => {
                 </div>
               )}
 
-              {/* Attachments */}
-              {selectedLiquidation.liquidation_attachments && selectedLiquidation.liquidation_attachments.length > 0 && (
-                <div className="space-y-3">
-                  <label className="text-xs text-slate-400 uppercase font-semibold flex items-center gap-2">
-                    <Paperclip size={12} />
-                    Receipt Attachments ({selectedLiquidation.liquidation_attachments.length})
-                    {loadingAttachments && <Loader2 size={12} className="animate-spin" />}
-                  </label>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {selectedLiquidation.liquidation_attachments.map((attachment) => {
+              {/* General Attachments (not linked to specific rows) */}
+              {(() => {
+                const generalAttachments = selectedLiquidation.liquidation_attachments?.filter(
+                  att => att.liquidation_item_id === null
+                ) || [];
+                return generalAttachments.length > 0 ? (
+                  <div className="space-y-3">
+                    <label className="text-xs text-slate-400 uppercase font-semibold flex items-center gap-2">
+                      <Paperclip size={12} />
+                      General Attachments ({generalAttachments.length})
+                      {loadingAttachments && <Loader2 size={12} className="animate-spin" />}
+                    </label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                      {generalAttachments.map((attachment) => {
                       const signedUrl = attachmentUrls[attachment.id];
                       return (
                         <a
@@ -440,11 +553,12 @@ const LiquidationHistory: React.FC = () => {
                             </div>
                           </div>
                         </a>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                ) : null;
+              })()}
 
               {/* Review Info */}
               {selectedLiquidation.status !== 'pending' && selectedLiquidation.approved_at && (
