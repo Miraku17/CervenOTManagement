@@ -503,8 +503,8 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
         await Promise.all(uploadPromises.filter(Boolean));
       }
 
-      queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
-      queryClient.invalidateQueries({ queryKey: ['approved-cash-advances'] });
+      await queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
+      await queryClient.invalidateQueries({ queryKey: ['approved-cash-advances'] });
       onSuccess();
       handleClose();
     },
@@ -521,21 +521,26 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
         .flatMap(item => item.attachmentsToRemove || []);
 
       // Upload new files for each item if any
-      if (result.liquidation?.id) {
-        const uploadPromises = formData.items.map(async (item) => {
-          if (item.files && item.files.length > 0 && item.id) {
-            const filesData = await prepareFilesForUpload(item.id, item.files);
-            return uploadMutation.mutateAsync({
-              liquidation_id: result.liquidation.id,
-              files: filesData,
-            });
+      if (result.liquidation?.id && result.liquidation?.items) {
+        // Map form items to newly created item IDs by index
+        const uploadPromises = formData.items.map(async (item, index) => {
+          if (item.files && item.files.length > 0) {
+            // Get the newly created item ID from the result (same order as formData.items)
+            const createdItemId = result.liquidation.items[index]?.id;
+            if (createdItemId) {
+              const filesData = await prepareFilesForUpload(createdItemId, item.files);
+              return uploadMutation.mutateAsync({
+                liquidation_id: result.liquidation.id,
+                files: filesData,
+              });
+            }
           }
         });
         await Promise.all(uploadPromises.filter(Boolean));
       }
 
-      queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
-      queryClient.invalidateQueries({ queryKey: ['attachment-urls', result.liquidation?.id] });
+      await queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
+      await queryClient.invalidateQueries({ queryKey: ['attachment-urls', result.liquidation?.id] });
       onSuccess();
       handleClose();
     },

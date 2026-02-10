@@ -156,7 +156,59 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Failed to update liquidation');
     }
 
-    // Delete existing items
+    // Get existing items with their attachments before deletion
+    const { data: oldItems, error: fetchItemsError } = await supabaseAdmin
+      .from('liquidation_items')
+      .select('id')
+      .eq('liquidation_id', liquidation_id)
+      .order('created_at', { ascending: true });
+
+    if (fetchItemsError) {
+      console.error('Error fetching old items:', fetchItemsError);
+      throw new Error('Failed to fetch existing items');
+    }
+
+    // Store old item IDs in order
+    const oldItemIds = oldItems?.map(item => item.id) || [];
+
+    // Get all attachments linked to these items (not marked for removal)
+    let existingAttachments: { id: string; liquidation_item_id: string | null }[] = [];
+    if (oldItemIds.length > 0) {
+      const { data: fetchedAttachments, error: fetchAttachmentsError } = await supabaseAdmin
+        .from('liquidation_attachments')
+        .select('id, liquidation_item_id')
+        .in('liquidation_item_id', oldItemIds)
+        .not('liquidation_item_id', 'is', null);
+
+      if (fetchAttachmentsError) {
+        console.error('Error fetching existing attachments:', fetchAttachmentsError);
+      } else {
+        existingAttachments = fetchedAttachments || [];
+      }
+    }
+
+    // Create a map of old item ID to its index
+    const oldItemIdToIndex = new Map<string, number>();
+    oldItemIds.forEach((id, index) => {
+      oldItemIdToIndex.set(id, index);
+    });
+
+    // IMPORTANT: Temporarily detach attachments from items to prevent CASCADE deletion
+    // Set liquidation_item_id to NULL for all attachments we want to preserve
+    if (existingAttachments.length > 0) {
+      const attachmentIdsToPreserve = existingAttachments.map(a => a.id);
+      const { error: detachError } = await supabaseAdmin
+        .from('liquidation_attachments')
+        .update({ liquidation_item_id: null })
+        .in('id', attachmentIdsToPreserve);
+
+      if (detachError) {
+        console.error('Error detaching attachments:', detachError);
+        throw new Error('Failed to preserve attachments');
+      }
+    }
+
+    // Now safe to delete existing items (attachments won't cascade delete)
     const { error: deleteItemsError } = await supabaseAdmin
       .from('liquidation_items')
       .delete()
@@ -173,13 +225,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ...item,
     }));
 
-    const { error: itemsError } = await supabaseAdmin
+    const { data: createdItems, error: itemsError } = await supabaseAdmin
       .from('liquidation_items')
-      .insert(itemsToInsert);
+      .insert(itemsToInsert)
+      .select();
 
     if (itemsError) {
       console.error('Error creating liquidation items:', itemsError);
       throw new Error('Failed to create liquidation items');
+    }
+
+    // Reattach existing attachments to new item IDs
+    // Match by index: old item at index 0 -> new item at index 0
+    if (existingAttachments.length > 0 && createdItems) {
+      for (const attachment of existingAttachments) {
+        if (attachment.liquidation_item_id) {
+          const oldIndex = oldItemIdToIndex.get(attachment.liquidation_item_id);
+          if (oldIndex !== undefined && createdItems[oldIndex]) {
+            // Update attachment to point to new item ID at same index
+            await supabaseAdmin
+              .from('liquidation_attachments')
+              .update({ liquidation_item_id: createdItems[oldIndex].id })
+              .eq('id', attachment.id);
+          }
+        }
+      }
     }
 
     // Handle attachment deletion if any
@@ -231,7 +301,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       message: 'Liquidation updated successfully',
       liquidation: {
         ...updatedLiquidation,
-        items: processedItems,
+        items: createdItems || processedItems,
       },
     });
   } catch (error: unknown) {
