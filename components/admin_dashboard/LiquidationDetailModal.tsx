@@ -251,7 +251,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
+        className="bg-slate-900 border border-slate-700 w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
