@@ -66,11 +66,12 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequest | null>(null);
   const [dateFilter, setDateFilter] = useState<string>('');
   const [employeeFilter, setEmployeeFilter] = useState<string>('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage] = useState<number>(10);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
 
-  // Filtered requests based on date and employee filters
+  // Filtered requests based on date, employee, and status filters
   const filteredRequests = useMemo(() => {
     return requests.filter(request => {
       // Filter by date
@@ -89,13 +90,21 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
         }
       }
 
+      // Filter by status
+      if (statusFilter && statusFilter !== 'all') {
+        const relevantStatus = request.final_status || request.level1_status || 'pending';
+        if (relevantStatus !== statusFilter) {
+          return false;
+        }
+      }
+
       return true;
     }).sort((a, b) => {
       const dateA = new Date(a.requested_at).getTime();
       const dateB = new Date(b.requested_at).getTime();
       return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
     });
-  }, [requests, dateFilter, employeeFilter, sortOrder]);
+  }, [requests, dateFilter, employeeFilter, statusFilter, sortOrder]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredRequests.length / itemsPerPage);
@@ -106,7 +115,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [dateFilter, employeeFilter]);
+  }, [dateFilter, employeeFilter, statusFilter]);
 
   useEffect(() => {
     // Fetch requests immediately since access is already verified by the page
@@ -497,11 +506,12 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400" />
           <span className="text-sm font-medium text-slate-300">Filters</span>
-          {(dateFilter || employeeFilter) && (
+          {(dateFilter || employeeFilter || statusFilter !== 'all') && (
             <button
               onClick={() => {
                 setDateFilter('');
                 setEmployeeFilter('');
+                setStatusFilter('all');
               }}
               className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
             >
@@ -517,7 +527,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
             <span className="text-xs font-medium">{sortOrder === 'newest' ? 'Newest First' : 'Oldest First'}</span>
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Date Filter */}
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-2">
@@ -546,8 +556,26 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
               className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
             />
           </div>
+
+          {/* Status Filter */}
+          <div>
+            <label className="block text-xs font-medium text-slate-400 mb-2">
+              <Clock className="w-3 h-3 inline mr-1 text-white" />
+              Filter by Status
+            </label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm cursor-pointer"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+          </div>
         </div>
-        {(dateFilter || employeeFilter) && (
+        {(dateFilter || employeeFilter || statusFilter !== 'all') && (
           <div className="mt-3 text-xs text-slate-400">
             Showing <span className="font-medium text-white">{filteredRequests.length}</span> of{' '}
             <span className="font-medium text-white">{requests.length}</span> requests
