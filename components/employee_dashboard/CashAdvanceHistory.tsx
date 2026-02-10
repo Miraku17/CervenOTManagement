@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Wallet, CheckCircle, XCircle, Clock, AlertCircle, Calendar, Loader2, Eye, X } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
+import { Wallet, CheckCircle, XCircle, Clock, AlertCircle, Calendar, Loader2, Eye, X, Pencil } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
+import EditCashAdvanceModal from './EditCashAdvanceModal';
 
 interface CashAdvance {
   id: string;
@@ -63,11 +64,18 @@ const fetchMyCashAdvances = async (): Promise<CashAdvanceResponse> => {
 const CashAdvanceHistory: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedRequest, setSelectedRequest] = useState<CashAdvance | null>(null);
+  const [editingRequest, setEditingRequest] = useState<CashAdvance | null>(null);
+  const queryClient = useQueryClient();
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['my-cash-advances'],
     queryFn: fetchMyCashAdvances,
   });
+
+  const handleEditSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ['my-cash-advances'] });
+    setEditingRequest(null);
+  };
 
   const requests = data?.cashAdvances || [];
 
@@ -423,6 +431,18 @@ const CashAdvanceHistory: React.FC = () => {
                     {getStatusIcon(request.status)}
                     <span className="capitalize">{request.status}</span>
                   </div>
+                  {request.status === 'pending' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingRequest(request);
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-400 hover:text-orange-300 rounded-lg border border-orange-500/30 transition-colors text-xs font-medium"
+                    >
+                      <Pencil size={14} />
+                      <span className="hidden sm:inline">Edit</span>
+                    </button>
+                  )}
                   <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-xs font-medium">
                     <Eye size={14} />
                     <span className="hidden sm:inline">Details</span>
@@ -432,6 +452,16 @@ const CashAdvanceHistory: React.FC = () => {
             </div>
           ))}
         </div>
+      )}
+
+      {/* Edit Modal */}
+      {editingRequest && (
+        <EditCashAdvanceModal
+          isOpen={!!editingRequest}
+          onClose={() => setEditingRequest(null)}
+          onSuccess={handleEditSuccess}
+          request={editingRequest}
+        />
       )}
     </div>
   );

@@ -85,6 +85,10 @@ interface Liquidation {
     last_name: string;
     email: string;
     employee_id: string | null;
+    position_id: string | null;
+    positions: {
+      name: string;
+    } | null;
   } | null;
 }
 
@@ -678,6 +682,9 @@ export default function LiquidationRequestsPage() {
                         </p>
                         {liquidation.profiles?.employee_id && (
                           <p className="text-xs text-slate-400">{liquidation.profiles.employee_id}</p>
+                        )}
+                        {liquidation.profiles?.positions?.name && (
+                          <p className="text-xs text-slate-500 italic">{liquidation.profiles.positions.name}</p>
                         )}
                       </div>
                     </td>

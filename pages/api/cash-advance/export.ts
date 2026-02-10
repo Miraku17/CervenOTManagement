@@ -29,7 +29,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Get current user's position to check if they can view Operations Manager cash advances
+    // Get current user's position to check if they can view confidential cash advances
     const { data: currentUserProfile } = await supabaseAdmin
       .from('profiles')
       .select('position_id, positions:position_id (name)')
@@ -37,28 +37,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-    // Check if position contains HR, Accounting, Operations Manager, or Managing Director (case-insensitive)
-    const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
-                                 currentUserPosition.toLowerCase().includes('accounting') ||
-                                 currentUserPosition.toLowerCase().includes('operations manager') ||
-                                 currentUserPosition.toLowerCase().includes('managing director');
+    // Only Managing Director can view HR, Accounting, and Operations Manager cash advances
+    const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
 
-    // Get Operations Manager user IDs to filter confidential requests
-    let operationsManagerUserIds: string[] = [];
-    if (!canViewConfidential) {
-      const { data: opsManagerPosition } = await supabaseAdmin
+    console.log('Cash Advance Export - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
+
+    // Get confidential position IDs to filter requests (HR, Accounting, Operations Manager)
+    let confidentialUserIds: string[] = [];
+    if (!isManagingDirector) {
+      // Get HR, Accounting, and Operations Manager position IDs
+      const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
-        .eq('name', 'Operations Manager')
-        .single();
+        .or('name.eq.HR,name.eq.Accounting,name.eq.Operations Manager');
 
-      if (opsManagerPosition) {
-        const { data: opsManagerUsers } = await supabaseAdmin
+      if (confidentialPositions && confidentialPositions.length > 0) {
+        const positionIds = confidentialPositions.map(p => p.id);
+
+        // Get all user IDs with these positions
+        const { data: confidentialUsers } = await supabaseAdmin
           .from('profiles')
           .select('id')
-          .eq('position_id', opsManagerPosition.id);
+          .in('position_id', positionIds);
 
-        operationsManagerUserIds = (opsManagerUsers || []).map(u => u.id);
+        confidentialUserIds = (confidentialUsers || []).map(u => u.id);
+        console.log('Cash Advance Export - Confidential user IDs to exclude:', confidentialUserIds);
       }
     }
 
@@ -94,9 +97,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.eq('type', type);
     }
 
-    // Filter out Operations Manager cash advances if user is not HR or Accounting
-    if (!canViewConfidential && operationsManagerUserIds.length > 0) {
-      query = query.filter('requested_by', 'not.in', `(${operationsManagerUserIds.join(',')})`);
+    // Filter out HR, Accounting, and Operations Manager cash advances if user is not Managing Director
+    if (!isManagingDirector && confidentialUserIds.length > 0) {
+      query = query.filter('requested_by', 'not.in', `(${confidentialUserIds.join(',')})`);
+      console.log('Cash Advance Export - Applied filter to exclude confidential requests (HR, Accounting, Ops Manager)');
     }
 
     const { data: cashAdvances, error } = await query;
