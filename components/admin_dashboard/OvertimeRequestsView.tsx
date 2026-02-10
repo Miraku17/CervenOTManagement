@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, X, Clock, AlertCircle, Loader2, Calendar, User, Filter, ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { ConfirmModal } from '@/components/ConfirmModal';
@@ -64,6 +65,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
     comment: '',
   });
   const [selectedRequest, setSelectedRequest] = useState<OvertimeRequest | null>(null);
+  const [showPendingModal, setShowPendingModal] = useState<boolean>(false);
   const [dateFilter, setDateFilter] = useState<string>('');
   const [employeeFilter, setEmployeeFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -478,6 +480,209 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
         </div>
       )}
 
+      {/* Pending Requests Modal */}
+      {showPendingModal && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-[9999]"
+          onClick={() => setShowPendingModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden transform transition-all max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="p-6 border-b border-slate-800 bg-slate-900 flex justify-between items-center shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-white">Pending Overtime Requests</h3>
+                <p className="text-slate-400 text-sm mt-1">
+                  {requests.filter(r => !r.final_status || r.final_status === 'pending').length} pending requests requiring action
+                </p>
+              </div>
+              <button
+                onClick={() => setShowPendingModal(false)}
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-slate-400">
+                  <thead className="bg-slate-950/50 text-slate-200 font-medium border-b border-slate-800 uppercase tracking-wider sticky top-0">
+                    <tr>
+                      <th className="px-6 py-4">Employee</th>
+                      <th className="px-6 py-4">Date</th>
+                      <th className="px-6 py-4">Time Period</th>
+                      <th className="px-6 py-4">Hours</th>
+                      <th className="px-6 py-4">Level 1 Status</th>
+                      {canApproveLevel2 && <th className="px-6 py-4">Level 2 Status</th>}
+                      <th className="px-6 py-4">Reason</th>
+                      <th className="px-6 py-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/50">
+                    {requests
+                      .filter(r => !r.final_status || r.final_status === 'pending')
+                      .sort((a, b) => new Date(b.requested_at).getTime() - new Date(a.requested_at).getTime())
+                      .map((request) => {
+                        const canLevel1Approve = canApproveLevel1 && (!request.level1_status || request.level1_status === 'pending');
+                        const canLevel2Approve = canApproveLevel2 && request.level1_status === 'approved' && (!request.level2_status || request.level2_status === 'pending');
+                        const showActions = canLevel1Approve || canLevel2Approve;
+
+                        return (
+                          <tr
+                            key={request.id}
+                            className="hover:bg-slate-800/30 transition-colors cursor-pointer"
+                            onClick={() => {
+                              setShowPendingModal(false);
+                              setSelectedRequest(request);
+                            }}
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-full bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-xs">
+                                  {request.requested_by.first_name[0]}{request.requested_by.last_name[0]}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-slate-200">
+                                    {request.requested_by.first_name} {request.requested_by.last_name}
+                                  </div>
+                                  <div className="text-xs text-slate-500">{request.requested_by.email}</div>
+                                  {request.requested_by.positions && (
+                                    <div className="text-xs text-slate-500 italic">{request.requested_by.positions.name}</div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-medium text-slate-300">
+                                {new Date(request.overtime_date).toLocaleDateString(undefined, {
+                                  month: 'short', day: 'numeric', year: 'numeric'
+                                })}
+                              </div>
+                              <div className="text-xs text-slate-500">
+                                Requested: {new Date(request.requested_at).toLocaleDateString()}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-slate-300">
+                              <div className="text-sm">
+                                {formatTime(request.start_time)} - {formatTime(request.end_time)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 font-mono text-slate-300 font-semibold">
+                              {request.total_hours.toFixed(2)} hrs
+                            </td>
+                            <td className="px-6 py-4">
+                              {request.level1_status ? (
+                                <div className="flex flex-col items-start gap-1">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.level1_status)}`}>
+                                    {request.level1_status.toUpperCase()}
+                                  </span>
+                                  {request.level1_reviewer_profile && (
+                                    <span className="text-[10px] text-slate-400">
+                                      by {request.level1_reviewer_profile.first_name} {request.level1_reviewer_profile.last_name}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-yellow-500/30 bg-yellow-500/10 text-yellow-400">
+                                  PENDING
+                                </span>
+                              )}
+                            </td>
+                            {canApproveLevel2 && (
+                              <td className="px-6 py-4">
+                                {request.level2_status ? (
+                                  <div className="flex flex-col items-start gap-1">
+                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(request.level2_status)}`}>
+                                      {request.level2_status.toUpperCase()}
+                                    </span>
+                                    {request.level2_reviewer_profile && (
+                                      <span className="text-[10px] text-slate-400">
+                                        by {request.level2_reviewer_profile.first_name} {request.level2_reviewer_profile.last_name}
+                                      </span>
+                                    )}
+                                  </div>
+                                ) : request.level1_status === 'approved' ? (
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border border-yellow-500/30 bg-yellow-500/10 text-yellow-400">
+                                    PENDING
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-slate-600">-</span>
+                                )}
+                              </td>
+                            )}
+                            <td className="px-6 py-4 text-slate-300 max-w-xs">
+                              <div className="text-xs truncate" title={request.reason}>
+                                {request.reason || <span className="text-slate-500">-</span>}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4" onClick={(e) => e.stopPropagation()}>
+                              {showActions ? (
+                                <div className="flex items-center justify-center gap-2">
+                                  <button
+                                    onClick={() => {
+                                      setShowPendingModal(false);
+                                      openConfirmation(request.id, 'approve', canLevel1Approve ? 'level1' : 'level2');
+                                    }}
+                                    disabled={processingId !== null}
+                                    className={`p-1.5 rounded-md bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={`${canLevel1Approve ? 'Level 1' : 'Level 2'} Approve`}
+                                  >
+                                    {processingId === request.id ? (
+                                      <Loader2 size={16} className="animate-spin" />
+                                    ) : (
+                                      <Check size={16} />
+                                    )}
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setShowPendingModal(false);
+                                      openConfirmation(request.id, 'reject', canLevel1Approve ? 'level1' : 'level2');
+                                    }}
+                                    disabled={processingId !== null}
+                                    className={`p-1.5 rounded-md bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                    title={`${canLevel1Approve ? 'Level 1' : 'Level 2'} Reject`}
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="text-center text-xs text-slate-600">-</div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    {requests.filter(r => !r.final_status || r.final_status === 'pending').length === 0 && (
+                      <tr>
+                        <td colSpan={canApproveLevel2 ? 8 : 7} className="px-6 py-12 text-center text-slate-500">
+                          <Clock className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                          <p>No pending overtime requests</p>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-800/50 border-t border-slate-800 flex justify-end shrink-0">
+              <button
+                onClick={() => setShowPendingModal(false)}
+                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Error Toast */}
       {error && (
         <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right z-50">
@@ -495,9 +700,12 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
           <p className="text-slate-400 mt-1">Manage and review employee overtime submissions</p>
         </div>
         <div className="flex items-center gap-4">
-          <div className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-slate-300">
+          <button
+            onClick={() => setShowPendingModal(true)}
+            className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-700 hover:border-blue-500/50 transition-all cursor-pointer"
+          >
             <span className="font-bold text-white">{filteredRequests.filter(r => !r.final_status || r.final_status === 'pending').length}</span> Pending Requests
-          </div>
+          </button>
         </div>
       </div>
 
