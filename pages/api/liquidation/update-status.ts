@@ -48,10 +48,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
     const now = new Date().toISOString();
 
-    // Fetch the liquidation first
+    // Fetch the liquidation with user profile info
     const { data: liquidation, error: fetchError } = await supabaseAdmin
       .from('liquidations')
-      .select('*')
+      .select(`
+        *,
+        requester:user_id (
+          id,
+          first_name,
+          last_name,
+          email,
+          position_id
+        )
+      `)
       .eq('id', id)
       .single();
 
@@ -61,6 +70,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (liquidation.status !== 'pending') {
       return res.status(400).json({ error: 'Liquidation has already been processed' });
+    }
+
+    // Check if this is a confidential liquidation (HR or Accounting)
+    const requesterPositionId = (liquidation.requester as any)?.position_id;
+    if (requesterPositionId) {
+      // Get HR and Accounting position IDs
+      const { data: confidentialPositions } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .or('name.eq.HR,name.eq.Accounting');
+
+      const confidentialPositionIds = (confidentialPositions || []).map(p => p.id);
+
+      if (confidentialPositionIds.includes(requesterPositionId)) {
+        // This is a confidential request - only Managing Director can approve
+        const { data: currentUserProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('position_id, positions:position_id (name)')
+          .eq('id', userId)
+          .single();
+
+        const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+        const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+
+        if (!isManagingDirector) {
+          return res.status(403).json({
+            error: 'Forbidden: HR and Accounting liquidations can only be approved by Managing Director'
+          });
+        }
+      }
     }
 
     // Update the liquidation status

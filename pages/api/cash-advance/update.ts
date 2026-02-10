@@ -66,18 +66,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Cash advance request not found.');
     }
 
-    // Check if this is an Operations Manager's cash advance (confidential)
+    // Check if this is a confidential cash advance (HR, Accounting, or Operations Manager)
     const requesterPositionId = (request.requester as any)?.position_id;
     if (requesterPositionId) {
-      // Get Operations Manager position ID
-      const { data: opsManagerPosition } = await supabaseAdmin
+      // Get HR, Accounting, and Operations Manager position IDs
+      const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
-        .eq('name', 'Operations Manager')
-        .single();
+        .or('name.eq.HR,name.eq.Accounting,name.eq.Operations Manager');
 
-      if (opsManagerPosition && requesterPositionId === opsManagerPosition.id) {
-        // Check if current user is HR or Accounting
+      const confidentialPositionIds = (confidentialPositions || []).map(p => p.id);
+
+      if (confidentialPositionIds.includes(requesterPositionId)) {
+        // This is a confidential request - only Managing Director can approve
         const { data: currentUserProfile } = await supabaseAdmin
           .from('profiles')
           .select('position_id, positions:position_id (name)')
@@ -85,13 +86,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .single();
 
         const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-        const canViewConfidential = currentUserPosition.toLowerCase().includes('hr') ||
-                                     currentUserPosition.toLowerCase().includes('accounting') ||
-                                     currentUserPosition.toLowerCase().includes('operations manager') ||
-                                     currentUserPosition.toLowerCase().includes('managing director');
-        if (!canViewConfidential) {
+        const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+
+        if (!isManagingDirector) {
           return res.status(403).json({
-            error: 'Forbidden: Operations Manager cash advances are confidential and can only be processed by HR, Accounting, or Managing Director'
+            error: 'Forbidden: HR, Accounting, and Operations Manager cash advances can only be approved by Managing Director'
           });
         }
       }

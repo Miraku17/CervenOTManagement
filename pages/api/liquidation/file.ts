@@ -179,8 +179,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Send email notification to approvers (async, non-blocking)
-    // COMMENTED OUT FOR TESTING
-    /*
     (async () => {
       try {
         // Fetch user info
@@ -234,7 +232,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         console.error('Failed to send liquidation notification email:', emailError);
       }
     })();
-    */
 
     return res.status(201).json({
       message: 'Liquidation submitted successfully',

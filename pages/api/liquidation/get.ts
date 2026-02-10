@@ -35,6 +35,45 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Get current user's position to check if they can view HR and Accounting liquidations
+    const { data: currentUserProfile } = await supabaseAdmin
+      .from('profiles')
+      .select(`
+        position_id,
+        positions:position_id (name)
+      `)
+      .eq('id', userId)
+      .single();
+
+    const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+    // Only Managing Director can view HR and Accounting liquidations
+    const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+
+    console.log('Liquidation Get - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
+
+    // Get confidential position IDs to filter requests (HR and Accounting)
+    let confidentialUserIds: string[] = [];
+    if (!isManagingDirector) {
+      // Get HR and Accounting position IDs
+      const { data: confidentialPositions } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .or('name.eq.HR,name.eq.Accounting');
+
+      if (confidentialPositions && confidentialPositions.length > 0) {
+        const positionIds = confidentialPositions.map(p => p.id);
+
+        // Get all user IDs with these positions
+        const { data: confidentialUsers } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .in('position_id', positionIds);
+
+        confidentialUserIds = (confidentialUsers || []).map(u => u.id);
+        console.log('Liquidation Get - Confidential user IDs to exclude:', confidentialUserIds);
+      }
+    }
+
     // Get query parameters
     const { page = '1', limit = '20', status }: LiquidationQueryParams = req.query;
     const pageNum = parseInt(page as string, 10);
@@ -105,6 +144,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.eq('status', status);
     }
 
+    // Filter out HR and Accounting liquidations if user is not Managing Director
+    if (!isManagingDirector && confidentialUserIds.length > 0) {
+      // Exclude liquidations requested by HR and Accounting
+      query = query.filter('user_id', 'not.in', `(${confidentialUserIds.join(',')})`);
+      console.log('Liquidation Get - Applied filter to exclude confidential requests (HR, Accounting)');
+    }
+
     // Apply pagination
     query = query.range(offset, offset + limitNum - 1);
 
@@ -122,7 +168,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (userIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, first_name, last_name, email, employee_id')
+        .select(`
+          id,
+          first_name,
+          last_name,
+          email,
+          employee_id,
+          position_id,
+          positions:position_id (
+            name
+          )
+        `)
         .in('id', userIds);
 
       if (profiles) {

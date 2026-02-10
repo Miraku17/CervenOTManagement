@@ -28,6 +28,10 @@ interface CashAdvance {
     last_name: string;
     email: string;
     employee_id: string | null;
+    position_id: string | null;
+    positions: {
+      name: string;
+    } | null;
   } | null;
   approved_by_user: {
     id: string;
@@ -702,6 +706,9 @@ export default function CashFlowRequestsPage() {
                         </p>
                         {request.requester?.employee_id && (
                           <p className="text-xs text-slate-400">{request.requester.employee_id}</p>
+                        )}
+                        {request.requester?.positions?.name && (
+                          <p className="text-xs text-slate-500 italic">{request.requester.positions.name}</p>
                         )}
                       </div>
                     </td>
