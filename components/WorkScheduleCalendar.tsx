@@ -177,6 +177,11 @@ export const WorkScheduleCalendar: React.FC<WorkScheduleCalendarProps> = ({ user
     const checkDate = new Date(dateStr);
 
     for (const leave of leaveRequests) {
+      // Skip revoked leave requests - they shouldn't appear on the schedule
+      if (leave.status === 'revoked') {
+        continue;
+      }
+
       const startDate = new Date(leave.start_date);
       const endDate = new Date(leave.end_date);
 
