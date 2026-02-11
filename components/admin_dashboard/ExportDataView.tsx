@@ -155,7 +155,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
 
     for (const employee of sortedEmployees) {
       // Add header row
-      reportData.push(['EMPLOYEE NAME', 'TIME STAMP', 'TIME IN', 'TIME OUT', 'SHIFT SCHEDULE', 'REMARKS', 'NO. OF LATE HH:MM', 'TOTAL LATE MINUTES', 'NO. OF DAYS', 'HOLIDAY STATUS']);
+      reportData.push(['EMPLOYEE NAME', 'TIME STAMP', 'TIME IN', 'TIME OUT', 'WORK HOURS', 'SHIFT SCHEDULE', 'REMARKS', 'NO. OF LATE HH:MM', 'TOTAL LATE MINUTES', 'NO. OF DAYS', 'HOLIDAY STATUS']);
       rowStyles.push({ row: currentRow, type: 'header' });
       currentRow++;
 
@@ -204,12 +204,31 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
 
         if (isRestDay) {
           remarks = 'REST DAY';
-          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+          // Check if employee still has attendance on this rest day
+          if (userAttendance.has(date)) {
+            const records = userAttendance.get(date)!;
+            const record = records[0];
+            timeIn = record.time_in ? new Date(record.time_in).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+            timeOut = record.time_out ? new Date(record.time_out).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }) : '';
+
+            let workHours = '';
+            if (record.time_in && record.time_out) {
+              const diffMs = new Date(record.time_out).getTime() - new Date(record.time_in).getTime();
+              const totalMinutes = Math.floor(diffMs / (1000 * 60));
+              const hours = Math.floor(totalMinutes / 60);
+              const mins = totalMinutes % 60;
+              workHours = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+            }
+
+            reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, '', '', '', holidayStatus]);
+          } else {
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+          }
           rowStyles.push({ row: currentRow, type: 'restday' });
           currentRow++;
         } else if (isLeave) {
           remarks = 'LEAVE';
-          reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+          reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
           rowStyles.push({ row: currentRow, type: 'leave' });
           currentRow++;
         } else if (userAttendance.has(date)) {
@@ -239,6 +258,15 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
             }
           }
 
+          let workHours = '';
+          if (record.time_in && record.time_out) {
+            const diffMs = new Date(record.time_out).getTime() - new Date(record.time_in).getTime();
+            const totalMinutes = Math.floor(diffMs / (1000 * 60));
+            const hours = Math.floor(totalMinutes / 60);
+            const mins = totalMinutes % 60;
+            workHours = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
+          }
+
           if (!record.time_out) {
             remarks = 'ACTIVE';
           } else if (timeIn && schedule && schedule.shift_start) {
@@ -249,17 +277,17 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
             }
           }
 
-          reportData.push([employee.name, formattedDate, timeIn, timeOut, shiftSchedule, remarks, lateHHMM, lateMinutes || '', lateDays || '', holidayStatus]);
+          reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, lateHHMM, lateMinutes || '', lateDays || '', holidayStatus]);
           rowStyles.push({ row: currentRow, type: 'data' });
           currentRow++;
         } else {
           // No attendance for this date
           if (holiday) {
             remarks = `${holiday.holiday_type} - ${holiday.name}`.toUpperCase();
-            reportData.push([employee.name, formattedDate, '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
             rowStyles.push({ row: currentRow, type: 'holiday' });
           } else {
-            reportData.push([employee.name, formattedDate, '', '', shiftSchedule, '', '', '', '', holidayStatus]);
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, '', '', '', '', holidayStatus]);
             rowStyles.push({ row: currentRow, type: 'data' });
           }
           currentRow++;
@@ -267,7 +295,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       }
 
       // Add total row
-      reportData.push([`${employee.name} Total`, '', '', '', '', '', '', totalLateMinutes, totalLateDays, '']);
+      reportData.push([`${employee.name} Total`, '', '', '', '', '', '', '', totalLateMinutes, totalLateDays, '']);
       rowStyles.push({ row: currentRow, type: 'total' });
       currentRow++;
       reportData.push([]); // Empty row
@@ -284,6 +312,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       { wch: 35 },  // Time Stamp
       { wch: 12 },  // Time In
       { wch: 12 },  // Time Out
+      { wch: 12 },  // Work Hours
       { wch: 25 },  // Shift Schedule
       { wch: 15 },  // Remarks
       { wch: 18 },  // NO. OF LATE HH:MM
