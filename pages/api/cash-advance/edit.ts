@@ -76,18 +76,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const updatePayload: Record<string, unknown> = {};
 
     if (type !== undefined) {
-      if (type !== 'personal' && type !== 'support') {
-        return res.status(400).json({ error: 'Invalid type. Must be "personal" or "support".' });
+      if (type !== 'personal' && type !== 'support' && type !== 'reimbursement') {
+        return res.status(400).json({ error: 'Invalid type. Must be "personal", "support", or "reimbursement".' });
       }
       updatePayload.type = type;
     }
 
     if (amount !== undefined) {
       const parsedAmount = parseFloat(amount);
-      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      // For reimbursement type, amount can be 0 or empty
+      const finalType = type !== undefined ? type : existingRequest.type;
+      if (finalType !== 'reimbursement' && (isNaN(parsedAmount) || parsedAmount <= 0)) {
         return res.status(400).json({ error: 'Amount must be a positive number.' });
       }
-      updatePayload.amount = parsedAmount;
+      updatePayload.amount = isNaN(parsedAmount) ? 0 : parsedAmount;
     }
 
     if (purpose !== undefined) {

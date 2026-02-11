@@ -77,12 +77,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .eq('id', cash_advance_id)
       .eq('requested_by', userId)
       .eq('status', 'approved')
-      .eq('type', 'support')
+      .in('type', ['support', 'reimbursement'])
       .single();
 
     if (caError || !cashAdvance) {
       return res.status(400).json({
-        error: 'Invalid cash advance. Must be an approved support cash advance.',
+        error: 'Invalid cash advance. Must be an approved support or reimbursement cash advance.',
       });
     }
 

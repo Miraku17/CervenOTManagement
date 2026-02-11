@@ -64,7 +64,7 @@ interface FileLiquidationModalProps {
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   status: string;
@@ -217,9 +217,9 @@ const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
     throw new Error('Failed to fetch cash advances');
   }
   const data = await response.json();
-  // Only return approved support cash advances that don't have liquidations yet
+  // Only return approved support and reimbursement cash advances that don't have liquidations yet
   return data.cashAdvances.filter(
-    (ca: CashAdvance) => ca.status === 'approved' && ca.type === 'support'
+    (ca: CashAdvance) => ca.status === 'approved' && (ca.type === 'support' || ca.type === 'reimbursement')
   );
 };
 
@@ -1064,7 +1064,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
               )}
               {!isEditMode && cashAdvances.length === 0 && !loadingCashAdvances && (
                 <p className="text-xs text-amber-400 mt-1">
-                  No approved support cash advances available
+                  No approved support or reimbursement cash advances available
                 </p>
               )}
             </div>

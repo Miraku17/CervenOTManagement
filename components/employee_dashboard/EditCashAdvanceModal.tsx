@@ -11,7 +11,7 @@ interface EditCashAdvanceModalProps {
   onSuccess: () => void;
   request: {
     id: string;
-    type: 'personal' | 'support';
+    type: 'personal' | 'support' | 'reimbursement';
     amount: number;
     date_requested: string;
     purpose: string | null;
@@ -127,12 +127,13 @@ const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({ isOpen, onC
             <div className="relative">
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'personal' | 'support' })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as 'personal' | 'support' | 'reimbursement' })}
                 className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500 appearance-none cursor-pointer pr-10"
                 disabled={isSubmitting}
               >
                 <option value="personal">Personal</option>
                 <option value="support">Support</option>
+                <option value="reimbursement">Reimbursement</option>
               </select>
               <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                 <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -144,7 +145,9 @@ const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({ isOpen, onC
 
           {/* Amount */}
           <div>
-            <label className="block text-sm font-medium text-slate-300 mb-2">Amount (PHP)</label>
+            <label className="block text-sm font-medium text-slate-300 mb-2">
+              Amount (PHP) {formData.type === 'reimbursement' && <span className="text-slate-500">(Optional)</span>}
+            </label>
             <input
               type="number"
               value={formData.amount}
@@ -152,7 +155,7 @@ const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({ isOpen, onC
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
               placeholder="0.00"
               step="0.01"
-              required
+              required={formData.type !== 'reimbursement'}
               disabled={isSubmitting}
             />
           </div>

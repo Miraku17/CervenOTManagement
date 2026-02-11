@@ -15,7 +15,7 @@ interface FileCashAdvanceModalProps {
 
 interface CashAdvanceFormData {
   userId: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   date: string;
   purpose: string;
@@ -42,7 +42,7 @@ const submitCashAdvance = async (data: CashAdvanceFormData) => {
 const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onClose, onSuccess, userId }) => {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
-    type: 'personal' as 'personal' | 'support',
+    type: 'personal' as 'personal' | 'support' | 'reimbursement',
     amount: '',
     date: format(new Date(), 'yyyy-MM-dd'),
     purpose: '',
@@ -105,9 +105,9 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
     e.preventDefault();
     setError(null);
 
-    // Validate amount
+    // Validate amount - optional for reimbursement
     const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
+    if (formData.type !== 'reimbursement' && (isNaN(amount) || amount <= 0)) {
       setError('Please enter a valid amount greater than 0.');
       return;
     }
@@ -115,7 +115,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
     mutation.mutate({
       userId,
       type: formData.type,
-      amount: amount,
+      amount: formData.type === 'reimbursement' && !formData.amount ? 0 : amount,
       date: formData.date,
       purpose: formData.purpose,
     });
@@ -170,7 +170,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
             {/* Cash Advance Type */}
             <div>
               <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-2">Type of Cash Advance</label>
-              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, type: 'support' })}
@@ -195,12 +195,26 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
                   <span className="font-semibold text-sm sm:text-base">Personal</span>
                   <span className="text-[10px] sm:text-xs opacity-70">Personal Cash Advance</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, type: 'reimbursement' })}
+                  className={`px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl border-2 transition-all duration-200 flex flex-col items-center gap-0.5 sm:gap-1 ${
+                    formData.type === 'reimbursement'
+                      ? 'border-purple-500 bg-purple-500/10 text-purple-400'
+                      : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  <span className="font-semibold text-sm sm:text-base">Reimbursement</span>
+                  <span className="text-[10px] sm:text-xs opacity-70">Reimbursement</span>
+                </button>
               </div>
             </div>
 
             {/* Amount */}
             <div>
-              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">Amount (PHP)</label>
+              <label className="block text-xs sm:text-sm font-medium text-slate-400 mb-1.5">
+                Amount (PHP) {formData.type === 'reimbursement' && <span className="text-slate-500">(Optional)</span>}
+              </label>
               <div className="relative">
                 <span className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm sm:text-base">₱</span>
                 <input
@@ -209,7 +223,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: formatCurrency(e.target.value) })}
                   placeholder="0.00"
-                  required
+                  required={formData.type !== 'reimbursement'}
                   className="w-full bg-slate-950 border border-slate-700 text-white pl-8 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 rounded-xl focus:ring-2 focus:ring-green-500 outline-none text-base sm:text-lg font-mono"
                 />
               </div>

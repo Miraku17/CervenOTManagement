@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   status: 'pending' | 'approved' | 'rejected';
@@ -43,7 +43,7 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
   onEditSuccess,
 }) => {
   const [formData, setFormData] = useState({
-    type: 'personal' as 'personal' | 'support',
+    type: 'personal' as 'personal' | 'support' | 'reimbursement',
     amount: '',
     purpose: '',
     date_requested: '',
@@ -170,6 +170,7 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
               >
                 <option value="personal">Personal</option>
                 <option value="support">Support</option>
+                <option value="reimbursement">Reimbursement</option>
               </select>
             </div>
 
