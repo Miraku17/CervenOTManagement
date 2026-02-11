@@ -10,7 +10,11 @@
       "Bash(npx next lint:*)",
       "Bash(npm run build:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(psql:*)"
+      "Bash(psql:*)",
+      "Bash(git -C /Users/ukayko/Documents/zian_sideJobs/CervenTech/CervenOTManagement log --oneline -20)",
+      "Bash(git -C /Users/ukayko/Documents/zian_sideJobs/CervenTech/CervenOTManagement diff --name-only main..HEAD)",
+      "Bash(git -C /Users/ukayko/Documents/zian_sideJobs/CervenTech/CervenOTManagement status)",
+      "Bash(git -C /Users/ukayko/Documents/zian_sideJobs/CervenTech/CervenOTManagement log --oneline main..HEAD)"
     ]
   }
 }

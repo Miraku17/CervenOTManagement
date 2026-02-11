@@ -1,6 +1,6 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { X, Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { X, Calendar, Clock, User, FileText, CheckCircle, XCircle, AlertCircle, RotateCcw } from 'lucide-react';
 import { differenceInDays, parseISO, format } from 'date-fns';
 
 interface LeaveRequestDetailModalProps {
@@ -18,7 +18,7 @@ interface LeaveRequestDetailModalProps {
     start_date: string;
     end_date: string;
     reason: string;
-    status: 'pending' | 'approved' | 'rejected';
+    status: 'pending' | 'approved' | 'rejected' | 'revoked';
     created_at: string;
     reviewer?: {
       first_name: string;
@@ -58,6 +58,12 @@ export const LeaveRequestDetailModal: React.FC<LeaveRequestDetailModalProps> = (
           color: 'text-red-400 bg-red-500/10 border-red-500/20',
           icon: <XCircle size={20} />,
           label: 'Rejected',
+        };
+      case 'revoked':
+        return {
+          color: 'text-orange-400 bg-orange-500/10 border-orange-500/20',
+          icon: <RotateCcw size={20} />,
+          label: 'Revoked',
         };
       default:
         return {
