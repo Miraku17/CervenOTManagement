@@ -298,8 +298,6 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       reportData.push([`${employee.name} Total`, '', '', '', '', '', '', '', totalLateMinutes, totalLateDays, '']);
       rowStyles.push({ row: currentRow, type: 'total' });
       currentRow++;
-      reportData.push([]); // Empty row
-      currentRow++;
     }
 
     // Create workbook
