@@ -55,6 +55,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Check if user has any pending liquidation
+    const { data: pendingLiquidations, error: pendingLiquidationError } = await supabaseAdmin
+      .from('liquidations')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'pending')
+      .limit(1);
+
+    if (pendingLiquidationError) {
+      console.error('Error checking for pending liquidations:', pendingLiquidationError);
+      throw pendingLiquidationError;
+    }
+
+    if (pendingLiquidations && pendingLiquidations.length > 0) {
+      return res.status(400).json({
+        error: 'You cannot file a new cash advance while you have a pending liquidation.'
+      });
+    }
+
     // Check if user is an Operations Manager (auto-approve if so)
     const { data: userProfile } = await supabaseAdmin
       .from('profiles')
