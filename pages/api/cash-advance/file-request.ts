@@ -22,11 +22,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const { type, amount, date, purpose } = req.body;
 
     // Validate required fields
-    if (!type || !['personal', 'support'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid cash advance type. Must be "personal" or "support".' });
+    if (!type || !['personal', 'support', 'reimbursement'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid cash advance type. Must be "personal", "support", or "reimbursement".' });
     }
 
-    if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+    // Amount is optional for reimbursement
+    if (type !== 'reimbursement' && (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0)) {
       return res.status(400).json({ error: 'Please provide a valid amount greater than 0.' });
     }
 
@@ -73,11 +74,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     if (isOperationsManager) {
       // Auto-approve for Operations Manager - no emails sent
       const now = new Date().toISOString();
+      const parsedAmount = amount ? parseFloat(amount) : 0;
       const { data: cashAdvance, error: insertError } = await supabaseAdmin
         .from('cash_advances')
         .insert({
           type,
-          amount: parseFloat(amount),
+          amount: parsedAmount,
           purpose: purpose || null,
           requested_by: userId,
           date_requested: new Date(date).toISOString(),
@@ -111,11 +113,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Standard flow for non-Operations Manager users
+    const parsedAmount = amount ? parseFloat(amount) : 0;
     const { data: cashAdvance, error: insertError } = await supabaseAdmin
       .from('cash_advances')
       .insert({
         type,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         purpose: purpose || null,
         requested_by: userId,
         date_requested: new Date(date).toISOString(),
@@ -136,7 +139,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         requesterName: `${userProfile.first_name || ''} ${userProfile.last_name || ''}`.trim() || 'Unknown',
         requesterEmail: userProfile.email || 'No email provided',
         type,
-        amount: parseFloat(amount),
+        amount: parsedAmount,
         date: new Date(date).toISOString(),
         purpose: purpose || undefined,
         requestId: cashAdvance.id,

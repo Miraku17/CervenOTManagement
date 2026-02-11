@@ -13,7 +13,7 @@ const transporter = nodemailer.createTransport({
 interface CashAdvanceEmailData {
   requesterName: string;
   requesterEmail: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   date: string;
   purpose?: string;
@@ -23,7 +23,7 @@ interface CashAdvanceEmailData {
 interface CashAdvanceLevelApprovalEmailData {
   requesterName: string;
   requesterEmail: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   date: string;
   purpose?: string;
@@ -36,7 +36,7 @@ interface CashAdvanceLevelApprovalEmailData {
 interface CashAdvanceStatusEmailData {
   requesterName: string;
   requesterEmail: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   date: string;
   purpose?: string;
@@ -59,7 +59,7 @@ export async function sendCashAdvanceRequestEmail(data: CashAdvanceEmailData) {
     day: 'numeric',
   });
 
-  const typeLabel = data.type === 'personal' ? 'Personal' : 'Support';
+  const typeLabel = data.type === 'personal' ? 'Personal' : data.type === 'support' ? 'Support' : 'Reimbursement';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -124,7 +124,7 @@ export async function sendCashAdvanceRequestEmail(data: CashAdvanceEmailData) {
                           <p style="margin: 0; color: #111827; font-size: 32px; font-weight: 700;">${formattedAmount}</p>
                         </td>
                         <td style="text-align: right; vertical-align: bottom;">
-                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : '#dcfce7'}; color: ${data.type === 'personal' ? '#1d4ed8' : '#166534'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
+                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : data.type === 'support' ? '#dcfce7' : '#ede9fe'}; color: ${data.type === 'personal' ? '#1d4ed8' : data.type === 'support' ? '#166534' : '#7c3aed'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
                             ${typeLabel}
                           </span>
                         </td>
@@ -270,7 +270,7 @@ export async function sendCashAdvanceLevel1Email(data: CashAdvanceLevelApprovalE
     day: 'numeric',
   });
 
-  const typeLabel = data.type === 'personal' ? 'Personal' : 'Support';
+  const typeLabel = data.type === 'personal' ? 'Personal' : data.type === 'support' ? 'Support' : 'Reimbursement';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -326,7 +326,7 @@ export async function sendCashAdvanceLevel1Email(data: CashAdvanceLevelApprovalE
                           <p style="margin: 0; color: #111827; font-size: 32px; font-weight: 700;">${formattedAmount}</p>
                         </td>
                         <td style="text-align: right; vertical-align: bottom;">
-                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : '#dcfce7'}; color: ${data.type === 'personal' ? '#1d4ed8' : '#166534'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
+                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : data.type === 'support' ? '#dcfce7' : '#ede9fe'}; color: ${data.type === 'personal' ? '#1d4ed8' : data.type === 'support' ? '#166534' : '#7c3aed'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
                             ${typeLabel}
                           </span>
                         </td>
@@ -466,7 +466,7 @@ export async function sendCashAdvanceLevel2Email(data: CashAdvanceLevelApprovalE
     day: 'numeric',
   });
 
-  const typeLabel = data.type === 'personal' ? 'Personal' : 'Support';
+  const typeLabel = data.type === 'personal' ? 'Personal' : data.type === 'support' ? 'Support' : 'Reimbursement';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -535,7 +535,7 @@ export async function sendCashAdvanceLevel2Email(data: CashAdvanceLevelApprovalE
                           <p style="margin: 0; color: #111827; font-size: 32px; font-weight: 700;">${formattedAmount}</p>
                         </td>
                         <td style="text-align: right; vertical-align: bottom;">
-                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : '#dcfce7'}; color: ${data.type === 'personal' ? '#1d4ed8' : '#166534'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
+                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : data.type === 'support' ? '#dcfce7' : '#ede9fe'}; color: ${data.type === 'personal' ? '#1d4ed8' : data.type === 'support' ? '#166534' : '#7c3aed'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
                             ${typeLabel}
                           </span>
                         </td>
@@ -940,7 +940,7 @@ export async function sendCashAdvanceStatusEmail(data: CashAdvanceStatusEmailDat
     day: 'numeric',
   });
 
-  const typeLabel = data.type === 'personal' ? 'Personal' : 'Support';
+  const typeLabel = data.type === 'personal' ? 'Personal' : data.type === 'support' ? 'Support' : 'Reimbursement';
   const isApproved = data.status === 'approved';
 
   const htmlContent = `
@@ -999,7 +999,7 @@ export async function sendCashAdvanceStatusEmail(data: CashAdvanceStatusEmailDat
                           <p style="margin: 0; color: ${isApproved ? '#16a34a' : '#111827'}; font-size: 32px; font-weight: 700;">${formattedAmount}</p>
                         </td>
                         <td style="text-align: right; vertical-align: bottom;">
-                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : '#dcfce7'}; color: ${data.type === 'personal' ? '#1d4ed8' : '#166534'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
+                          <span style="display: inline-block; padding: 6px 14px; background-color: ${data.type === 'personal' ? '#dbeafe' : data.type === 'support' ? '#dcfce7' : '#ede9fe'}; color: ${data.type === 'personal' ? '#1d4ed8' : data.type === 'support' ? '#166534' : '#7c3aed'}; font-size: 13px; font-weight: 600; border-radius: 20px;">
                             ${typeLabel}
                           </span>
                         </td>
