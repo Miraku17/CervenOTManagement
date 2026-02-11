@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye, ArrowUpDown } from 'lucide-react';
+import { Check, X, Calendar, AlertCircle, Clock, Loader2, Search, FileDown, Upload, Edit3, ChevronDown, Eye, ArrowUpDown, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { differenceInDays, parseISO } from 'date-fns';
@@ -22,7 +22,7 @@ interface LeaveRequest {
   start_date: string;
   end_date: string;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'revoked';
   created_at: string;
   reviewer?: {
     first_name: string;
@@ -47,7 +47,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
   const { hasPermission } = usePermissions();
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
+  const [filter, setFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'revoked'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +58,13 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
     employeeName: '',
   });
   const [reviewerComment, setReviewerComment] = useState('');
+  const [revokeConfirmation, setRevokeConfirmation] = useState<{
+    isOpen: boolean;
+    requestId: string | null;
+    employeeName: string;
+    duration: number;
+  }>({ isOpen: false, requestId: null, employeeName: '', duration: 0 });
+  const [revokeComment, setRevokeComment] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExporting, setIsExporting] = useState(false);
@@ -159,6 +166,60 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
   const handleApprove = (id: string) => openConfirmation(id, 'approve');
   const handleReject = (id: string) => openConfirmation(id, 'reject');
 
+  const handleRevoke = (id: string) => {
+    const request = requests.find(r => r.id === id);
+    if (!request) return;
+
+    const duration = calculateDuration(request.start_date, request.end_date);
+    setRevokeConfirmation({
+      isOpen: true,
+      requestId: id,
+      employeeName: `${request.employee.first_name} ${request.employee.last_name}`,
+      duration,
+    });
+  };
+
+  const closeRevokeConfirmation = () => {
+    setRevokeConfirmation({
+      isOpen: false,
+      requestId: null,
+      employeeName: '',
+      duration: 0,
+    });
+    setRevokeComment('');
+  };
+
+  const handleConfirmedRevoke = async () => {
+    if (!revokeConfirmation.requestId) return;
+
+    setProcessingId(revokeConfirmation.requestId);
+    closeRevokeConfirmation();
+
+    try {
+      const response = await fetch('/api/admin/revoke-leave', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: revokeConfirmation.requestId,
+          adminId: user?.id,
+          reviewerComment: revokeComment.trim() || undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to revoke leave request');
+      }
+
+      await fetchRequests();
+    } catch (err: any) {
+      console.error('Error revoking leave request:', err);
+      setError(err.message);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const handleExportExcel = async () => {
     if (!startDate || !endDate) {
       setError('Please select both start and end dates for export');
@@ -252,6 +313,8 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       case 'rejected':
         return 'bg-red-500/10 text-red-400 border-red-500/20';
+      case 'revoked':
+        return 'bg-orange-500/10 text-orange-400 border-orange-500/20';
       default:
         return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
     }
@@ -360,6 +423,24 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         />
       </ConfirmModal>
 
+      <ConfirmModal
+        isOpen={revokeConfirmation.isOpen}
+        title="Revoke Leave Request"
+        message={`Are you sure you want to revoke the approved leave request for ${revokeConfirmation.employeeName}? This will restore ${revokeConfirmation.duration} day${revokeConfirmation.duration !== 1 ? 's' : ''} to their leave credits balance.`}
+        confirmText="Revoke"
+        type="warning"
+        onConfirm={handleConfirmedRevoke}
+        onCancel={closeRevokeConfirmation}
+      >
+        <textarea
+          value={revokeComment}
+          onChange={(e) => setRevokeComment(e.target.value)}
+          placeholder="Optional: Add a comment about the revocation..."
+          className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-white text-sm focus:ring-2 focus:ring-orange-500 outline-none resize-none placeholder-slate-600"
+          rows={3}
+        />
+      </ConfirmModal>
+
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -441,7 +522,7 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
 
         <div className="flex gap-2 flex-wrap">
           <div className="flex gap-2 bg-slate-800 p-1 rounded-lg border border-slate-700 overflow-x-auto">
-            {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => (
+            {(['all', 'pending', 'approved', 'rejected', 'revoked'] as const).map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -640,7 +721,29 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
                           </button>
                         </div>
                       )}
-                      {request.status === 'pending' && !canApprove && (
+                      {request.status === 'approved' && canApprove && (
+                        <div className="flex items-center justify-end">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRevoke(request.id);
+                            }}
+                            disabled={processingId !== null}
+                            className={`p-1.5 rounded-md bg-orange-500/10 text-orange-400 hover:bg-orange-500/20 border border-orange-500/30 transition-colors ${processingId !== null ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            title="Revoke"
+                          >
+                            {processingId === request.id ? (
+                              <Loader2 size={16} className="animate-spin" />
+                            ) : (
+                              <RotateCcw size={16} />
+                            )}
+                          </button>
+                        </div>
+                      )}
+                      {((request.status === 'pending' && !canApprove) ||
+                        request.status === 'rejected' ||
+                        request.status === 'revoked' ||
+                        (request.status === 'approved' && !canApprove)) && (
                         <span className="text-xs text-slate-500 italic">View Only</span>
                       )}
                     </td>

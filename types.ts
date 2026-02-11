@@ -109,7 +109,7 @@ export interface LeaveRequest {
   start_date: string;
   end_date: string;
   reason: string;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'rejected' | 'revoked';
   created_at: string;
   reviewer_id?: string;
   reviewer?: {

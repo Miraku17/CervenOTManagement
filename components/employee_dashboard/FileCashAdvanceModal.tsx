@@ -49,6 +49,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
   });
   const [error, setError] = useState<string | null>(null);
   const [hasPendingCashAdvance, setHasPendingCashAdvance] = useState(false);
+  const [hasPendingLiquidation, setHasPendingLiquidation] = useState(false);
   const [checkingPending, setCheckingPending] = useState(false);
 
   const mutation = useMutation({
@@ -75,13 +76,17 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
         purpose: '',
       });
 
-      // Check for pending cash advances
-      const checkPendingCashAdvances = async () => {
+      // Check for pending cash advances and pending liquidations
+      const checkPendingRequests = async () => {
         setCheckingPending(true);
         try {
-          const response = await fetch('/api/cash-advance/my-requests?limit=100');
-          if (response.ok) {
-            const data = await response.json();
+          const [caResponse, liqResponse] = await Promise.all([
+            fetch('/api/cash-advance/my-requests?limit=100'),
+            fetch('/api/liquidation/my-requests?limit=100'),
+          ]);
+
+          if (caResponse.ok) {
+            const data = await caResponse.json();
             const hasPending = data.cashAdvances?.some(
               (ca: any) => ca.status === 'pending' && !ca.deleted_at
             );
@@ -90,14 +95,25 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
               setError('You cannot file a new cash advance while you have a pending cash advance request.');
             }
           }
+
+          if (liqResponse.ok) {
+            const data = await liqResponse.json();
+            const hasPendingLiq = data.liquidations?.some(
+              (liq: any) => liq.status === 'pending'
+            );
+            setHasPendingLiquidation(hasPendingLiq);
+            if (hasPendingLiq) {
+              setError('You cannot file a new cash advance while you have a pending liquidation.');
+            }
+          }
         } catch (err) {
-          console.error('Error checking for pending cash advances:', err);
+          console.error('Error checking for pending requests:', err);
         } finally {
           setCheckingPending(false);
         }
       };
 
-      checkPendingCashAdvances();
+      checkPendingRequests();
     }
   }, [isOpen]);
 
@@ -124,6 +140,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
   const handleClose = () => {
     setError(null);
     setHasPendingCashAdvance(false);
+    setHasPendingLiquidation(false);
     setCheckingPending(false);
     setFormData({
       type: 'personal',
@@ -275,7 +292,7 @@ const FileCashAdvanceModal: React.FC<FileCashAdvanceModalProps> = ({ isOpen, onC
             </button>
             <button
               type="submit"
-              disabled={mutation.isPending || hasPendingCashAdvance || checkingPending}
+              disabled={mutation.isPending || hasPendingCashAdvance || hasPendingLiquidation || checkingPending}
               className="w-full sm:flex-1 px-4 py-2.5 bg-green-600 text-white hover:bg-green-500 rounded-xl transition-colors shadow-lg shadow-green-900/30 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
             >
               {mutation.isPending ? (
