@@ -11,7 +11,7 @@ interface Liquidation {
   total_amount: number;
   return_to_company: number;
   reimbursement: number;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'level1_approved' | 'approved' | 'rejected';
   stores: {
     id: string;
     store_code: string;
