@@ -677,7 +677,7 @@ interface LiquidationSubmittedEmailData {
 }
 
 /**
- * Send email notification to users with approve_liquidations permission when a new liquidation is submitted
+ * Send email notification to Level 1 approvers when a new liquidation is submitted
  */
 export async function sendLiquidationSubmittedEmail(data: LiquidationSubmittedEmailData) {
   const formatCurrency = (amount: number) =>
@@ -896,12 +896,12 @@ export async function sendLiquidationSubmittedEmail(data: LiquidationSubmittedEm
 </html>
   `;
 
-  // Get all users with approve_liquidations permission
-  const recipientEmails = await getUserEmailsWithPermission('approve_liquidations');
+  // Get all users with approve_liquidations_level1 permission
+  const recipientEmails = await getUserEmailsWithPermission('approve_liquidations_level1');
 
   if (recipientEmails.length === 0) {
-    console.error('No users found with approve_liquidations permission');
-    return { success: false, error: 'No recipients found' };
+    console.error('No users found with approve_liquidations_level1 permission');
+    return { success: false, error: 'No Level 1 approvers found' };
   }
 
   const mailOptions = {
@@ -1124,6 +1124,316 @@ export async function sendCashAdvanceStatusEmail(data: CashAdvanceStatusEmailDat
     return { success: true };
   } catch (error) {
     console.error('Error sending cash advance status email:', error);
+    return { success: false, error };
+  }
+}
+
+// ============================================================================
+// LIQUIDATION TWO-LEVEL APPROVAL EMAILS
+// ============================================================================
+
+interface LiquidationLevel1ApprovedEmailData {
+  requesterName: string;
+  level1ApproverName: string;
+  cashAdvanceAmount: number;
+  totalExpenses: number;
+  liquidationDate: string;
+  requestId: string;
+}
+
+/**
+ * Send email notification to Level 2 approvers when a liquidation is approved at Level 1
+ */
+export async function sendLiquidationLevel1ApprovedEmail(data: LiquidationLevel1ApprovedEmailData) {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+
+  const formattedDate = new Date(data.liquidationDate).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquidation Approved at Level 1 - Needs Final Approval</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="height: 6px; background: linear-gradient(90deg, #3b82f6 0%, #10b981 100%);"></td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 40px 30px;">
+              <img src="cid:cerventech-logo" alt="CervenTech Logo" style="height: 50px; margin-bottom: 30px;">
+              <h1 style="margin: 0 0 10px; color: #1e293b; font-size: 28px; font-weight: 700;">Level 1 Approved</h1>
+              <p style="margin: 0; color: #64748b; font-size: 16px;">Final approval needed for liquidation request</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px;">
+              <div style="background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%); padding: 25px; border-radius: 12px; margin-bottom: 30px;">
+                <p style="margin: 0 0 10px; color: #ffffff; font-size: 14px; opacity: 0.9;">Employee</p>
+                <p style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">${data.requesterName}</p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Liquidation Date</span>
+                    <p style="margin: 5px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${formattedDate}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Cash Advance</span>
+                    <p style="margin: 5px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${formatCurrency(data.cashAdvanceAmount)}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Total Expenses</span>
+                    <p style="margin: 5px 0 0; color: #f59e0b; font-size: 18px; font-weight: 700;">${formatCurrency(data.totalExpenses)}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 15px 0;">
+                    <span style="color: #64748b; font-size: 14px;">Level 1 Approved By</span>
+                    <p style="margin: 5px 0 0; color: #10b981; font-size: 16px; font-weight: 600;">✓ ${data.level1ApproverName}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px;">
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; border-radius: 8px; margin-bottom: 25px;">
+                <p style="margin: 0; color: #92400e; font-size: 14px; line-height: 1.6;">
+                  <strong>⚠️ Final Approval Required</strong><br>
+                  This liquidation has been approved at Level 1 and now requires your final approval (Level 2).
+                </p>
+              </div>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/admin/liquidation-requests"
+                 style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #3b82f6 0%, #10b981 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);">
+                Review & Approve
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 25px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
+                This is an automated notification from CervenTech HR Portal. Please log in to review and take action on this liquidation request.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  // Get all users with approve_liquidations_level2 permission
+  const recipientEmails = await getUserEmailsWithPermission('approve_liquidations_level2');
+
+  if (recipientEmails.length === 0) {
+    console.error('No users found with approve_liquidations_level2 permission');
+    return { success: false, error: 'No Level 2 approvers found' };
+  }
+
+  const mailOptions = {
+    from: `"CervenTech HR Portal" <${process.env.EMAIL_USER}>`,
+    to: recipientEmails.join(', '),
+    subject: `🔔 Level 1 Approved - Final Approval Needed | ${data.requesterName} - ${formatCurrency(data.totalExpenses)}`,
+    html: htmlContent,
+    attachments: [
+      {
+        filename: 'logo.png',
+        path: path.join(process.cwd(), 'public', 'logo.png'),
+        cid: 'cerventech-logo',
+      },
+    ],
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Liquidation Level 1 approved email sent successfully to ${recipientEmails.length} Level 2 approver(s)`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending liquidation Level 1 approved email:', error);
+    return { success: false, error };
+  }
+}
+
+interface LiquidationStatusEmailData {
+  requesterName: string;
+  requesterEmail: string;
+  status: 'approved' | 'rejected';
+  level: 1 | 2;
+  reviewerName: string;
+  reviewerComment?: string;
+  cashAdvanceAmount: number;
+  totalExpenses: number;
+  liquidationDate: string;
+}
+
+/**
+ * Send email notification to requester when their liquidation is approved or rejected at any level
+ */
+export async function sendLiquidationStatusEmail(data: LiquidationStatusEmailData) {
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount);
+
+  const formattedDate = new Date(data.liquidationDate).toLocaleDateString('en-PH', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const isApproved = data.status === 'approved';
+  const isFinalApproval = data.level === 2 && isApproved;
+  const levelText = data.level === 1 ? 'Level 1' : 'Level 2 (Final)';
+  const statusText = isApproved ? 'Approved' : 'Rejected';
+  const statusColor = isApproved ? '#10b981' : '#ef4444';
+  const statusIcon = isApproved ? '✓' : '✕';
+
+  const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Liquidation ${statusText} at ${levelText}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 20px;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
+          <tr>
+            <td style="height: 6px; background-color: ${statusColor};"></td>
+          </tr>
+          <tr>
+            <td style="padding: 40px 40px 30px;">
+              <img src="cid:cerventech-logo" alt="CervenTech Logo" style="height: 50px; margin-bottom: 30px;">
+              <h1 style="margin: 0 0 10px; color: ${statusColor}; font-size: 28px; font-weight: 700;">${statusIcon} ${statusText} at ${levelText}</h1>
+              <p style="margin: 0; color: #64748b; font-size: 16px;">Your liquidation request status update</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 30px;">
+              <table style="width: 100%; border-collapse: collapse;">
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Liquidation Date</span>
+                    <p style="margin: 5px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${formattedDate}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Total Expenses</span>
+                    <p style="margin: 5px 0 0; color: #f59e0b; font-size: 18px; font-weight: 700;">${formatCurrency(data.totalExpenses)}</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="padding: 15px 0; border-bottom: 1px solid #e2e8f0;">
+                    <span style="color: #64748b; font-size: 14px;">Reviewed By</span>
+                    <p style="margin: 5px 0 0; color: #1e293b; font-size: 16px; font-weight: 600;">${data.reviewerName}</p>
+                  </td>
+                </tr>
+                ${data.reviewerComment ? `
+                <tr>
+                  <td style="padding: 15px 0;">
+                    <span style="color: #64748b; font-size: 14px;">Reviewer Comment</span>
+                    <p style="margin: 5px 0 0; color: #1e293b; font-size: 14px; line-height: 1.6; font-style: italic; background-color: #f8fafc; padding: 12px; border-radius: 8px; border-left: 3px solid ${statusColor};">"${data.reviewerComment}"</p>
+                  </td>
+                </tr>
+                ` : ''}
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 0 40px 40px;">
+              ${isFinalApproval ? `
+              <div style="background-color: #dcfce7; border-left: 4px solid #10b981; padding: 16px; border-radius: 8px; margin-bottom: 25px;">
+                <p style="margin: 0; color: #166534; font-size: 14px; line-height: 1.6;">
+                  <strong>🎉 Fully Approved!</strong><br>
+                  Your liquidation has been fully approved. The process is now complete.
+                </p>
+              </div>
+              ` : isApproved && data.level === 1 ? `
+              <div style="background-color: #dbeafe; border-left: 4px solid #3b82f6; padding: 16px; border-radius: 8px; margin-bottom: 25px;">
+                <p style="margin: 0; color: #1e40af; font-size: 14px; line-height: 1.6;">
+                  <strong>📋 Next Step</strong><br>
+                  Your liquidation has been approved at Level 1. It now awaits final approval (Level 2).
+                </p>
+              </div>
+              ` : `
+              <div style="background-color: #fee2e2; border-left: 4px solid #ef4444; padding: 16px; border-radius: 8px; margin-bottom: 25px;">
+                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.6;">
+                  <strong>❌ Rejected</strong><br>
+                  Your liquidation has been rejected at ${levelText}. Please review the comment above and contact your approver if you have questions.
+                </p>
+              </div>
+              `}
+              <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard/employee"
+                 style="display: inline-block; padding: 14px 32px; background-color: ${statusColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                View My Liquidations
+              </a>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 25px 40px; background-color: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; color: #64748b; font-size: 13px; line-height: 1.6;">
+                This is an automated notification from CervenTech HR Portal.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+
+  const mailOptions = {
+    from: `"CervenTech HR Portal" <${process.env.EMAIL_USER}>`,
+    to: data.requesterEmail,
+    subject: `Liquidation ${statusText} at ${levelText} - ${formatCurrency(data.totalExpenses)}`,
+    html: htmlContent,
+    attachments: [
+      {
+        filename: 'logo.png',
+        path: path.join(process.cwd(), 'public', 'logo.png'),
+        cid: 'cerventech-logo',
+      },
+    ],
+  };
+
+  try {
+    await transporter.sendMail(mailOptions);
+    console.log(`Liquidation status email sent successfully to ${data.requesterEmail}`);
+    return { success: true };
+  } catch (error) {
+    console.error('Error sending liquidation status email:', error);
     return { success: false, error };
   }
 }

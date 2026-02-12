@@ -161,11 +161,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw error;
     }
 
-    // Fetch profiles for the user_ids (since user_id references auth.users, not profiles)
+    // Fetch profiles for the user_ids and all approver fields (since they reference auth.users, not profiles)
     const userIds = [...new Set(liquidations?.map((l) => l.user_id).filter(Boolean) || [])];
+    const approverIds = [...new Set(liquidations?.map((l) => l.approved_by).filter(Boolean) || [])];
+    const level1ApproverIds = [...new Set(liquidations?.map((l) => l.level1_approved_by).filter(Boolean) || [])];
+    const level2ApproverIds = [...new Set(liquidations?.map((l) => l.level2_approved_by).filter(Boolean) || [])];
+    const allProfileIds = [...new Set([...userIds, ...approverIds, ...level1ApproverIds, ...level2ApproverIds])];
 
     let profilesMap: Record<string, any> = {};
-    if (userIds.length > 0) {
+    if (allProfileIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
         .select(`
@@ -179,7 +183,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             name
           )
         `)
-        .in('id', userIds);
+        .in('id', allProfileIds);
 
       if (profiles) {
         profilesMap = profiles.reduce((acc, profile) => {
@@ -193,6 +197,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const liquidationsWithProfiles = liquidations?.map((liq) => ({
       ...liq,
       profiles: liq.user_id ? profilesMap[liq.user_id] || null : null,
+      approver: liq.approved_by ? profilesMap[liq.approved_by] || null : null,
+      level1_approver: liq.level1_approved_by ? profilesMap[liq.level1_approved_by] || null : null,
+      level2_approver: liq.level2_approved_by ? profilesMap[liq.level2_approved_by] || null : null,
     })) || [];
 
     return res.status(200).json({
