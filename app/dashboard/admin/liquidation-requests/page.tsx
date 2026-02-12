@@ -58,10 +58,16 @@ interface Liquidation {
   return_to_company: number;
   reimbursement: number;
   remarks: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'level1_approved' | 'approved' | 'rejected';
   created_at: string;
   approved_at: string | null;
   reviewer_comment: string | null;
+  level1_approved_by: string | null;
+  level1_approved_at: string | null;
+  level1_reviewer_comment: string | null;
+  level2_approved_by: string | null;
+  level2_approved_at: string | null;
+  level2_reviewer_comment: string | null;
   cash_advances: {
     id: string;
     amount: number;
@@ -80,6 +86,39 @@ interface Liquidation {
   liquidation_items: LiquidationItem[];
   liquidation_attachments: LiquidationAttachment[];
   profiles: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    employee_id: string | null;
+    position_id: string | null;
+    positions: {
+      name: string;
+    } | null;
+  } | null;
+  approver: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    employee_id: string | null;
+    position_id: string | null;
+    positions: {
+      name: string;
+    } | null;
+  } | null;
+  level1_approver: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    employee_id: string | null;
+    position_id: string | null;
+    positions: {
+      name: string;
+    } | null;
+  } | null;
+  level2_approver: {
     id: string;
     first_name: string;
     last_name: string;
@@ -149,6 +188,8 @@ export default function LiquidationRequestsPage() {
 
   const canManageLiquidation = hasPermission('manage_liquidation');
   const canApproveLiquidation = hasPermission('approve_liquidations');
+  const canApproveLevel1 = hasPermission('approve_liquidations_level1');
+  const canApproveLevel2 = hasPermission('approve_liquidations_level2');
 
   // Export states
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -528,6 +569,13 @@ export default function LiquidationRequestsPage() {
             Pending
           </span>
         );
+      case 'level1_approved':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <CheckCircle size={12} />
+            Level 1 Approved
+          </span>
+        );
       case 'approved':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-400 border border-green-500/20">
@@ -545,6 +593,68 @@ export default function LiquidationRequestsPage() {
       default:
         return null;
     }
+  };
+
+  const getApprovalLevelStatus = (liquidation: Liquidation, level: 1 | 2) => {
+    const approver = level === 1 ? liquidation.level1_approver : liquidation.level2_approver;
+    const approvedAt = level === 1 ? liquidation.level1_approved_at : liquidation.level2_approved_at;
+    const isRejected = liquidation.status === 'rejected';
+    const isApproved = level === 1
+      ? (liquidation.level1_approved_by !== null)
+      : (liquidation.level2_approved_by !== null);
+
+    // Check if this level should show as rejected
+    const isRejectedAtThisLevel = isRejected && (
+      (level === 1 && liquidation.level1_approved_by && !liquidation.level2_approved_by) ||
+      (level === 2 && liquidation.level2_approved_by)
+    );
+
+    if (isRejectedAtThisLevel) {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
+            <XCircle size={12} />
+            Rejected
+          </span>
+          {approver && (
+            <span className="text-xs text-slate-500 truncate max-w-[120px]" title={`${approver.first_name} ${approver.last_name}`}>
+              {approver.first_name} {approver.last_name}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    if (isApproved) {
+      return (
+        <div className="flex flex-col gap-1">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-400">
+            <CheckCircle size={12} />
+            Approved
+          </span>
+          {approver && (
+            <span className="text-xs text-slate-500 truncate max-w-[120px]" title={`${approver.first_name} ${approver.last_name}`}>
+              {approver.first_name} {approver.last_name}
+            </span>
+          )}
+        </div>
+      );
+    }
+
+    // Not yet reached this level
+    if (level === 2 && liquidation.status === 'pending') {
+      return (
+        <span className="text-xs text-slate-600">-</span>
+      );
+    }
+
+    // Pending at this level
+    return (
+      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-400">
+        <Clock size={12} />
+        Pending
+      </span>
+    );
   };
 
   const formatCurrency = (amount: number) => {
@@ -615,12 +725,12 @@ export default function LiquidationRequestsPage() {
             className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
           >
             <Filter size={16} />
-            <span>Status: {statusFilter === 'all' ? 'All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</span>
+            <span>Status: {statusFilter === 'all' ? 'All' : statusFilter === 'level1_approved' ? 'Level 1 Approved' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}</span>
             <ChevronDown size={16} className={`transition-transform ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
           </button>
           {isStatusDropdownOpen && (
-            <div className="absolute z-10 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
-              {['all', 'pending', 'approved', 'rejected'].map((status) => (
+            <div className="absolute z-10 mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+              {['all', 'pending', 'level1_approved', 'approved', 'rejected'].map((status) => (
                 <button
                   key={status}
                   onClick={() => {
@@ -632,7 +742,7 @@ export default function LiquidationRequestsPage() {
                     statusFilter === status ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
                   }`}
                 >
-                  {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
+                  {status === 'all' ? 'All' : status === 'level1_approved' ? 'Level 1 Approved' : status.charAt(0).toUpperCase() + status.slice(1)}
                 </button>
               ))}
             </div>
@@ -663,6 +773,8 @@ export default function LiquidationRequestsPage() {
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Expenses</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Level 1</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Level 2</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
@@ -719,6 +831,8 @@ export default function LiquidationRequestsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(liquidation.status)}</td>
+                    <td className="px-6 py-4">{getApprovalLevelStatus(liquidation, 1)}</td>
+                    <td className="px-6 py-4">{getApprovalLevelStatus(liquidation, 2)}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
                         <button
@@ -780,6 +894,8 @@ export default function LiquidationRequestsPage() {
         adminId={user?.id || ''}
         onActionSuccess={handleActionSuccess}
         canApproveLiquidation={canApproveLiquidation}
+        canApproveLevel1={canApproveLevel1}
+        canApproveLevel2={canApproveLevel2}
       />
 
       {/* Edit Modal */}

@@ -22,7 +22,7 @@ interface Liquidation {
   return_to_company: number;
   reimbursement: number;
   remarks: string | null;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'level1_approved' | 'approved' | 'rejected';
   cash_advances: {
     id: string;
     amount: number;
@@ -72,7 +72,7 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
     ticket_id: '',
     liquidation_date: '',
     remarks: '',
-    status: 'pending' as 'pending' | 'approved' | 'rejected',
+    status: 'pending' as 'pending' | 'level1_approved' | 'approved' | 'rejected',
   });
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoadingStores, setIsLoadingStores] = useState(false);

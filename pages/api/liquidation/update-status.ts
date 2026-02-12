@@ -48,23 +48,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const newStatus = action === 'approve' ? 'approved' : 'rejected';
     const now = new Date().toISOString();
 
-    // Fetch the liquidation with user profile info
+    // Fetch the liquidation
     const { data: liquidation, error: fetchError } = await supabaseAdmin
       .from('liquidations')
-      .select(`
-        *,
-        requester:user_id (
-          id,
-          first_name,
-          last_name,
-          email,
-          position_id
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 
     if (fetchError || !liquidation) {
+      console.error('Error fetching liquidation:', fetchError);
       return res.status(404).json({ error: 'Liquidation not found' });
     }
 
@@ -72,8 +64,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Liquidation has already been processed' });
     }
 
+    // Fetch the requester's profile to check their position
+    const { data: requesterProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id, position_id')
+      .eq('id', liquidation.user_id)
+      .single();
+
     // Check if this is a confidential liquidation (HR or Accounting)
-    const requesterPositionId = (liquidation.requester as any)?.position_id;
+    const requesterPositionId = requesterProfile?.position_id;
     if (requesterPositionId) {
       // Get HR and Accounting position IDs
       const { data: confidentialPositions } = await supabaseAdmin
@@ -137,4 +136,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withAuth(handler, { requireRole: 'admin' });
+export default withAuth(handler);
