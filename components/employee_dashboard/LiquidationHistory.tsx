@@ -10,6 +10,7 @@ import { format, parseISO } from 'date-fns';
 
 interface LiquidationItem {
   id: string;
+  expense_date?: string;
   from_destination: string;
   to_destination: string;
   jeep: number;
@@ -367,6 +368,12 @@ const LiquidationHistory: React.FC = () => {
                         {/* Expenses Grid */}
                         <div className="p-3">
                           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 text-xs">
+                            {item.expense_date && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Date:</span>{' '}
+                                <span className="text-white font-medium">{format(parseISO(item.expense_date), 'MMM dd, yyyy')}</span>
+                              </div>
+                            )}
                             {item.jeep > 0 && (
                               <div className="bg-slate-800 px-2 py-1.5 rounded">
                                 <span className="text-slate-400">Jeep:</span>{' '}
