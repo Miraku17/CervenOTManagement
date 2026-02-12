@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 interface LiquidationItemData {
   id: string;
+  expense_date?: string;
   from_destination: string;
   to_destination: string;
   jeep: number;
@@ -89,6 +90,7 @@ interface Ticket {
 
 interface LiquidationItem {
   id: string;
+  expense_date: string;
   from_destination: string;
   to_destination: string;
   jeep: string;
@@ -117,6 +119,7 @@ interface LiquidationFormData {
 
 const emptyItem = (): LiquidationItem => ({
   id: Math.random().toString(36).substr(2, 9),
+  expense_date: format(new Date(), 'yyyy-MM-dd'),
   from_destination: '',
   to_destination: '',
   jeep: '',
@@ -605,6 +608,7 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
         remarks: editingLiquidation.remarks || '',
         items: editingLiquidation.liquidation_items.map((item) => ({
           id: item.id || Math.random().toString(36).substr(2, 9),
+          expense_date: item.expense_date ? item.expense_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
           from_destination: item.from_destination || '',
           to_destination: item.to_destination || '',
           jeep: item.jeep > 0 ? String(item.jeep) : '',
@@ -1239,6 +1243,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-800/50 text-slate-400 text-xs uppercase">
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Date
+                    </th>
                     <th colSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700">
                       Dispatch
                     </th>
@@ -1280,6 +1287,16 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                 <tbody>
                   {formData.items.map((item) => (
                     <tr key={item.id} className="border-b border-slate-700 last:border-b-0">
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="date"
+                          value={item.expense_date}
+                          onChange={(e) =>
+                            updateItem(item.id, 'expense_date', e.target.value)
+                          }
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[120px] [color-scheme:dark]"
+                        />
+                      </td>
                       <td className="p-1 border-r border-slate-700">
                         <input
                           type="text"

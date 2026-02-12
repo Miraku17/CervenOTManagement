@@ -98,7 +98,10 @@ export default function AdminLayout({
 
   // Check if user has access to liquidation management or approval
   const hasLiquidationAccess = () => {
-    return hasPermission('manage_liquidation') || hasPermission('approve_liquidations');
+    return hasPermission('manage_liquidation') ||
+           hasPermission('approve_liquidations') ||
+           hasPermission('approve_liquidations_level1') ||
+           hasPermission('approve_liquidations_level2');
   };
 
   const handleNavigate = (path: string) => {

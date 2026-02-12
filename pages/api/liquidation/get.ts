@@ -103,6 +103,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         ),
         liquidation_items (
           id,
+          expense_date,
           from_destination,
           to_destination,
           jeep,

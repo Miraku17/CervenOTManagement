@@ -7,6 +7,7 @@ import { format, parseISO } from 'date-fns';
 
 interface LiquidationItem {
   id: string;
+  expense_date?: string;
   from_destination: string;
   to_destination: string;
   jeep: number;
@@ -454,6 +455,12 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
 
                     {/* Expense Details Grid */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mb-3">
+                      <div>
+                        <p className="text-xs text-slate-400 mb-1">Date</p>
+                        <p className="text-white text-xs sm:text-sm font-semibold">
+                          {item.expense_date ? format(parseISO(item.expense_date), 'MMM dd, yyyy') : '-'}
+                        </p>
+                      </div>
                       <div>
                         <p className="text-xs text-slate-400 mb-1">From</p>
                         <p className="text-white text-xs sm:text-sm truncate">{item.from_destination || '-'}</p>

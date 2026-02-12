@@ -510,7 +510,7 @@ export default function LiquidationRequestsPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-liquidations', currentPage, pageLimit, statusFilter],
     queryFn: () => fetchLiquidations(currentPage, pageLimit, statusFilter),
-    enabled: canManageLiquidation || canApproveLiquidation,
+    enabled: canManageLiquidation || canApproveLiquidation || canApproveLevel1 || canApproveLevel2,
   });
 
   const liquidations = data?.liquidations || [];
@@ -674,7 +674,7 @@ export default function LiquidationRequestsPage() {
   }
 
   // Show access denied if no permission (need either manage or approve permission)
-  if (!canManageLiquidation && !canApproveLiquidation) {
+  if (!canManageLiquidation && !canApproveLiquidation && !canApproveLevel1 && !canApproveLevel2) {
     return (
       <div className="p-6 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 flex items-center gap-3">
         <AlertTriangle size={24} />

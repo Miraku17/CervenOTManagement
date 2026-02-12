@@ -13,6 +13,7 @@ export const config = {
 
 interface LiquidationItem {
   id?: string;
+  expense_date: string;
   from_destination: string;
   to_destination: string;
   jeep: string;
@@ -111,6 +112,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       totalAmount += itemTotal;
 
       return {
+        expense_date: item.expense_date || liquidation_date,
         from_destination: item.from_destination || '',
         to_destination: item.to_destination || '',
         jeep,
