@@ -15,7 +15,12 @@ if (!supabaseAnonKey) {
 export const supabaseServer = createClient(supabaseUrl, supabaseAnonKey);
 
 export const supabaseAdmin = supabaseServiceKey
-  ? createClient(supabaseUrl, supabaseServiceKey)
+  ? createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    })
   : null;
 
 if (!supabaseAdmin) {
