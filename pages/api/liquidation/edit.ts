@@ -105,11 +105,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         updatePayload.approved_by = req.user?.id;
       }
 
-      // If changing back to pending, clear approval info
+      // If changing back to pending, clear approval info and level approvals
       if (status === 'pending') {
         updatePayload.approved_at = null;
         updatePayload.approved_by = null;
         updatePayload.reviewer_comment = null;
+        // Reset level 1 approval
+        updatePayload.level1_approved_by = null;
+        updatePayload.level1_approved_at = null;
+        updatePayload.level1_reviewer_comment = null;
+        // Reset level 2 approval
+        updatePayload.level2_approved_by = null;
+        updatePayload.level2_approved_at = null;
+        updatePayload.level2_reviewer_comment = null;
       }
     }
 
@@ -125,13 +133,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .eq('id', id)
       .select(`
         *,
-        profiles:user_id(
-          id,
-          first_name,
-          last_name,
-          email,
-          employee_id
-        ),
         cash_advances(
           id,
           amount,
@@ -156,9 +157,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw updateError;
     }
 
+    // Fetch the profile separately
+    let profileData = null;
+    if (updatedLiquidation?.user_id) {
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, first_name, last_name, email, employee_id')
+        .eq('id', updatedLiquidation.user_id)
+        .single();
+      profileData = profile;
+    }
+
+    // Attach profile to liquidation
+    const liquidationWithProfile = {
+      ...updatedLiquidation,
+      profiles: profileData
+    };
+
     return res.status(200).json({
       message: 'Liquidation updated successfully',
-      data: updatedLiquidation
+      data: liquidationWithProfile
     });
 
   } catch (error: unknown) {

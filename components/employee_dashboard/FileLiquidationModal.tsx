@@ -137,8 +137,8 @@ const emptyItem = (): LiquidationItem => ({
   attachmentsToRemove: [],
 });
 
-// Image compression utility
-const compressImage = (file: File, maxWidth = 1920, maxHeight = 1920, quality = 0.8): Promise<File> => {
+// Image compression utility - more aggressive for receipts
+const compressImage = (file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.7): Promise<File> => {
   return new Promise((resolve, reject) => {
     // Skip non-image files
     if (!file.type.startsWith('image/')) {
@@ -488,22 +488,33 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const createMutation = useMutation({
     mutationFn: submitLiquidation,
     onSuccess: async (result) => {
-      // Upload files for each item if any
+      // Upload files for each item if any - in batches to avoid payload too large
       if (result.liquidation?.id && result.liquidation?.items) {
-        const uploadPromises = formData.items.map(async (item, index) => {
+        const BATCH_SIZE = 5; // Upload max 5 files per request
+
+        for (let itemIndex = 0; itemIndex < formData.items.length; itemIndex++) {
+          const item = formData.items[itemIndex];
+
           if (item.files && item.files.length > 0) {
             // Get the created item ID from the result
-            const createdItemId = result.liquidation.items[index]?.id;
+            const createdItemId = result.liquidation.items[itemIndex]?.id;
+
             if (createdItemId) {
-              const filesData = await prepareFilesForUpload(createdItemId, item.files);
-              return uploadMutation.mutateAsync({
-                liquidation_id: result.liquidation.id,
-                files: filesData,
-              });
+              // Split files into batches of BATCH_SIZE
+              for (let i = 0; i < item.files.length; i += BATCH_SIZE) {
+                const fileBatch = item.files.slice(i, i + BATCH_SIZE);
+                const filesData = await prepareFilesForUpload(createdItemId, fileBatch);
+
+                console.log(`Uploading batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(item.files.length/BATCH_SIZE)} for item ${itemIndex + 1} (${fileBatch.length} files)`);
+
+                await uploadMutation.mutateAsync({
+                  liquidation_id: result.liquidation.id,
+                  files: filesData,
+                });
+              }
             }
           }
-        });
-        await Promise.all(uploadPromises.filter(Boolean));
+        }
       }
 
       await queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
@@ -523,23 +534,33 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       const allAttachmentsToRemove = formData.items
         .flatMap(item => item.attachmentsToRemove || []);
 
-      // Upload new files for each item if any
+      // Upload new files for each item if any - in batches to avoid payload too large
       if (result.liquidation?.id && result.liquidation?.items) {
-        // Map form items to newly created item IDs by index
-        const uploadPromises = formData.items.map(async (item, index) => {
+        const BATCH_SIZE = 5; // Upload max 5 files per request
+
+        for (let itemIndex = 0; itemIndex < formData.items.length; itemIndex++) {
+          const item = formData.items[itemIndex];
+
           if (item.files && item.files.length > 0) {
             // Get the newly created item ID from the result (same order as formData.items)
-            const createdItemId = result.liquidation.items[index]?.id;
+            const createdItemId = result.liquidation.items[itemIndex]?.id;
+
             if (createdItemId) {
-              const filesData = await prepareFilesForUpload(createdItemId, item.files);
-              return uploadMutation.mutateAsync({
-                liquidation_id: result.liquidation.id,
-                files: filesData,
-              });
+              // Split files into batches of BATCH_SIZE
+              for (let i = 0; i < item.files.length; i += BATCH_SIZE) {
+                const fileBatch = item.files.slice(i, i + BATCH_SIZE);
+                const filesData = await prepareFilesForUpload(createdItemId, fileBatch);
+
+                console.log(`Uploading batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(item.files.length/BATCH_SIZE)} for item ${itemIndex + 1} (${fileBatch.length} files)`);
+
+                await uploadMutation.mutateAsync({
+                  liquidation_id: result.liquidation.id,
+                  files: filesData,
+                });
+              }
             }
           }
-        });
-        await Promise.all(uploadPromises.filter(Boolean));
+        }
       }
 
       await queryClient.invalidateQueries({ queryKey: ['my-liquidations'] });
