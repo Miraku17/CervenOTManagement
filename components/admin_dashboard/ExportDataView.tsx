@@ -445,11 +445,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     // Debug logging
     console.log('Overtime V2 records received:', overtimeV2Data.length);
 
-    // Sort by date first, then by surname (last name), then by first name
+    // Sort alphabetically by surname (last name), then by first name, then by date
     const sortedData = [...overtimeV2Data].sort((a, b) => {
-      const dateCompare = a.overtime_date.localeCompare(b.overtime_date);
-      if (dateCompare !== 0) return dateCompare;
-
       const lastNameA = a.profiles?.last_name || '';
       const lastNameB = b.profiles?.last_name || '';
       const lastNameCompare = lastNameA.localeCompare(lastNameB);
@@ -457,7 +454,11 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
 
       const firstNameA = a.profiles?.first_name || '';
       const firstNameB = b.profiles?.first_name || '';
-      return firstNameA.localeCompare(firstNameB);
+      const firstNameCompare = firstNameA.localeCompare(firstNameB);
+      if (firstNameCompare !== 0) return firstNameCompare;
+
+      // If names are the same, sort by date
+      return a.overtime_date.localeCompare(b.overtime_date);
     });
 
     // Add overtime records
