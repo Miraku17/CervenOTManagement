@@ -137,9 +137,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     }
 
     const sortedEmployees = Array.from(employeeMap.values()).sort((a, b) => {
-      const lastNameCompare = a.lastName.localeCompare(b.lastName);
-      if (lastNameCompare !== 0) return lastNameCompare;
-      return a.firstName.localeCompare(b.firstName);
+      return a.name.localeCompare(b.name);
     });
 
     // Build the report
@@ -445,17 +443,12 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
     // Debug logging
     console.log('Overtime V2 records received:', overtimeV2Data.length);
 
-    // Sort alphabetically by surname (last name), then by first name, then by date
+    // Sort alphabetically by full name (first name then last name), then by date
     const sortedData = [...overtimeV2Data].sort((a, b) => {
-      const lastNameA = a.profiles?.last_name || '';
-      const lastNameB = b.profiles?.last_name || '';
-      const lastNameCompare = lastNameA.localeCompare(lastNameB);
-      if (lastNameCompare !== 0) return lastNameCompare;
-
-      const firstNameA = a.profiles?.first_name || '';
-      const firstNameB = b.profiles?.first_name || '';
-      const firstNameCompare = firstNameA.localeCompare(firstNameB);
-      if (firstNameCompare !== 0) return firstNameCompare;
+      const nameA = `${a.profiles?.first_name || ''} ${a.profiles?.last_name || ''}`.trim();
+      const nameB = `${b.profiles?.first_name || ''} ${b.profiles?.last_name || ''}`.trim();
+      const nameCompare = nameA.localeCompare(nameB);
+      if (nameCompare !== 0) return nameCompare;
 
       // If names are the same, sort by date
       return a.overtime_date.localeCompare(b.overtime_date);
