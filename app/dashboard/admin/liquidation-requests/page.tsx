@@ -247,19 +247,46 @@ export default function LiquidationRequestsPage() {
       'Store Name',
       'Incident No.',
       'Liquidation Date',
+      'Expense Date',
+      'From Destination',
+      'To Destination',
+      'Jeep',
+      'Bus',
+      'FX/Van',
+      'Gas',
+      'Toll',
+      'Meals',
+      'Lodging',
+      'Others',
+      'Item Total',
+      'Item Remarks',
       'Cash Advance',
       'Total Expenses',
       'Return to Company',
       'Reimbursement',
       'Status',
       'Approved At',
-      'Remarks',
-      'Expense Details',
-      'Receipt Attachments'
+      'Overall Remarks'
     ]);
 
-    // Data rows
-    for (const liq of liquidations) {
+    // Sort liquidations alphabetically by last name, then first name, then by date
+    const sortedLiquidations = [...liquidations].sort((a, b) => {
+      const lastNameA = a.profiles?.last_name || '';
+      const lastNameB = b.profiles?.last_name || '';
+      const lastNameCompare = lastNameA.localeCompare(lastNameB);
+      if (lastNameCompare !== 0) return lastNameCompare;
+
+      const firstNameA = a.profiles?.first_name || '';
+      const firstNameB = b.profiles?.first_name || '';
+      const firstNameCompare = firstNameA.localeCompare(firstNameB);
+      if (firstNameCompare !== 0) return firstNameCompare;
+
+      // If names are the same, sort by date
+      return a.liquidation_date.localeCompare(b.liquidation_date);
+    });
+
+    // Data rows - each liquidation item gets its own row
+    for (const liq of sortedLiquidations) {
       const employeeName = liq.profiles
         ? `${liq.profiles.first_name} ${liq.profiles.last_name}`
         : 'Unknown';
@@ -276,46 +303,71 @@ export default function LiquidationRequestsPage() {
       const approvedAt = liq.approved_at
         ? format(new Date(liq.approved_at), 'MMM dd, yyyy h:mm a')
         : 'N/A';
-      const remarks = liq.remarks || '';
+      const overallRemarks = liq.remarks || '';
 
-      // Create expense details summary
-      const expenseDetails = liq.liquidation_items?.map((item: any) => {
-        const parts = [];
-        if (item.from_destination || item.to_destination) {
-          parts.push(`${item.from_destination || ''} -> ${item.to_destination || ''}`);
-        }
-        if (item.jeep > 0) parts.push(`Jeep: ${item.jeep}`);
-        if (item.bus > 0) parts.push(`Bus: ${item.bus}`);
-        if (item.fx_van > 0) parts.push(`FX/Van: ${item.fx_van}`);
-        if (item.gas > 0) parts.push(`Gas: ${item.gas}`);
-        if (item.toll > 0) parts.push(`Toll: ${item.toll}`);
-        if (item.meals > 0) parts.push(`Meals: ${item.meals}`);
-        if (item.lodging > 0) parts.push(`Lodging: ${item.lodging}`);
-        if (item.others > 0) parts.push(`Others: ${item.others}`);
-        parts.push(`Total: ${item.total}`);
-        return parts.join(', ');
-      }).join(' | ') || '';
-
-      // List attached receipts
-      const receiptAttachments = liq.liquidation_attachments?.map((att: any) => att.file_name).join(', ') || 'None';
-
-      reportData.push([
-        employeeName,
-        employeeId,
-        storeCode,
-        storeName,
-        incidentNo,
-        liquidationDate,
-        cashAdvance,
-        totalExpenses,
-        returnToCompany,
-        reimbursement,
-        status,
-        approvedAt,
-        remarks,
-        expenseDetails,
-        receiptAttachments
-      ]);
+      // Each liquidation item gets its own row
+      if (liq.liquidation_items && liq.liquidation_items.length > 0) {
+        liq.liquidation_items.forEach((item: any) => {
+          reportData.push([
+            employeeName,
+            employeeId,
+            storeCode,
+            storeName,
+            incidentNo,
+            liquidationDate,
+            item.expense_date || '',
+            item.from_destination || '',
+            item.to_destination || '',
+            item.jeep || 0,
+            item.bus || 0,
+            item.fx_van || 0,
+            item.gas || 0,
+            item.toll || 0,
+            item.meals || 0,
+            item.lodging || 0,
+            item.others || 0,
+            item.total || 0,
+            item.remarks || '',
+            cashAdvance,
+            totalExpenses,
+            returnToCompany,
+            reimbursement,
+            status,
+            approvedAt,
+            overallRemarks
+          ]);
+        });
+      } else {
+        // If no items, still show the liquidation with empty expense columns
+        reportData.push([
+          employeeName,
+          employeeId,
+          storeCode,
+          storeName,
+          incidentNo,
+          liquidationDate,
+          '', // expense_date
+          '', // from_destination
+          '', // to_destination
+          0, // jeep
+          0, // bus
+          0, // fx_van
+          0, // gas
+          0, // toll
+          0, // meals
+          0, // lodging
+          0, // others
+          0, // item total
+          '', // item remarks
+          cashAdvance,
+          totalExpenses,
+          returnToCompany,
+          reimbursement,
+          status,
+          approvedAt,
+          overallRemarks
+        ]);
+      }
     }
 
     // Create workbook
@@ -330,15 +382,26 @@ export default function LiquidationRequestsPage() {
       { wch: 20 },  // Store Name
       { wch: 15 },  // Incident No.
       { wch: 15 },  // Liquidation Date
+      { wch: 15 },  // Expense Date
+      { wch: 20 },  // From Destination
+      { wch: 20 },  // To Destination
+      { wch: 10 },  // Jeep
+      { wch: 10 },  // Bus
+      { wch: 10 },  // FX/Van
+      { wch: 10 },  // Gas
+      { wch: 10 },  // Toll
+      { wch: 10 },  // Meals
+      { wch: 10 },  // Lodging
+      { wch: 10 },  // Others
+      { wch: 12 },  // Item Total
+      { wch: 25 },  // Item Remarks
       { wch: 15 },  // Cash Advance
       { wch: 15 },  // Total Expenses
       { wch: 18 },  // Return to Company
       { wch: 15 },  // Reimbursement
       { wch: 12 },  // Status
       { wch: 20 },  // Approved At
-      { wch: 30 },  // Remarks
-      { wch: 60 },  // Expense Details
-      { wch: 40 }   // Receipt Attachments
+      { wch: 30 }   // Overall Remarks
     ];
 
     // Apply styles
