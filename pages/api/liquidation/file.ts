@@ -87,11 +87,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Check if liquidation already exists for this cash advance
+    // Check if a non-rejected liquidation already exists for this cash advance
     const { data: existingLiquidation } = await supabaseAdmin
       .from('liquidations')
       .select('id')
       .eq('cash_advance_id', cash_advance_id)
+      .neq('status', 'rejected')
       .single();
 
     if (existingLiquidation) {
