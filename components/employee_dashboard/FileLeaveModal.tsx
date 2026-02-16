@@ -121,6 +121,7 @@ const FileLeaveModal: React.FC<FileLeaveModalProps> = ({ isOpen, onClose, onSucc
                   <option value="Sick">Sick Leave</option>
                   <option value="Personal">Personal Leave</option>
                   <option value="Emergency">Emergency Leave</option>
+                  <option value="Holiday Leave">Holiday Leave</option>
                   <option value="Leave Without Pay">Leave Without Pay</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">

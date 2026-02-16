@@ -63,7 +63,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const duration = differenceInDays(parseISO(request.end_date), parseISO(request.start_date)) + 1;
 
     // 3. Restore leave credits (skip for Leave Without Pay)
-    if (request.leave_type !== 'Leave Without Pay') {
+    if (request.leave_type !== 'Leave Without Pay' && request.leave_type !== 'Holiday Leave') {
       const currentCredits = request.employee?.leave_credits || 0;
 
       // Restore credits by adding duration back
