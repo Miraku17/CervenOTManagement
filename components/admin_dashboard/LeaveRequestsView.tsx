@@ -330,6 +330,8 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
       case 'Leave Without Pay':
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+      case 'Holiday Leave':
+        return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
       default:
         return 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20';
     }

@@ -46,7 +46,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const isOperationsManager = userPosition === 'Operations Manager';
 
     // 2. Check Leave Credits (skip for Leave Without Pay and Operations Managers)
-    if (type !== 'Leave Without Pay' && !isOperationsManager) {
+    if (type !== 'Leave Without Pay' && type !== 'Holiday Leave' && !isOperationsManager) {
       const currentCredits = userProfile.leave_credits || 0;
       if (currentCredits < duration) {
         return res.status(400).json({
@@ -104,7 +104,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // If auto-approved and not Leave Without Pay, deduct credits immediately
-    if (isOperationsManager && type !== 'Leave Without Pay') {
+    if (isOperationsManager && type !== 'Leave Without Pay' && type !== 'Holiday Leave') {
       const currentCredits = userProfile.leave_credits || 0;
       const { error: updateError } = await supabaseAdmin
         .from('profiles')

@@ -53,7 +53,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // 2. If approving, deduct leave credits (skip for Leave Without Pay)
-    if (newStatus === 'approved' && request.leave_type !== 'Leave Without Pay') {
+    if (newStatus === 'approved' && request.leave_type !== 'Leave Without Pay' && request.leave_type !== 'Holiday Leave') {
       const duration = differenceInDays(parseISO(request.end_date), parseISO(request.start_date)) + 1;
 
       // Fetch current credits
