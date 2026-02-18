@@ -19,8 +19,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const hasPermission = await userHasPermission(adminUserId, 'manage_liquidation');
-    if (!hasPermission) {
+    const [canManage, canApprove, canApproveL1, canApproveL2] = await Promise.all([
+      userHasPermission(adminUserId, 'manage_liquidation'),
+      userHasPermission(adminUserId, 'approve_liquidations'),
+      userHasPermission(adminUserId, 'approve_liquidations_level1'),
+      userHasPermission(adminUserId, 'approve_liquidations_level2'),
+    ]);
+
+    if (!canManage && !canApprove && !canApproveL1 && !canApproveL2) {
       return res.status(403).json({ error: 'Forbidden: You do not have permission to download attachments' });
     }
 
