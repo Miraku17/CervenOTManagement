@@ -107,9 +107,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Filter assets based on search term (search across all fields) and status
     let filteredAssets = allAssetsWithDetails || [];
     
-    // Apply status filter
+    // Apply status filter (supports comma-separated values e.g. "Broken,Under Repair")
     if (statusFilter && statusFilter !== 'All') {
-      filteredAssets = filteredAssets.filter((asset: any) => asset.status === statusFilter);
+      const statuses = statusFilter.split(',').map((s: string) => s.trim());
+      filteredAssets = filteredAssets.filter((asset: any) => statuses.includes(asset.status));
     }
 
     // Apply search filter

@@ -70,6 +70,11 @@ interface KBArticle {
   kb_code: string;
 }
 
+interface Manager {
+  id: string;
+  manager_name: string;
+}
+
 interface Employee {
   id: string;
   fullName: string;
@@ -436,6 +441,10 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
   const [showServicedByDropdown, setShowServicedByDropdown] = useState(false);
   const [servicedBySearchTerm, setServicedBySearchTerm] = useState('');
   const servicedByDropdownRef = useRef<HTMLDivElement>(null);
+  const [managers, setManagers] = useState<Manager[]>([]);
+  const [showModDropdown, setShowModDropdown] = useState(false);
+  const [modSearchTerm, setModSearchTerm] = useState('');
+  const modDropdownRef = useRef<HTMLDivElement>(null);
   const [kbArticles, setKbArticles] = useState<KBArticle[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [attachments, setAttachments] = useState<TicketAttachment[]>([]);
@@ -460,6 +469,9 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       }
       if (servicedByDropdownRef.current && !servicedByDropdownRef.current.contains(event.target as Node)) {
         setShowServicedByDropdown(false);
+      }
+      if (modDropdownRef.current && !modDropdownRef.current.contains(event.target as Node)) {
+        setShowModDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -532,6 +544,29 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       fetchEmployees();
     }
   }, [isOpen]);
+
+  // Fetch managers when ticket's store changes
+  useEffect(() => {
+    const fetchManagers = async () => {
+      if (!ticket?.store_id) {
+        setManagers([]);
+        return;
+      }
+      try {
+        const response = await fetch(`/api/stores/managers?store_id=${ticket.store_id}`);
+        const data = await response.json();
+        if (response.ok) {
+          setManagers(data.managers || []);
+        }
+      } catch (error) {
+        console.error('Error fetching managers:', error);
+      }
+    };
+
+    if (isOpen && ticket) {
+      fetchManagers();
+    }
+  }, [isOpen, ticket?.store_id]);
 
   // Fetch attachments when ticket changes
   useEffect(() => {
@@ -618,6 +653,7 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         pause_time_end_2: ticket.pause_time_end_2 || '',
         kb_id: ticket.kb_id || '',
         serviced_by: ticket.serviced_by || '',
+        mod_id: ticket.mod_id || '',
       });
       // Set search term to current employee name
       if (ticket.serviced_by_user) {
@@ -625,6 +661,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       } else {
         setServicedBySearchTerm('');
       }
+      // Set MOD search term to current manager name
+      setModSearchTerm(ticket.store_managers?.manager_name || '');
     }
   }, [ticket]);
 
@@ -826,13 +864,19 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
       }, {} as Record<string, any>);
 
       // 2. Update ticket fields
+      // If no mod_id is set but a name was typed, send it as mod_name for the API to resolve
+      const modNamePayload = (!sanitizedData.mod_id && modSearchTerm.trim())
+        ? { mod_name: modSearchTerm.trim() }
+        : {};
+
       const response = await fetch('/api/tickets/update', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: ticket.id,
           ...sanitizedData,
-          status: toDbStatus(editData.status || 'Open')
+          status: toDbStatus(editData.status || 'Open'),
+          ...modNamePayload,
         })
       });
 
@@ -921,6 +965,8 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
         if (data.ticket.serviced_by_user) {
           setServicedBySearchTerm(`${data.ticket.serviced_by_user.first_name} ${data.ticket.serviced_by_user.last_name}`);
         }
+        // Update MOD search term with new manager name
+        setModSearchTerm(data.ticket.store_managers?.manager_name || '');
       }
 
       if (onUpdate && data.ticket) {
@@ -1198,7 +1244,99 @@ const TicketDetailModal: React.FC<TicketDetailModalProps> = ({ isOpen, onClose, 
             <LabelValue label="Store Name" value={ticket.stores?.store_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Store Code" value={ticket.stores?.store_code} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
             <LabelValue label="Station" value={ticket.stations?.name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
-            <LabelValue label="Manager on Duty (MOD)" value={ticket.store_managers?.manager_name} isEditMode={isEditMode} editData={editData} setEditData={setEditData} isSaving={isSaving} />
+            {/* Manager on Duty - Editable Searchable Dropdown */}
+            <div ref={modDropdownRef} className={isEditMode ? "relative" : ""}>
+              <span className="block text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">
+                Manager on Duty (MOD)
+                {isEditMode && editData.mod_id && (
+                  <span className="text-slate-400 normal-case ml-2">
+                    (Selected: {managers.find(m => m.id === editData.mod_id)?.manager_name || 'Loading...'})
+                  </span>
+                )}
+              </span>
+              {isEditMode ? (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      disabled={isSaving}
+                      value={modSearchTerm}
+                      onChange={(e) => {
+                        const typed = e.target.value;
+                        setModSearchTerm(typed);
+                        setShowModDropdown(true);
+                        // If user edits away from the currently selected manager, clear mod_id
+                        const currentManager = managers.find(m => m.id === editData.mod_id);
+                        if (currentManager && currentManager.manager_name !== typed) {
+                          setEditData({ ...editData, mod_id: '' });
+                        }
+                      }}
+                      onFocus={() => setShowModDropdown(true)}
+                      className="w-full bg-slate-950 border border-slate-700 text-slate-200 text-sm px-3 py-2 pr-16 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                      placeholder="Search for a manager..."
+                    />
+                    {editData.mod_id && !isSaving && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditData({ ...editData, mod_id: '' });
+                          setModSearchTerm('');
+                          setShowModDropdown(false);
+                        }}
+                        className="absolute right-8 top-1/2 -translate-y-1/2 text-slate-500 hover:text-red-400 transition-colors p-1"
+                        title="Clear selection"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                    <ChevronDown
+                      size={16}
+                      className={`absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none transition-transform ${showModDropdown ? 'rotate-180' : ''}`}
+                    />
+                  </div>
+
+                  {showModDropdown && !isSaving && (
+                    <div className="absolute z-50 w-full mt-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-60 overflow-y-auto animate-in fade-in zoom-in-95 duration-100">
+                      {managers.filter(m =>
+                        m.manager_name.toLowerCase().includes(modSearchTerm.toLowerCase())
+                      ).length > 0 ? (
+                        managers
+                          .filter(m => m.manager_name.toLowerCase().includes(modSearchTerm.toLowerCase()))
+                          .map((manager) => (
+                            <button
+                              key={manager.id}
+                              type="button"
+                              onClick={() => {
+                                setEditData({ ...editData, mod_id: manager.id });
+                                setModSearchTerm(manager.manager_name);
+                                setShowModDropdown(false);
+                              }}
+                              className={`w-full text-left px-3 py-2.5 hover:bg-slate-800 transition-colors border-b border-slate-800 last:border-0 ${
+                                editData.mod_id === manager.id ? 'bg-slate-800/50' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium text-white">{manager.manager_name}</div>
+                                {editData.mod_id === manager.id && (
+                                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                                )}
+                              </div>
+                            </button>
+                          ))
+                      ) : (
+                        <div className="px-3 py-3 text-sm text-slate-500 text-center">
+                          {managers.length === 0 ? 'No managers found for this store' : 'No managers match your search'}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-sm text-slate-300 font-medium break-words">
+                  {ticket.store_managers?.manager_name || <span className="text-slate-600 italic">N/A</span>}
+                </div>
+              )}
+            </div>
           </DetailSection>
 
           <DetailSection title="People Involved" icon={User}>

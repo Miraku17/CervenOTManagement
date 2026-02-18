@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, X, User, Pencil, Trash2 } from 'lucide-react';
+import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, FolderDown, X, User, Pencil, Trash2 } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -200,6 +200,7 @@ export default function LiquidationRequestsPage() {
   const [isLoadingEmployees, setIsLoadingEmployees] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingAll, setIsExportingAll] = useState(false);
+  const [isDownloadingAttachments, setIsDownloadingAttachments] = useState(false);
 
   // Fetch employees for export dropdown
   useEffect(() => {
@@ -570,6 +571,57 @@ export default function LiquidationRequestsPage() {
     }
   };
 
+  const handleDownloadAllAttachments = async () => {
+    setIsDownloadingAttachments(true);
+    try {
+      const response = await fetch('/api/liquidation/download-attachments');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch attachments');
+      }
+
+      if (!result.attachments || result.attachments.length === 0) {
+        alert('No image attachments found.');
+        return;
+      }
+
+      const zip = new JSZip();
+
+      for (const attachment of result.attachments) {
+        if (!attachment.signed_url) continue;
+
+        try {
+          const imgResponse = await fetch(attachment.signed_url);
+          if (!imgResponse.ok) continue;
+
+          const imgBlob = await imgResponse.blob();
+          const date = attachment.liquidation_date || 'unknown-date';
+          const sanitizedName = attachment.file_name.replace(/[^a-zA-Z0-9._-]/g, '_');
+          zip.folder(date)?.file(sanitizedName, imgBlob);
+        } catch (err) {
+          console.error('Failed to download attachment:', err);
+        }
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipUrl = window.URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = zipUrl;
+      a.download = `liquidation_receipts_${today}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(zipUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download attachments. Please try again.');
+    } finally {
+      setIsDownloadingAttachments(false);
+    }
+  };
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin-liquidations', currentPage, pageLimit, statusFilter],
     queryFn: () => fetchLiquidations(currentPage, pageLimit, statusFilter),
@@ -770,13 +822,27 @@ export default function LiquidationRequestsPage() {
             <p className="text-sm text-slate-400">Review and approve employee liquidation reports</p>
           </div>
         </div>
-        <button
-          onClick={() => setIsExportModalOpen(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors font-medium"
-        >
-          <FileDown size={18} />
-          Export
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleDownloadAllAttachments}
+            disabled={isDownloadingAttachments}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isDownloadingAttachments ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <FolderDown size={18} />
+            )}
+            {isDownloadingAttachments ? 'Downloading...' : 'Download Receipts'}
+          </button>
+          <button
+            onClick={() => setIsExportModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg transition-colors font-medium"
+          >
+            <FileDown size={18} />
+            Export
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
