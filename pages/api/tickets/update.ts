@@ -67,7 +67,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch the existing ticket to get current data for SLA calculation
     const { data: existingTicket, error: fetchError } = await supabaseAdmin
       .from('tickets')
-      .select('id, serviced_by, sev, date_reported, time_reported, date_responded, time_responded, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_start, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2, sla_count_hrs')
+      .select('id, store_id, serviced_by, sev, date_reported, time_reported, date_responded, time_responded, date_resolved, time_resolved, date_ack, time_ack, date_attended, work_start, work_end, pause_time_start, pause_time_end, pause_time_start_2, pause_time_end_2, sla_count_hrs')
       .eq('id', id)
       .single();
 
@@ -77,6 +77,39 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         error: 'Ticket not found',
         details: fetchError
       });
+    }
+
+    // Handle free-text MOD name: look up or create a store_managers record
+    if (updateData.mod_name) {
+      const managerName = (updateData.mod_name as string).trim();
+      const storeId = existingTicket.store_id;
+
+      if (managerName && storeId) {
+        // Check if a manager with this name already exists for the store
+        const { data: existingManager } = await supabaseAdmin
+          .from('store_managers')
+          .select('id')
+          .eq('store_id', storeId)
+          .ilike('manager_name', managerName)
+          .maybeSingle();
+
+        if (existingManager) {
+          updateData.mod_id = existingManager.id;
+        } else {
+          // Create a new store_managers record
+          const { data: newManager } = await supabaseAdmin
+            .from('store_managers')
+            .insert({ store_id: storeId, manager_name: managerName })
+            .select('id')
+            .single();
+
+          if (newManager) {
+            updateData.mod_id = newManager.id;
+          }
+        }
+      }
+
+      delete updateData.mod_name;
     }
 
     // Calculate SLA Count Hours: (Date Attended & Work End) - (Date & Time Acknowledge)
@@ -301,7 +334,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           first_name,
           last_name
         ),
-        manager_on_duty:store_managers (
+        store_managers:mod_id (
+          id,
           manager_name
         )
       `)

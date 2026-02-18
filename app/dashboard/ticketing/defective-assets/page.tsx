@@ -120,7 +120,10 @@ export default function DefectiveAssetsPage() {
       const effectivePage = showAll ? 1 : currentPage;
 
       const searchParam = searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : '';
-      const statusParam = statusFilter && statusFilter !== 'All' ? `&status=${encodeURIComponent(statusFilter)}` : '';
+      // Always filter to defective statuses; narrow further if a specific status is selected
+      const statusParam = statusFilter && statusFilter !== 'All'
+        ? `&status=${encodeURIComponent(statusFilter)}`
+        : `&status=${encodeURIComponent('Broken,Under Repair')}`;
 
       const response = await fetch(`/api/assets/get?page=${effectivePage}&limit=${effectiveLimit}${searchParam}${statusParam}`);
       if (!response.ok) {
@@ -128,14 +131,10 @@ export default function DefectiveAssetsPage() {
       }
 
       const data = await response.json();
+      const defectiveAssets = data.assets || [];
 
-      // Filter to show only Broken or Under Repair assets
-      const defectiveAssets = statusFilter === 'All'
-        ? (data.assets || []).filter((asset: Asset) => asset.status === 'Broken' || asset.status === 'Under Repair')
-        : data.assets || [];
-
-      // Calculate defective-specific stats
-      const totalDefectiveAssets = defectiveAssets.length;
+      // Calculate defective-specific stats from current page data
+      const totalDefectiveAssets = data.pagination.totalCount;
       const defectivePrinters = defectiveAssets.filter(
         (asset: Asset) => asset.categories?.name?.toLowerCase().includes('printer')
       ).length;
@@ -149,8 +148,8 @@ export default function DefectiveAssetsPage() {
           uniqueCategories,
         },
         pagination: {
-          totalCount: statusFilter === 'All' ? defectiveAssets.length : data.pagination.totalCount,
-          totalPages: statusFilter === 'All' ? Math.ceil(defectiveAssets.length / pageSize) : data.pagination.totalPages,
+          totalCount: data.pagination.totalCount,
+          totalPages: data.pagination.totalPages,
         },
       };
     },

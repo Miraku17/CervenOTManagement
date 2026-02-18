@@ -328,6 +328,10 @@ const LeaveRequestsView: React.FC<LeaveRequestsViewProps> = ({ canApprove = true
         return 'bg-red-500/10 text-red-400 border-red-500/20';
       case 'Vacation':
         return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'Paternity Leave':
+        return 'bg-sky-500/10 text-sky-400 border-sky-500/20';
+      case 'Maternity Leave':
+        return 'bg-purple-500/10 text-purple-400 border-purple-500/20';
       case 'Leave Without Pay':
         return 'bg-slate-500/10 text-slate-400 border-slate-500/20';
       case 'Holiday Leave':
