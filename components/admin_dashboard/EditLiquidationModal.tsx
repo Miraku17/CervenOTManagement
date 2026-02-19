@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Receipt, Loader2, Save, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { X, Receipt, Loader2, Save, CheckCircle, XCircle, Clock, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface LiquidationItem {
@@ -54,6 +54,15 @@ interface Store {
   store_name: string;
 }
 
+interface Ticket {
+  id: number;
+  rcc_reference_number: string;
+  stores?: {
+    store_name: string;
+    store_code: string;
+  } | null;
+}
+
 interface EditLiquidationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -78,6 +87,15 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
   const [isLoadingStores, setIsLoadingStores] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ticket search state
+  const [ticketSearch, setTicketSearch] = useState('');
+  const [ticketResults, setTicketResults] = useState<Ticket[]>([]);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+  const [showTicketDropdown, setShowTicketDropdown] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const ticketSearchRef = useRef<HTMLDivElement>(null);
+  const ticketDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch stores on mount
   useEffect(() => {
@@ -112,8 +130,56 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
         status: liquidation.status,
       });
       setError(null);
+      // Pre-load the current ticket by reference
+      if (liquidation.tickets) {
+        setSelectedTicket(liquidation.tickets as Ticket);
+        setTicketSearch(liquidation.tickets.rcc_reference_number);
+      } else {
+        setSelectedTicket(null);
+        setTicketSearch('');
+      }
+      setTicketResults([]);
+      setShowTicketDropdown(false);
     }
   }, [liquidation]);
+
+  // Debounced ticket search
+  useEffect(() => {
+    if (ticketDebounceRef.current) clearTimeout(ticketDebounceRef.current);
+    if (!showTicketDropdown) return;
+
+    ticketDebounceRef.current = setTimeout(async () => {
+      setIsLoadingTickets(true);
+      try {
+        const params = new URLSearchParams({ limit: '20' });
+        if (ticketSearch.trim()) params.set('q', ticketSearch.trim());
+        const res = await fetch(`/api/tickets/search?${params.toString()}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTicketResults(data.tickets || []);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setIsLoadingTickets(false);
+      }
+    }, 300);
+
+    return () => {
+      if (ticketDebounceRef.current) clearTimeout(ticketDebounceRef.current);
+    };
+  }, [ticketSearch, showTicketDropdown]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ticketSearchRef.current && !ticketSearchRef.current.contains(e.target as Node)) {
+        setShowTicketDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (!isOpen || !liquidation) return null;
 
@@ -278,20 +344,81 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
               </select>
             </div>
 
-            {/* Ticket ID */}
+            {/* Ticket/Incident No. searchable dropdown */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
                 Ticket/Incident No. (Optional)
               </label>
-              <input
-                type="text"
-                name="ticket_id"
-                value={formData.ticket_id}
-                onChange={handleInputChange}
-                placeholder="Enter ticket number"
-                disabled={isSubmitting}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
-              />
+              <div ref={ticketSearchRef} className="relative">
+                <div className="relative">
+                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={ticketSearch}
+                    onChange={(e) => {
+                      setTicketSearch(e.target.value);
+                      setShowTicketDropdown(true);
+                      if (!e.target.value.trim()) {
+                        setSelectedTicket(null);
+                        setFormData((prev) => ({ ...prev, ticket_id: '' }));
+                      }
+                    }}
+                    onFocus={() => setShowTicketDropdown(true)}
+                    placeholder="Search by reference no."
+                    disabled={isSubmitting}
+                    className="w-full pl-9 pr-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50"
+                  />
+                  {selectedTicket && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedTicket(null);
+                        setTicketSearch('');
+                        setFormData((prev) => ({ ...prev, ticket_id: '' }));
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-400 transition-colors"
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+
+                {showTicketDropdown && (
+                  <div className="absolute z-10 mt-1 w-full bg-slate-800 border border-slate-600 rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                    {isLoadingTickets ? (
+                      <div className="flex items-center justify-center py-4 text-slate-400 text-sm gap-2">
+                        <Loader2 size={14} className="animate-spin" />
+                        Searching...
+                      </div>
+                    ) : ticketResults.length === 0 ? (
+                      <div className="py-4 text-center text-slate-500 text-sm">No tickets found</div>
+                    ) : (
+                      ticketResults.map((ticket) => (
+                        <button
+                          key={ticket.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedTicket(ticket);
+                            setTicketSearch(ticket.rcc_reference_number);
+                            setFormData((prev) => ({ ...prev, ticket_id: ticket.id.toString() }));
+                            setShowTicketDropdown(false);
+                          }}
+                          className={`w-full text-left px-4 py-2.5 hover:bg-slate-700 transition-colors text-sm ${
+                            selectedTicket?.id === ticket.id ? 'bg-slate-700 text-orange-400' : 'text-white'
+                          }`}
+                        >
+                          <span className="font-medium">{ticket.rcc_reference_number}</span>
+                          {ticket.stores && (
+                            <span className="ml-2 text-xs text-slate-400">
+                              {ticket.stores.store_code} — {ticket.stores.store_name}
+                            </span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Liquidation Date */}
