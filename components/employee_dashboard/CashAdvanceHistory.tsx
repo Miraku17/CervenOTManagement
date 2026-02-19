@@ -9,7 +9,7 @@ import EditCashAdvanceModal from './EditCashAdvanceModal';
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   status: 'pending' | 'approved' | 'rejected';

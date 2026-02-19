@@ -6,7 +6,7 @@ import { AlertTriangle, Trash2, X, Loader2 } from 'lucide-react';
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   requester: {

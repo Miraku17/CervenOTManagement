@@ -7,7 +7,7 @@ import { format, parseISO } from 'date-fns';
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   status: 'pending' | 'approved' | 'rejected';
