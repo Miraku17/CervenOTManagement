@@ -16,6 +16,7 @@ interface LiquidationItem {
   expense_date: string;
   from_destination: string;
   to_destination: string;
+  ticket_id?: string;
   jeep: string;
   bus: string;
   fx_van: string;
@@ -29,8 +30,6 @@ interface LiquidationItem {
 
 interface UpdateLiquidationRequest {
   liquidation_id: string;
-  store_id?: string;
-  ticket_id?: string;
   liquidation_date: string;
   remarks: string;
   items: LiquidationItem[];
@@ -55,8 +54,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const {
       liquidation_id,
-      store_id,
-      ticket_id,
       liquidation_date,
       remarks,
       items,
@@ -115,6 +112,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         expense_date: item.expense_date || liquidation_date,
         from_destination: item.from_destination || '',
         to_destination: item.to_destination || '',
+        ticket_id: item.ticket_id ? parseInt(item.ticket_id) : null,
         jeep,
         bus,
         fx_van,
@@ -136,12 +134,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ? totalAmount - cashAdvanceAmount
       : 0;
 
-    // Update liquidation
+    // Update liquidation (store_id and ticket_id now live on items)
     const { data: updatedLiquidation, error: updateError } = await supabaseAdmin
       .from('liquidations')
       .update({
-        store_id: store_id || null,
-        ticket_id: ticket_id ? parseInt(ticket_id) : null,
         liquidation_date,
         total_amount: totalAmount,
         return_to_company: returnToCompany,

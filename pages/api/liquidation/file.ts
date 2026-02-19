@@ -16,6 +16,7 @@ interface LiquidationItem {
   expense_date: string;
   from_destination: string;
   to_destination: string;
+  ticket_id?: string;
   jeep: string;
   bus: string;
   fx_van: string;
@@ -30,8 +31,6 @@ interface LiquidationItem {
 interface LiquidationRequest {
   userId: string;
   cash_advance_id: string;
-  store_id?: string;
-  ticket_id?: string;
   liquidation_date: string;
   remarks: string;
   items: LiquidationItem[];
@@ -55,8 +54,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const {
       cash_advance_id,
-      store_id,
-      ticket_id,
       liquidation_date,
       remarks,
       items,
@@ -119,6 +116,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         expense_date: item.expense_date || liquidation_date,
         from_destination: item.from_destination || '',
         to_destination: item.to_destination || '',
+        ticket_id: item.ticket_id ? parseInt(item.ticket_id) : null,
         jeep,
         bus,
         fx_van,
@@ -146,8 +144,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .insert({
         cash_advance_id,
         user_id: userId,
-        store_id: store_id || null,
-        ticket_id: ticket_id ? parseInt(ticket_id) : null,
+        store_id: null,
+        ticket_id: null,
         liquidation_date,
         total_amount: totalAmount,
         return_to_company: returnToCompany,
@@ -191,29 +189,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .eq('id', userId)
           .single();
 
-        // Fetch store name if store_id is provided
-        let storeName: string | undefined;
-        if (store_id) {
-          const { data: store } = await supabaseAdmin
-            .from('stores')
-            .select('store_name, store_code')
-            .eq('id', store_id)
-            .single();
-          if (store) {
-            storeName = `${store.store_name} (${store.store_code})`;
-          }
-        }
-
-        // Fetch ticket reference if ticket_id is provided
+        // Collect unique ticket references from items
+        const ticketIds = [...new Set(processedItems.map(i => i.ticket_id).filter(Boolean))];
         let ticketReference: string | undefined;
-        if (ticket_id) {
-          const { data: ticket } = await supabaseAdmin
+        if (ticketIds.length > 0) {
+          const { data: ticketRows } = await supabaseAdmin
             .from('tickets')
             .select('rcc_reference_number')
-            .eq('id', parseInt(ticket_id))
-            .single();
-          if (ticket) {
-            ticketReference = ticket.rcc_reference_number;
+            .in('id', ticketIds);
+          if (ticketRows && ticketRows.length > 0) {
+            ticketReference = ticketRows.map(t => t.rcc_reference_number).join(', ');
           }
         }
 
@@ -226,7 +211,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
             returnToCompany,
             reimbursement,
             liquidationDate: liquidation_date,
-            storeName,
             ticketReference,
             requestId: liquidation.id,
           });
