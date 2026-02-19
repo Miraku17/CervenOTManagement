@@ -13,6 +13,11 @@ interface LiquidationItem {
   expense_date?: string;
   from_destination: string;
   to_destination: string;
+  ticket_id?: number | null;
+  tickets?: {
+    id: number;
+    rcc_reference_number: string;
+  } | null;
   jeep: number;
   bus: number;
   fx_van: number;
@@ -269,7 +274,7 @@ const LiquidationHistory: React.FC = () => {
               </div>
 
               {/* Info Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-semibold">Cash Advance</label>
                   <p className="text-white mt-1 font-mono text-sm">
@@ -282,14 +287,6 @@ const LiquidationHistory: React.FC = () => {
                   <label className="text-xs text-slate-400 uppercase font-semibold">Total Expenses</label>
                   <p className="text-orange-400 mt-1 font-mono text-sm font-semibold">
                     {formatCurrency(selectedLiquidation.total_amount)}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
-                  <label className="text-xs text-slate-400 uppercase font-semibold">Store</label>
-                  <p className="text-white mt-1 text-sm">
-                    {selectedLiquidation.stores
-                      ? `${selectedLiquidation.stores.store_code}`
-                      : 'N/A'}
                   </p>
                 </div>
               </div>
@@ -324,8 +321,8 @@ const LiquidationHistory: React.FC = () => {
                 )}
               </div>
 
-              {/* Ticket Info */}
-              {selectedLiquidation.tickets && (
+              {/* Legacy Ticket Info (old data where ticket was on liquidation level) */}
+              {selectedLiquidation.tickets && !selectedLiquidation.liquidation_items?.some(i => i.ticket_id) && (
                 <div className="p-3 bg-slate-800 rounded-lg border border-slate-700">
                   <label className="text-xs text-slate-400 uppercase font-semibold flex items-center gap-1">
                     <Ticket size={12} />
@@ -354,6 +351,12 @@ const LiquidationHistory: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-semibold text-slate-400">Row {index + 1}</span>
+                              {item.tickets && (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs bg-slate-700/50 text-slate-300 border border-slate-600">
+                                  <Ticket size={10} />
+                                  {item.tickets.rcc_reference_number}
+                                </span>
+                              )}
                               {(item.from_destination || item.to_destination) && (
                                 <span className="text-xs text-white flex items-center gap-1">
                                   <MapPin size={12} className="text-slate-500" />
@@ -663,23 +666,10 @@ const LiquidationHistory: React.FC = () => {
                     <span className="text-xl font-bold text-orange-400 font-mono">
                       {formatCurrency(liquidation.total_amount)}
                     </span>
-                    {liquidation.stores && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-700/50 text-slate-300 border border-slate-600">
-                        <MapPin size={10} className="mr-1" />
-                        {liquidation.stores.store_code}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2 text-sm text-slate-400">
                     <Calendar size={14} />
                     <span>{formatDate(liquidation.liquidation_date)}</span>
-                    {liquidation.tickets && (
-                      <>
-                        <span className="text-slate-600">•</span>
-                        <Ticket size={14} />
-                        <span>{liquidation.tickets.rcc_reference_number}</span>
-                      </>
-                    )}
                   </div>
                 </div>
 

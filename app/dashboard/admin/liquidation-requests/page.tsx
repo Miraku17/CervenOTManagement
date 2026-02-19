@@ -244,11 +244,9 @@ export default function LiquidationRequestsPage() {
     reportData.push([
       'Employee Name',
       'Employee ID',
-      'Store Code',
-      'Store Name',
-      'Incident No.',
       'Liquidation Date',
       'Expense Date',
+      'Incident No.',
       'From Destination',
       'To Destination',
       'Jeep',
@@ -292,9 +290,6 @@ export default function LiquidationRequestsPage() {
         ? `${liq.profiles.first_name} ${liq.profiles.last_name}`
         : 'Unknown';
       const employeeId = liq.profiles?.employee_id || 'N/A';
-      const storeCode = liq.stores?.store_code || 'N/A';
-      const storeName = liq.stores?.store_name || 'N/A';
-      const incidentNo = liq.tickets?.rcc_reference_number || 'N/A';
       const liquidationDate = liq.liquidation_date;
       const cashAdvance = liq.cash_advances?.amount || 0;
       const totalExpenses = liq.total_amount || 0;
@@ -312,11 +307,9 @@ export default function LiquidationRequestsPage() {
           reportData.push([
             employeeName,
             employeeId,
-            storeCode,
-            storeName,
-            incidentNo,
             liquidationDate,
             item.expense_date || '',
+            item.tickets?.rcc_reference_number || liq.tickets?.rcc_reference_number || 'N/A',
             item.from_destination || '',
             item.to_destination || '',
             item.jeep || 0,
@@ -343,11 +336,9 @@ export default function LiquidationRequestsPage() {
         reportData.push([
           employeeName,
           employeeId,
-          storeCode,
-          storeName,
-          incidentNo,
           liquidationDate,
           '', // expense_date
+          liq.tickets?.rcc_reference_number || 'N/A', // incident no
           '', // from_destination
           '', // to_destination
           0, // jeep
@@ -379,11 +370,9 @@ export default function LiquidationRequestsPage() {
     worksheet['!cols'] = [
       { wch: 25 },  // Employee Name
       { wch: 15 },  // Employee ID
-      { wch: 12 },  // Store Code
-      { wch: 20 },  // Store Name
-      { wch: 15 },  // Incident No.
       { wch: 15 },  // Liquidation Date
       { wch: 15 },  // Expense Date
+      { wch: 18 },  // Incident No.
       { wch: 20 },  // From Destination
       { wch: 20 },  // To Destination
       { wch: 10 },  // Jeep
@@ -897,8 +886,6 @@ export default function LiquidationRequestsPage() {
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-800/50">
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
-                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Store</th>
-                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Ticket No.</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Advance</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Expenses</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
@@ -929,16 +916,6 @@ export default function LiquidationRequestsPage() {
                           <p className="text-xs text-slate-500 italic">{liquidation.profiles.positions.name}</p>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-slate-300">
-                        {liquidation.stores?.store_code || '-'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-slate-300">
-                        {liquidation.tickets?.rcc_reference_number || '-'}
-                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm font-semibold text-white font-mono">

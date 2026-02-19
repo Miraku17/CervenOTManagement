@@ -10,6 +10,11 @@ interface LiquidationItem {
   expense_date?: string;
   from_destination: string;
   to_destination: string;
+  ticket_id?: number | null;
+  tickets?: {
+    id: number;
+    rcc_reference_number: string;
+  } | null;
   jeep: number;
   bus: number;
   fx_van: number;
@@ -375,7 +380,7 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
               <Receipt className="text-orange-400" size={16} />
               <h4 className="font-semibold text-white text-sm sm:text-base">Liquidation Details</h4>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 sm:ml-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 sm:ml-6">
               <div>
                 <p className="text-xs text-slate-400 mb-1">Cash Advance</p>
                 <p className="text-white font-bold text-base sm:text-lg font-mono break-all">
@@ -391,15 +396,6 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
               <div>
                 <p className="text-xs text-slate-400 mb-1">Liquidation Date</p>
                 <p className="text-white font-medium text-sm sm:text-base">{formatDate(liquidation.liquidation_date)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-slate-400 mb-1">Store</p>
-                <div className="flex items-center gap-1">
-                  <MapPin size={14} className="text-slate-400 shrink-0" />
-                  <p className="text-white font-medium text-sm sm:text-base truncate">
-                    {liquidation.stores ? liquidation.stores.store_code : 'N/A'}
-                  </p>
-                </div>
               </div>
             </div>
 
@@ -424,8 +420,8 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
               )}
             </div>
 
-            {/* Ticket */}
-            {liquidation.tickets && (
+            {/* Legacy Ticket (old data where ticket was on liquidation level) */}
+            {liquidation.tickets && !liquidation.liquidation_items?.some(i => i.ticket_id) && (
               <div className="mt-3 sm:mt-4 sm:ml-6 p-3 bg-slate-900/50 rounded-lg border border-slate-700">
                 <div className="flex items-center gap-2">
                   <Ticket size={14} className="text-slate-400" />
@@ -445,9 +441,17 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
                   <div key={item.id} className="bg-slate-900/50 p-3 sm:p-4 rounded-lg border border-slate-700">
                     {/* Row Header */}
                     <div className="flex items-center justify-between mb-3">
-                      <h5 className="text-xs sm:text-sm font-semibold text-orange-400">
-                        Row #{index + 1}
-                      </h5>
+                      <div className="flex items-center gap-2">
+                        <h5 className="text-xs sm:text-sm font-semibold text-orange-400">
+                          Row #{index + 1}
+                        </h5>
+                        {item.tickets && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs bg-slate-800 text-slate-300 border border-slate-600">
+                            <Ticket size={10} />
+                            {item.tickets.rcc_reference_number}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-xs sm:text-sm font-mono font-bold text-orange-400 break-all">
                         {formatCurrency(item.total)}
                       </span>

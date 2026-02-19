@@ -28,6 +28,15 @@ interface LiquidationItemData {
   others: number;
   total: number;
   remarks: string;
+  ticket_id?: number | null;
+  tickets?: {
+    id: number;
+    rcc_reference_number: string;
+    stores?: {
+      store_name: string;
+      store_code: string;
+    } | null;
+  } | null;
   liquidation_item_attachments?: LiquidationAttachment[];
 }
 
@@ -42,8 +51,8 @@ interface LiquidationAttachment {
 interface EditingLiquidation {
   id: string;
   cash_advance_id: string;
-  store_id: string;
-  ticket_id: number | null;
+  store_id?: string;
+  ticket_id?: number | null;
   liquidation_date: string;
   remarks: string | null;
   cash_advances: {
@@ -73,16 +82,10 @@ interface CashAdvance {
   created_at: string;
 }
 
-interface Store {
-  id: string;
-  store_code: string;
-  store_name: string;
-}
-
 interface Ticket {
   id: number;
   rcc_reference_number: string;
-  stores: {
+  stores?: {
     store_name: string;
     store_code: string;
   } | null;
@@ -93,6 +96,7 @@ interface LiquidationItem {
   expense_date: string;
   from_destination: string;
   to_destination: string;
+  ticket_id: string;
   jeep: string;
   bus: string;
   fx_van: string;
@@ -106,12 +110,11 @@ interface LiquidationItem {
   filePreviews?: string[];
   existingAttachments?: LiquidationAttachment[];
   attachmentsToRemove?: string[];
+  selectedTicket?: Ticket | null;
 }
 
 interface LiquidationFormData {
   cash_advance_id: string;
-  store_id: string;
-  ticket_id: string;
   liquidation_date: string;
   remarks: string;
   items: LiquidationItem[];
@@ -122,6 +125,7 @@ const emptyItem = (): LiquidationItem => ({
   expense_date: format(new Date(), 'yyyy-MM-dd'),
   from_destination: '',
   to_destination: '',
+  ticket_id: '',
   jeep: '',
   bus: '',
   fx_van: '',
@@ -135,6 +139,7 @@ const emptyItem = (): LiquidationItem => ({
   filePreviews: [],
   existingAttachments: [],
   attachmentsToRemove: [],
+  selectedTicket: null,
 });
 
 // Image compression utility - more aggressive for receipts
@@ -226,15 +231,6 @@ const fetchApprovedCashAdvances = async (): Promise<CashAdvance[]> => {
   );
 };
 
-const searchStores = async (query: string): Promise<Store[]> => {
-  const response = await fetch(`/api/stores/search?q=${encodeURIComponent(query)}&limit=30`);
-  if (!response.ok) {
-    throw new Error('Failed to search stores');
-  }
-  const data = await response.json();
-  return data.stores || [];
-};
-
 const searchTickets = async (query: string): Promise<Ticket[]> => {
   const response = await fetch(`/api/tickets/search?q=${encodeURIComponent(query)}&limit=30`);
   if (!response.ok) {
@@ -242,13 +238,6 @@ const searchTickets = async (query: string): Promise<Ticket[]> => {
   }
   const data = await response.json();
   return data.tickets || [];
-};
-
-const fetchStoreById = async (id: string): Promise<Store | null> => {
-  const response = await fetch(`/api/stores/search?id=${encodeURIComponent(id)}`);
-  if (!response.ok) return null;
-  const data = await response.json();
-  return data.stores?.[0] || null;
 };
 
 const fetchTicketById = async (id: string): Promise<Ticket | null> => {
@@ -358,8 +347,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
 
   const [formData, setFormData] = useState<LiquidationFormData>({
     cash_advance_id: '',
-    store_id: '',
-    ticket_id: '',
     liquidation_date: format(new Date(), 'yyyy-MM-dd'),
     remarks: '',
     items: [emptyItem()],
@@ -367,32 +354,22 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [hasPopulatedForm, setHasPopulatedForm] = useState(false);
 
-  // Search states for store and ticket
-  const [storeSearch, setStoreSearch] = useState('');
+  // Per-item ticket search states
   const [ticketSearch, setTicketSearch] = useState('');
-  const [debouncedStoreSearch, setDebouncedStoreSearch] = useState('');
   const [debouncedTicketSearch, setDebouncedTicketSearch] = useState('');
-  const [showStoreDropdown, setShowStoreDropdown] = useState(false);
-  const [showTicketDropdown, setShowTicketDropdown] = useState(false);
-  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+  const [showTicketDropdowns, setShowTicketDropdowns] = useState<{ [itemId: string]: boolean }>({});
+  const [activeTicketItemId, setActiveTicketItemId] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<{ url: string; name: string } | null>(null);
 
-  // Refs for dropdown click outside handling
-  const storeDropdownRef = useRef<HTMLDivElement>(null);
-  const ticketDropdownRef = useRef<HTMLDivElement>(null);
+  // Refs for dropdown click outside handling and positioning
+  const ticketDropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const ticketInputRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const [ticketDropdownPos, setTicketDropdownPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   // Track all blob URLs for cleanup
   const blobUrlsRef = useRef<Set<string>>(new Set());
 
-  // Debounce search inputs
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedStoreSearch(storeSearch);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [storeSearch]);
-
+  // Debounce ticket search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedTicketSearch(ticketSearch);
@@ -400,15 +377,33 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     return () => clearTimeout(timer);
   }, [ticketSearch]);
 
+  // Calculate dropdown position when opening
+  const updateDropdownPosition = (itemId: string) => {
+    const inputEl = ticketInputRefs.current[itemId];
+    if (inputEl) {
+      const rect = inputEl.getBoundingClientRect();
+      setTicketDropdownPos({
+        top: rect.bottom + 4,
+        left: rect.left,
+        width: rect.width,
+      });
+    }
+  };
+
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (storeDropdownRef.current && !storeDropdownRef.current.contains(event.target as Node)) {
-        setShowStoreDropdown(false);
+      // Check if click is inside any ticket input or the portal dropdown
+      const portalDropdown = document.getElementById('ticket-dropdown-portal');
+      if (portalDropdown && portalDropdown.contains(event.target as Node)) {
+        return;
       }
-      if (ticketDropdownRef.current && !ticketDropdownRef.current.contains(event.target as Node)) {
-        setShowTicketDropdown(false);
-      }
+
+      Object.entries(ticketInputRefs.current).forEach(([itemId, ref]) => {
+        if (ref && !ref.contains(event.target as Node)) {
+          setShowTicketDropdowns(prev => ({ ...prev, [itemId]: false }));
+        }
+      });
     };
 
     document.addEventListener('mousedown', handleClickOutside);
@@ -422,20 +417,13 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     enabled: isOpen && !isEditMode,
   });
 
-  // Search stores
-  const { data: stores = [], isLoading: loadingStores } = useQuery({
-    queryKey: ['stores-search', debouncedStoreSearch],
-    queryFn: () => searchStores(debouncedStoreSearch),
-    enabled: isOpen && showStoreDropdown,
-    staleTime: 1000 * 60, // 1 minute
-  });
-
-  // Search tickets
+  // Search tickets (shared query for the active item's dropdown)
+  const isAnyTicketDropdownOpen = Object.values(showTicketDropdowns).some(Boolean);
   const { data: tickets = [], isLoading: loadingTickets } = useQuery({
     queryKey: ['tickets-search', debouncedTicketSearch],
     queryFn: () => searchTickets(debouncedTicketSearch),
-    enabled: isOpen && showTicketDropdown,
-    staleTime: 1000 * 60, // 1 minute
+    enabled: isOpen && isAnyTicketDropdownOpen,
+    staleTime: 1000 * 60,
   });
 
   // Fetch existing attachment URLs for edit mode
@@ -589,12 +577,10 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     if (!isOpen) {
       setHasPopulatedForm(false);
       setError(null);
-      setStoreSearch('');
       setTicketSearch('');
-      setSelectedStore(null);
-      setSelectedTicket(null);
-      setShowStoreDropdown(false);
-      setShowTicketDropdown(false);
+      setDebouncedTicketSearch('');
+      setShowTicketDropdowns({});
+      setActiveTicketItemId(null);
     }
   }, [isOpen]);
 
@@ -608,8 +594,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     if (!editingLiquidation) {
       setFormData({
         cash_advance_id: '',
-        store_id: '',
-        ticket_id: '',
         liquidation_date: format(new Date(), 'yyyy-MM-dd'),
         remarks: '',
         items: [emptyItem()],
@@ -618,50 +602,55 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       return;
     }
 
-    // For edit mode, fetch store and ticket data
+    // For edit mode, fetch ticket data per item
     const loadEditData = async () => {
+      // For each item, resolve its ticket if it has one
+      const itemTickets: { [itemId: string]: Ticket | null } = {};
+      for (const item of editingLiquidation.liquidation_items) {
+        const itemId = item.id || Math.random().toString(36).substr(2, 9);
+        // Use item-level ticket_id first, fall back to liquidation-level for old data
+        const ticketId = item.ticket_id ?? editingLiquidation.ticket_id;
+        if (ticketId) {
+          if (item.tickets) {
+            itemTickets[itemId] = item.tickets;
+          } else {
+            const ticket = await fetchTicketById(String(ticketId));
+            itemTickets[itemId] = ticket;
+          }
+        }
+      }
+
       // Populate form with existing data
       setFormData({
         cash_advance_id: editingLiquidation.cash_advance_id,
-        store_id: editingLiquidation.store_id,
-        ticket_id: editingLiquidation.ticket_id ? String(editingLiquidation.ticket_id) : '',
         liquidation_date: editingLiquidation.liquidation_date.split('T')[0],
         remarks: editingLiquidation.remarks || '',
-        items: editingLiquidation.liquidation_items.map((item) => ({
-          id: item.id || Math.random().toString(36).substr(2, 9),
-          expense_date: item.expense_date ? item.expense_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
-          from_destination: item.from_destination || '',
-          to_destination: item.to_destination || '',
-          jeep: item.jeep > 0 ? String(item.jeep) : '',
-          bus: item.bus > 0 ? String(item.bus) : '',
-          fx_van: item.fx_van > 0 ? String(item.fx_van) : '',
-          gas: item.gas > 0 ? String(item.gas) : '',
-          toll: item.toll > 0 ? String(item.toll) : '',
-          meals: item.meals > 0 ? String(item.meals) : '',
-          lodging: item.lodging > 0 ? String(item.lodging) : '',
-          others: item.others > 0 ? String(item.others) : '',
-          remarks: item.remarks || '',
-          files: [],
-          filePreviews: [],
-          existingAttachments: item.liquidation_item_attachments || [],
-          attachmentsToRemove: [],
-        })),
+        items: editingLiquidation.liquidation_items.map((item) => {
+          const itemId = item.id || Math.random().toString(36).substr(2, 9);
+          const ticketId = item.ticket_id ?? editingLiquidation.ticket_id;
+          return {
+            id: itemId,
+            expense_date: item.expense_date ? item.expense_date.split('T')[0] : format(new Date(), 'yyyy-MM-dd'),
+            from_destination: item.from_destination || '',
+            to_destination: item.to_destination || '',
+            ticket_id: ticketId ? String(ticketId) : '',
+            jeep: item.jeep > 0 ? String(item.jeep) : '',
+            bus: item.bus > 0 ? String(item.bus) : '',
+            fx_van: item.fx_van > 0 ? String(item.fx_van) : '',
+            gas: item.gas > 0 ? String(item.gas) : '',
+            toll: item.toll > 0 ? String(item.toll) : '',
+            meals: item.meals > 0 ? String(item.meals) : '',
+            lodging: item.lodging > 0 ? String(item.lodging) : '',
+            others: item.others > 0 ? String(item.others) : '',
+            remarks: item.remarks || '',
+            files: [],
+            filePreviews: [],
+            existingAttachments: item.liquidation_item_attachments || [],
+            attachmentsToRemove: [],
+            selectedTicket: itemTickets[itemId] || null,
+          };
+        }),
       });
-
-      // Fetch store and ticket data for display
-      if (editingLiquidation.store_id) {
-        const store = await fetchStoreById(editingLiquidation.store_id);
-        if (store) {
-          setSelectedStore(store);
-        }
-      }
-
-      if (editingLiquidation.ticket_id) {
-        const ticket = await fetchTicketById(String(editingLiquidation.ticket_id));
-        if (ticket) {
-          setSelectedTicket(ticket);
-        }
-      }
 
       setHasPopulatedForm(true);
     };
@@ -734,20 +723,16 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
     // Reset form to initial state
     setFormData({
       cash_advance_id: '',
-      store_id: '',
-      ticket_id: '',
       liquidation_date: format(new Date(), 'yyyy-MM-dd'),
       remarks: '',
       items: [emptyItem()],
     });
 
     // Reset search states
-    setStoreSearch('');
     setTicketSearch('');
-    setSelectedStore(null);
-    setSelectedTicket(null);
-    setShowStoreDropdown(false);
-    setShowTicketDropdown(false);
+    setDebouncedTicketSearch('');
+    setShowTicketDropdowns({});
+    setActiveTicketItemId(null);
 
     onClose();
   };
@@ -1048,8 +1033,8 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
             </div>
           )}
 
-          {/* Top Section: Cash Advance, Store, Ticket, Date */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Top Section: Cash Advance + Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Cash Advance Selection */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1.5">
@@ -1094,140 +1079,6 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
               )}
             </div>
 
-            {/* Store/Site Selection - Searchable */}
-            <div ref={storeDropdownRef} className="relative">
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">
-                Site Name (Store Code)
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                <input
-                  type="text"
-                  value={selectedStore ? `${selectedStore.store_code} - ${selectedStore.store_name}` : storeSearch}
-                  onChange={(e) => {
-                    setStoreSearch(e.target.value);
-                    setSelectedStore(null);
-                    setFormData({ ...formData, store_id: '' });
-                    if (!showStoreDropdown) setShowStoreDropdown(true);
-                  }}
-                  onFocus={() => setShowStoreDropdown(true)}
-                  placeholder="Search store by name or code..."
-                  className="w-full bg-slate-950 border border-slate-700 text-white pl-9 pr-10 py-2.5 h-11 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none placeholder-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowStoreDropdown(!showStoreDropdown)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300"
-                >
-                  <ChevronDown size={18} className={`transition-transform ${showStoreDropdown ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              {/* Store Dropdown */}
-              {showStoreDropdown && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[10000] overflow-hidden max-h-60 overflow-y-auto">
-                  {loadingStores ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
-                      <span className="ml-2 text-sm text-slate-400">Searching...</span>
-                    </div>
-                  ) : stores.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-slate-400 text-center">
-                      {debouncedStoreSearch ? 'No stores found' : 'Type to search stores'}
-                    </div>
-                  ) : (
-                    stores.map((store) => (
-                      <button
-                        key={store.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedStore(store);
-                          setFormData({ ...formData, store_id: store.id });
-                          setStoreSearch('');
-                          setShowStoreDropdown(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-800 ${
-                          formData.store_id === store.id
-                            ? 'bg-orange-500/10 text-orange-400'
-                            : 'text-slate-300'
-                        }`}
-                      >
-                        <span className="font-medium">{store.store_code}</span>
-                        <span className="text-slate-400"> - {store.store_name}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Ticket/Incident Selection - Searchable */}
-            <div ref={ticketDropdownRef} className="relative">
-              <label className="block text-sm font-medium text-slate-400 mb-1.5">
-                Incident No. (Ticket)
-              </label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
-                <input
-                  type="text"
-                  value={selectedTicket ? `${selectedTicket.rcc_reference_number} - ${selectedTicket.stores?.store_code || 'N/A'}` : ticketSearch}
-                  onChange={(e) => {
-                    setTicketSearch(e.target.value);
-                    setSelectedTicket(null);
-                    setFormData({ ...formData, ticket_id: '' });
-                    if (!showTicketDropdown) setShowTicketDropdown(true);
-                  }}
-                  onFocus={() => setShowTicketDropdown(true)}
-                  placeholder="Search by incident number..."
-                  className="w-full bg-slate-950 border border-slate-700 text-white pl-9 pr-10 py-2.5 h-11 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none placeholder-slate-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowTicketDropdown(!showTicketDropdown)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-300"
-                >
-                  <ChevronDown size={18} className={`transition-transform ${showTicketDropdown ? 'rotate-180' : ''}`} />
-                </button>
-              </div>
-
-              {/* Ticket Dropdown */}
-              {showTicketDropdown && (
-                <div className="absolute top-full mt-1 left-0 right-0 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-[10000] overflow-hidden max-h-60 overflow-y-auto">
-                  {loadingTickets ? (
-                    <div className="flex items-center justify-center py-4">
-                      <Loader2 className="w-5 h-5 text-orange-400 animate-spin" />
-                      <span className="ml-2 text-sm text-slate-400">Searching...</span>
-                    </div>
-                  ) : tickets.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-slate-400 text-center">
-                      {debouncedTicketSearch ? 'No tickets found' : 'Type to search tickets'}
-                    </div>
-                  ) : (
-                    tickets.map((ticket) => (
-                      <button
-                        key={ticket.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedTicket(ticket);
-                          setFormData({ ...formData, ticket_id: String(ticket.id) });
-                          setTicketSearch('');
-                          setShowTicketDropdown(false);
-                        }}
-                        className={`w-full text-left px-4 py-2.5 text-sm transition-colors hover:bg-slate-800 ${
-                          formData.ticket_id === String(ticket.id)
-                            ? 'bg-orange-500/10 text-orange-400'
-                            : 'text-slate-300'
-                        }`}
-                      >
-                        <span className="font-medium">{ticket.rcc_reference_number}</span>
-                        <span className="text-slate-400"> - {ticket.stores?.store_code || 'N/A'}</span>
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Date */}
             <div>
               <label className="block text-sm font-medium text-slate-400 mb-1.5">
@@ -1266,6 +1117,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                   <tr className="bg-slate-800/50 text-slate-400 text-xs uppercase">
                     <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
                       Date
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Ticket
                     </th>
                     <th colSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700">
                       Dispatch
@@ -1317,6 +1171,76 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                           }
                           className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none min-w-[120px] [color-scheme:dark]"
                         />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <div
+                          ref={(el) => { ticketInputRefs.current[item.id] = el; }}
+                          className="relative min-w-[140px]"
+                        >
+                          <div className="relative">
+                            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-500 w-3 h-3" />
+                            <input
+                              type="text"
+                              value={item.selectedTicket
+                                ? item.selectedTicket.rcc_reference_number
+                                : (activeTicketItemId === item.id ? ticketSearch : '')}
+                              onChange={(e) => {
+                                setTicketSearch(e.target.value);
+                                setActiveTicketItemId(item.id);
+                                updateDropdownPosition(item.id);
+                                if (item.selectedTicket) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    items: prev.items.map(i =>
+                                      i.id === item.id ? { ...i, ticket_id: '', selectedTicket: null } : i
+                                    ),
+                                  }));
+                                }
+                                if (!showTicketDropdowns[item.id]) {
+                                  setShowTicketDropdowns(prev => ({ ...prev, [item.id]: true }));
+                                }
+                              }}
+                              onFocus={() => {
+                                setActiveTicketItemId(item.id);
+                                setTicketSearch('');
+                                setShowTicketDropdowns(prev => ({ ...prev, [item.id]: true }));
+                                setTimeout(() => updateDropdownPosition(item.id), 0);
+                              }}
+                              placeholder="Search ticket..."
+                              className="w-full bg-slate-950 border border-slate-700 text-white pl-6 pr-7 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none"
+                            />
+                            {item.selectedTicket ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    items: prev.items.map(i =>
+                                      i.id === item.id ? { ...i, ticket_id: '', selectedTicket: null } : i
+                                    ),
+                                  }));
+                                  setTicketSearch('');
+                                }}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-red-400"
+                              >
+                                <XCircle size={14} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveTicketItemId(item.id);
+                                  const newOpen = !showTicketDropdowns[item.id];
+                                  setShowTicketDropdowns(prev => ({ ...prev, [item.id]: newOpen }));
+                                  if (newOpen) setTimeout(() => updateDropdownPosition(item.id), 0);
+                                }}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 text-slate-500 hover:text-slate-300"
+                              >
+                                <ChevronDown size={14} className={`transition-transform ${showTicketDropdowns[item.id] ? 'rotate-180' : ''}`} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
                       </td>
                       <td className="p-1 border-r border-slate-700">
                         <input
@@ -1680,6 +1604,61 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Ticket Dropdown Portal - rendered outside overflow container */}
+      {activeTicketItemId && showTicketDropdowns[activeTicketItemId] && ticketDropdownPos && (
+        <div
+          id="ticket-dropdown-portal"
+          style={{
+            position: 'fixed',
+            top: ticketDropdownPos.top,
+            left: ticketDropdownPos.left,
+            width: Math.max(ticketDropdownPos.width, 240),
+            zIndex: 10001,
+          }}
+        >
+          <div className="bg-slate-900 border border-slate-700 rounded-lg shadow-2xl overflow-hidden max-h-48 overflow-y-auto">
+            {loadingTickets ? (
+              <div className="flex items-center justify-center py-3">
+                <Loader2 className="w-4 h-4 text-orange-400 animate-spin" />
+                <span className="ml-2 text-xs text-slate-400">Searching...</span>
+              </div>
+            ) : tickets.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-slate-400 text-center">
+                No tickets found
+              </div>
+            ) : (
+              tickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  onClick={() => {
+                    const itemId = activeTicketItemId;
+                    setFormData(prev => ({
+                      ...prev,
+                      items: prev.items.map(i =>
+                        i.id === itemId
+                          ? { ...i, ticket_id: String(ticket.id), selectedTicket: ticket }
+                          : i
+                      ),
+                    }));
+                    setTicketSearch('');
+                    setShowTicketDropdowns(prev => ({ ...prev, [itemId]: false }));
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-800 ${
+                    formData.items.find(i => i.id === activeTicketItemId)?.ticket_id === String(ticket.id)
+                      ? 'bg-orange-500/10 text-orange-400'
+                      : 'text-slate-300'
+                  }`}
+                >
+                  <span className="font-medium">{ticket.rcc_reference_number}</span>
+                  <span className="text-slate-400"> - {ticket.stores?.store_code || 'N/A'}</span>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Image Preview Modal */}
       {previewImage && (

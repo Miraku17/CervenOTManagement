@@ -49,6 +49,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           expense_date,
           from_destination,
           to_destination,
+          ticket_id,
           jeep,
           bus,
           fx_van,
@@ -59,6 +60,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           others,
           total,
           remarks,
+          tickets (
+            id,
+            rcc_reference_number
+          ),
           liquidation_item_attachments:liquidation_attachments!liquidation_item_id (
             id,
             file_name,
