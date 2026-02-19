@@ -898,6 +898,7 @@ export default function LiquidationRequestsPage() {
                 <tr className="border-b border-slate-800 bg-slate-800/50">
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Employee</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Store</th>
+                  <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Ticket No.</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Cash Advance</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Expenses</th>
                   <th className="text-left px-6 py-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Date</th>
@@ -932,6 +933,11 @@ export default function LiquidationRequestsPage() {
                     <td className="px-6 py-4">
                       <span className="text-sm text-slate-300">
                         {liquidation.stores?.store_code || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-slate-300">
+                        {liquidation.tickets?.rcc_reference_number || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
