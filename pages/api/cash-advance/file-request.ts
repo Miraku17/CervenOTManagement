@@ -131,7 +131,46 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Standard flow for non-Operations Manager users
+    // Auto-approve for reimbursement type - no emails sent
+    if (type === 'reimbursement') {
+      const now = new Date().toISOString();
+      const parsedAmount = amount ? parseFloat(amount) : 0;
+      const { data: cashAdvance, error: insertError } = await supabaseAdmin
+        .from('cash_advances')
+        .insert({
+          type,
+          amount: parsedAmount,
+          purpose: purpose || null,
+          requested_by: userId,
+          date_requested: new Date(date).toISOString(),
+          status: 'approved',
+          level1_status: 'approved',
+          level1_approved_by: userId,
+          level1_date_approved: now,
+          level1_comment: 'Auto-approved (Reimbursement)',
+          level2_status: 'approved',
+          level2_approved_by: userId,
+          level2_date_approved: now,
+          level2_comment: 'Auto-approved (Reimbursement)',
+          approved_by: userId,
+          date_approved: now,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error('Error creating reimbursement cash advance:', insertError);
+        throw insertError;
+      }
+
+      return res.status(201).json({
+        message: 'Reimbursement cash advance auto-approved successfully',
+        cashAdvance,
+        autoApproved: true,
+      });
+    }
+
+    // Standard flow for non-Operations Manager, non-reimbursement users
     const parsedAmount = amount ? parseFloat(amount) : 0;
     const { data: cashAdvance, error: insertError } = await supabaseAdmin
       .from('cash_advances')

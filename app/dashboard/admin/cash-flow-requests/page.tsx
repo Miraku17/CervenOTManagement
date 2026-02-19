@@ -14,7 +14,7 @@ import { DeleteCashAdvanceModal } from '@/components/admin_dashboard/DeleteCashA
 
 interface CashAdvance {
   id: string;
-  type: 'personal' | 'support';
+  type: 'personal' | 'support' | 'reimbursement';
   amount: number;
   purpose: string | null;
   status: 'pending' | 'approved' | 'rejected';
@@ -423,6 +423,12 @@ export default function CashFlowRequestsPage() {
             Support
           </span>
         );
+      case 'reimbursement':
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-500/10 text-purple-400 border border-purple-500/20">
+            Reimbursement
+          </span>
+        );
       default:
         return null;
     }
@@ -545,7 +551,7 @@ export default function CashFlowRequestsPage() {
             </button>
             {isTypeDropdownOpen && (
               <div className="absolute z-10 mt-2 w-40 bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
-                {['all', 'personal', 'support'].map((type) => (
+                {['all', 'personal', 'support', 'reimbursement'].map((type) => (
                   <button
                     key={type}
                     onClick={() => {
