@@ -56,7 +56,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           first_name,
           last_name,
           email,
-          position_id
+          position_id,
+          positions:position_id (name)
         )
       `)
       .eq('id', id)
@@ -68,6 +69,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Check if this is a confidential cash advance (HR, Accounting, or Operations Manager)
     const requesterPositionId = (request.requester as any)?.position_id;
+    const requesterPositionName = (request.requester as any)?.positions?.name || '';
     if (requesterPositionId) {
       // Get HR, Accounting, and Operations Manager position IDs
       const { data: confidentialPositions } = await supabaseAdmin
@@ -78,7 +80,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const confidentialPositionIds = (confidentialPositions || []).map(p => p.id);
 
       if (confidentialPositionIds.includes(requesterPositionId)) {
-        // This is a confidential request - only Managing Director can approve
         const { data: currentUserProfile } = await supabaseAdmin
           .from('profiles')
           .select('position_id, positions:position_id (name)')
@@ -87,10 +88,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
         const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+        const isOperationsManager = currentUserPosition === 'Operations Manager';
 
-        if (!isManagingDirector) {
+        // Operations Manager cash advances: only Managing Director can approve
+        // HR and Accounting cash advances: Managing Director or Operations Manager can approve
+        const isOpsManagerRequest = requesterPositionName === 'Operations Manager';
+
+        if (isOpsManagerRequest && !isManagingDirector) {
           return res.status(403).json({
-            error: 'Forbidden: HR, Accounting, and Operations Manager cash advances can only be approved by Managing Director'
+            error: 'Forbidden: Operations Manager cash advances can only be approved by Managing Director'
+          });
+        } else if (!isOpsManagerRequest && !isManagingDirector && !isOperationsManager) {
+          return res.status(403).json({
+            error: 'Forbidden: HR and Accounting cash advances can only be approved by Managing Director or Operations Manager'
           });
         }
       }

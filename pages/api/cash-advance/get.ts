@@ -37,24 +37,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-    // Only Managing Director can view HR, Accounting, and Operations Manager cash advances
     const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+    const isOperationsManager = currentUserPosition === 'Operations Manager';
 
     console.log('Cash Advance Get - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
-    // Get confidential position IDs to filter requests (HR, Accounting, Operations Manager)
+    // Get confidential position IDs to filter requests
+    // MD: sees all (HR, Accounting, Operations Manager)
+    // Operations Manager: sees HR and Accounting, but NOT other Operations Managers
+    // Others: sees none of the above
     let confidentialUserIds: string[] = [];
     if (!isManagingDirector) {
-      // Get HR, Accounting, and Operations Manager position IDs
+      const positionsToExclude = isOperationsManager
+        ? ['Operations Manager']
+        : ['HR', 'Accounting', 'Operations Manager'];
+
+      const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
-        .or('name.eq.HR,name.eq.Accounting,name.eq.Operations Manager');
+        .or(orFilter);
 
       if (confidentialPositions && confidentialPositions.length > 0) {
         const positionIds = confidentialPositions.map(p => p.id);
 
-        // Get all user IDs with these positions
         const { data: confidentialUsers } = await supabaseAdmin
           .from('profiles')
           .select('id')
