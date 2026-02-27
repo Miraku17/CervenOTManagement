@@ -306,13 +306,13 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
       </ConfirmModal>
 
       {/* Detail View Modal */}
-      {selectedRequest && (
+      {selectedRequest && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-50"
+          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm transition-opacity z-[9999]"
           onClick={() => setSelectedRequest(null)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden transform transition-all"
+            className="bg-slate-900 border border-slate-700 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -477,7 +477,8 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Pending Requests Modal */}
@@ -487,7 +488,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
           onClick={() => setShowPendingModal(false)}
         >
           <div
-            className="bg-slate-900 border border-slate-700 w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden transform transition-all max-h-[90vh] flex flex-col"
+            className="bg-slate-900 border border-slate-700 w-full max-w-7xl rounded-2xl shadow-2xl overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -684,7 +685,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
 
       {/* Error Toast */}
       {error && (
-        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right z-50">
+        <div className="fixed top-4 right-4 bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-in-right z-[10000]">
           <AlertCircle size={20} />
           <p>{error}</p>
           <button onClick={() => setError(null)} className="ml-2 hover:text-red-300">
