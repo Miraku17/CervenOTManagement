@@ -549,9 +549,8 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                                   <div className="font-medium text-slate-200">
                                     {request.requested_by.first_name} {request.requested_by.last_name}
                                   </div>
-                                  <div className="text-xs text-slate-500">{request.requested_by.email}</div>
                                   {request.requested_by.positions && (
-                                    <div className="text-xs text-slate-500 italic">{request.requested_by.positions.name}</div>
+                                    <div className="text-xs text-slate-500">{request.requested_by.positions.name}</div>
                                   )}
                                 </div>
                               </div>
@@ -837,7 +836,9 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                           <div className="font-medium text-slate-200">
                             {request.requested_by.first_name} {request.requested_by.last_name}
                           </div>
-                          <div className="text-xs text-slate-500">{request.requested_by.email}</div>
+                          {request.requested_by.positions && (
+                            <div className="text-xs text-slate-500">{request.requested_by.positions.name}</div>
+                          )}
                         </div>
                       </div>
                     </td>

@@ -69,7 +69,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const requesterPosition = (requesterProfile?.positions as any)?.name || '';
 
     if (MANAGING_DIRECTOR_ONLY_POSITIONS.includes(requesterPosition)) {
-      // Check if approver is Managing Director
+      // Check if approver is Managing Director or Operations Manager
       const { data: approverProfile, error: approverError } = await supabase
         .from('profiles')
         .select('positions(name)')
@@ -81,10 +81,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
 
       const approverPosition = (approverProfile?.positions as any)?.name || '';
+      const PRIVILEGED_POSITIONS = ['Managing Director', 'Operations Manager'];
 
-      if (approverPosition !== 'Managing Director') {
+      if (!PRIVILEGED_POSITIONS.includes(approverPosition)) {
         return res.status(403).json({
-          error: `Forbidden: Only Managing Director can approve/reject overtime requests from ${requesterPosition} employees`
+          error: `Forbidden: Only Managing Director or Operations Manager can approve/reject overtime requests from ${requesterPosition} employees`
         });
       }
     }

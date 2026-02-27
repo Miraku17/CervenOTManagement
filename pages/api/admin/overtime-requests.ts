@@ -37,7 +37,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-    const isManagingDirector = currentUserPosition === 'Managing Director';
+    const PRIVILEGED_POSITIONS = ['Managing Director', 'Operations Manager'];
+    const isManagingDirector = PRIVILEGED_POSITIONS.includes(currentUserPosition);
 
     // Fetch all overtime requests from overtime_v2
     const { data: overtimeData, error: overtimeError } = await supabase

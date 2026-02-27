@@ -33,6 +33,24 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(500).json({ error: 'Failed to verify user permissions' });
   }
 
+  // Fetch current user's position for HR/Accounting filtering
+  const PRIVILEGED_POSITIONS = ['Managing Director', 'Operations Manager'];
+  const RESTRICTED_POSITIONS = ['HR', 'Accounting'];
+  let isPrivileged = false;
+
+  try {
+    const { data: currentUserProfile } = await supabase
+      .from('profiles')
+      .select('positions(name)')
+      .eq('id', req.user?.id || '')
+      .single();
+
+    const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+    isPrivileged = PRIVILEGED_POSITIONS.includes(currentUserPosition);
+  } catch (error) {
+    console.error('Error fetching current user position:', error);
+  }
+
   try {
     let attendanceData: any[] | null = null;
     let error: any = null;
@@ -269,7 +287,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       overtimeV2Records.map(async (ot) => {
         const { data: profile } = await supabase!
           .from('profiles')
-          .select('first_name, last_name, email, employee_id')
+          .select('first_name, last_name, email, employee_id, positions(name)')
           .eq('id', ot.requested_by)
           .single();
 
@@ -321,9 +339,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .lte('date', endDate as string)
       .is('deleted_at', null);
 
+    // Filter out HR/Accounting OT records for non-privileged users
+    const filteredOvertimeV2 = isPrivileged
+      ? overtimeV2WithProfiles
+      : overtimeV2WithProfiles.filter(ot => {
+          const requesterPosition = (ot.profiles?.positions as any)?.name || '';
+          return !RESTRICTED_POSITIONS.includes(requesterPosition);
+        });
+
     return res.status(200).json({
       data,
-      overtimeV2: overtimeV2WithProfiles,
+      overtimeV2: filteredOvertimeV2,
       leaveRequests: leaveData || [],
       schedules: scheduleData || [],
       holidays: holidaysData || []
