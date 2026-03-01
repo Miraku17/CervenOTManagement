@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, FolderDown, X, User, Pencil, Trash2 } from 'lucide-react';
+import { Receipt, Filter, ChevronDown, Loader2, CheckCircle, XCircle, Clock, Eye, AlertTriangle, FileDown, FolderDown, X, User, Pencil, Trash2, Calendar } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -201,6 +201,24 @@ export default function LiquidationRequestsPage() {
   const [isExporting, setIsExporting] = useState(false);
   const [isExportingAll, setIsExportingAll] = useState(false);
   const [isDownloadingAttachments, setIsDownloadingAttachments] = useState(false);
+  const [isDownloadReceiptsModalOpen, setIsDownloadReceiptsModalOpen] = useState(false);
+  const [downloadStartDate, setDownloadStartDate] = useState('');
+  const [downloadEndDate, setDownloadEndDate] = useState('');
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0, status: '' });
+
+  // Prevent navigation while downloading
+  useEffect(() => {
+    if (!isDownloadingAttachments) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = 'Download is in progress. Are you sure you want to leave?';
+      return e.returnValue;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDownloadingAttachments]);
 
   // Fetch employees for export dropdown
   useEffect(() => {
@@ -561,9 +579,21 @@ export default function LiquidationRequestsPage() {
   };
 
   const handleDownloadAllAttachments = async () => {
+    if (!downloadStartDate || !downloadEndDate) {
+      alert('Please select both start and end dates.');
+      return;
+    }
+
     setIsDownloadingAttachments(true);
+    setIsDownloadReceiptsModalOpen(false);
+    setDownloadProgress({ current: 0, total: 0, status: 'Fetching attachments...' });
+
     try {
-      const response = await fetch('/api/liquidation/download-attachments');
+      const params = new URLSearchParams({
+        startDate: downloadStartDate,
+        endDate: downloadEndDate,
+      });
+      const response = await fetch(`/api/liquidation/download-attachments?${params.toString()}`);
       const result = await response.json();
 
       if (!response.ok) {
@@ -571,18 +601,29 @@ export default function LiquidationRequestsPage() {
       }
 
       if (!result.attachments || result.attachments.length === 0) {
-        alert('No image attachments found.');
+        alert('No image attachments found for the selected date range.');
         return;
       }
 
       const zip = new JSZip();
+      const total = result.attachments.length;
+      let current = 0;
+
+      setDownloadProgress({ current: 0, total, status: `Downloading 0 of ${total} receipts...` });
 
       for (const attachment of result.attachments) {
-        if (!attachment.signed_url) continue;
+        if (!attachment.signed_url) {
+          current++;
+          continue;
+        }
 
         try {
           const imgResponse = await fetch(attachment.signed_url);
-          if (!imgResponse.ok) continue;
+          if (!imgResponse.ok) {
+            current++;
+            setDownloadProgress({ current, total, status: `Downloading ${current} of ${total} receipts...` });
+            continue;
+          }
 
           const imgBlob = await imgResponse.blob();
           const date = attachment.liquidation_date || 'unknown-date';
@@ -591,14 +632,18 @@ export default function LiquidationRequestsPage() {
         } catch (err) {
           console.error('Failed to download attachment:', err);
         }
+
+        current++;
+        setDownloadProgress({ current, total, status: `Downloading ${current} of ${total} receipts...` });
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      setDownloadProgress({ current: total, total, status: 'Generating ZIP file...' });
+
       const zipBlob = await zip.generateAsync({ type: 'blob' });
       const zipUrl = window.URL.createObjectURL(zipBlob);
       const a = document.createElement('a');
       a.href = zipUrl;
-      a.download = `liquidation_receipts_${today}.zip`;
+      a.download = `liquidation_receipts_${downloadStartDate}_${downloadEndDate}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -608,6 +653,7 @@ export default function LiquidationRequestsPage() {
       alert('Failed to download attachments. Please try again.');
     } finally {
       setIsDownloadingAttachments(false);
+      setDownloadProgress({ current: 0, total: 0, status: '' });
     }
   };
 
@@ -813,16 +859,12 @@ export default function LiquidationRequestsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={handleDownloadAllAttachments}
+            onClick={() => setIsDownloadReceiptsModalOpen(true)}
             disabled={isDownloadingAttachments}
             className="flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isDownloadingAttachments ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <FolderDown size={18} />
-            )}
-            {isDownloadingAttachments ? 'Downloading...' : 'Download Receipts'}
+            <FolderDown size={18} />
+            Download Receipts
           </button>
           <button
             onClick={() => setIsExportModalOpen(true)}
@@ -1031,6 +1073,140 @@ export default function LiquidationRequestsPage() {
         liquidation={liquidationToDelete}
         onDeleteSuccess={handleDeleteSuccess}
       />
+
+      {/* Download Receipts Date Filter Modal */}
+      {isDownloadReceiptsModalOpen && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm z-[9999]"
+          onClick={() => setIsDownloadReceiptsModalOpen(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-slate-700 rounded-lg">
+                  <FolderDown className="w-5 h-5 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Download Receipts</h3>
+              </div>
+              <button
+                onClick={() => setIsDownloadReceiptsModalOpen(false)}
+                className="p-2 hover:bg-slate-800 rounded-full text-slate-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <style jsx>{`
+                input[type="date"]::-webkit-calendar-picker-indicator {
+                  filter: invert(1);
+                  cursor: pointer;
+                }
+              `}</style>
+              <p className="text-sm text-slate-400">
+                Select a date range to download all receipt images as a ZIP file.
+              </p>
+              <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                <h4 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+                  <Calendar size={14} className="text-orange-400" />
+                  Date Range
+                </h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={downloadStartDate}
+                      onChange={(e) => setDownloadStartDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={downloadEndDate}
+                      onChange={(e) => setDownloadEndDate(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 bg-slate-800 border-t border-slate-700 flex justify-end gap-3">
+              <button
+                onClick={() => setIsDownloadReceiptsModalOpen(false)}
+                className="px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDownloadAllAttachments}
+                disabled={!downloadStartDate || !downloadEndDate}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                  !downloadStartDate || !downloadEndDate
+                    ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                    : 'bg-orange-600 hover:bg-orange-500 text-white'
+                }`}
+              >
+                <FolderDown size={16} />
+                Download
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Download Progress Overlay */}
+      {isDownloadingAttachments && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-sm z-[10000]">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-md rounded-xl shadow-2xl overflow-hidden">
+            <div className="p-6 space-y-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-500/10 rounded-lg">
+                  <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Downloading Receipts</h3>
+                  <p className="text-sm text-slate-400">Please do not leave this page</p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-400">{downloadProgress.status}</span>
+                  {downloadProgress.total > 0 && (
+                    <span className="text-orange-400 font-mono font-medium">
+                      {Math.round((downloadProgress.current / downloadProgress.total) * 100)}%
+                    </span>
+                  )}
+                </div>
+                <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="bg-orange-500 h-2.5 rounded-full transition-all duration-300 ease-out"
+                    style={{
+                      width: downloadProgress.total > 0
+                        ? `${(downloadProgress.current / downloadProgress.total) * 100}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+                {downloadProgress.total > 0 && (
+                  <p className="text-xs text-slate-500 text-center">
+                    {downloadProgress.current} of {downloadProgress.total} files processed
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* Export Modal */}
       {isExportModalOpen && typeof document !== 'undefined' && createPortal(
