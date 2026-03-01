@@ -57,6 +57,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
+    // Parse optional date filters
+    const { startDate, endDate } = req.query;
+
     // Fetch all image attachments joined with their liquidation date
     let query = supabaseAdmin
       .from('liquidation_attachments')
@@ -72,6 +75,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         )
       `)
       .order('liquidation_id');
+
+    if (startDate && typeof startDate === 'string') {
+      query = query.gte('liquidations.liquidation_date', startDate);
+    }
+    if (endDate && typeof endDate === 'string') {
+      query = query.lte('liquidations.liquidation_date', endDate);
+    }
 
     const { data: rawAttachments, error } = await query;
 
