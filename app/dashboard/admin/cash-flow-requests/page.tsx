@@ -72,7 +72,8 @@ const fetchCashAdvances = async (
   page: number,
   limit: number,
   status?: string,
-  type?: string
+  type?: string,
+  position?: string
 ): Promise<CashAdvanceResponse> => {
   const params = new URLSearchParams({
     page: page.toString(),
@@ -84,6 +85,9 @@ const fetchCashAdvances = async (
   }
   if (type && type !== 'all') {
     params.append('type', type);
+  }
+  if (position && position !== 'all') {
+    params.append('position', position);
   }
 
   const response = await fetch(`/api/cash-advance/get?${params.toString()}`);
@@ -103,8 +107,10 @@ export default function CashFlowRequestsPage() {
   const [showAll, setShowAll] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [positionFilter, setPositionFilter] = useState<string>('all');
   const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isPositionDropdownOpen, setIsPositionDropdownOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<CashAdvance | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -122,9 +128,21 @@ export default function CashFlowRequestsPage() {
   const canApproveLevel1 = hasPermission('approve_cash_advance_level1');
   const canApproveLevel2 = hasPermission('approve_cash_advance_level2');
 
+  // Fetch positions for filter dropdown
+  const { data: positionsData } = useQuery({
+    queryKey: ['positions-list'],
+    queryFn: async () => {
+      const response = await fetch('/api/positions/get');
+      if (!response.ok) return [];
+      const result = await response.json();
+      return result.positions || result || [];
+    },
+  });
+  const positions: { id: string; name: string }[] = positionsData || [];
+
   const { data, isLoading, error } = useQuery({
-    queryKey: ['cash-advances', currentPage, pageLimit, statusFilter, typeFilter],
-    queryFn: () => fetchCashAdvances(currentPage, pageLimit, statusFilter, typeFilter),
+    queryKey: ['cash-advances', currentPage, pageLimit, statusFilter, typeFilter, positionFilter],
+    queryFn: () => fetchCashAdvances(currentPage, pageLimit, statusFilter, typeFilter, positionFilter),
   });
 
   const cashAdvances = data?.cashAdvances || [];
@@ -193,6 +211,9 @@ export default function CashFlowRequestsPage() {
       }
       if (typeFilter && typeFilter !== 'all') {
         params.append('type', typeFilter);
+      }
+      if (positionFilter && positionFilter !== 'all') {
+        params.append('position', positionFilter);
       }
 
       const response = await fetch(`/api/cash-advance/export?${params.toString()}`);
@@ -508,6 +529,7 @@ export default function CashFlowRequestsPage() {
               onClick={() => {
                 setIsStatusDropdownOpen(!isStatusDropdownOpen);
                 setIsTypeDropdownOpen(false);
+                setIsPositionDropdownOpen(false);
               }}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
             >
@@ -542,6 +564,7 @@ export default function CashFlowRequestsPage() {
               onClick={() => {
                 setIsTypeDropdownOpen(!isTypeDropdownOpen);
                 setIsStatusDropdownOpen(false);
+                setIsPositionDropdownOpen(false);
               }}
               className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
             >
@@ -564,6 +587,53 @@ export default function CashFlowRequestsPage() {
                     }`}
                   >
                     {type === 'all' ? 'All' : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Position Filter */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setIsPositionDropdownOpen(!isPositionDropdownOpen);
+                setIsStatusDropdownOpen(false);
+                setIsTypeDropdownOpen(false);
+              }}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-700 transition-colors"
+            >
+              <Filter size={16} />
+              <span>Position: {positionFilter === 'all' ? 'All' : positionFilter}</span>
+              <ChevronDown size={16} className={`transition-transform ${isPositionDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isPositionDropdownOpen && (
+              <div className="absolute z-10 mt-2 w-56 max-h-60 overflow-y-auto bg-slate-800 border border-slate-700 rounded-lg shadow-xl">
+                <button
+                  onClick={() => {
+                    setPositionFilter('all');
+                    setIsPositionDropdownOpen(false);
+                    setCurrentPage(1);
+                  }}
+                  className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700 transition-colors first:rounded-t-lg last:rounded-b-lg ${
+                    positionFilter === 'all' ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
+                  }`}
+                >
+                  All
+                </button>
+                {positions.map((pos) => (
+                  <button
+                    key={pos.id}
+                    onClick={() => {
+                      setPositionFilter(pos.name);
+                      setIsPositionDropdownOpen(false);
+                      setCurrentPage(1);
+                    }}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-slate-700 transition-colors last:rounded-b-lg ${
+                      positionFilter === pos.name ? 'text-blue-400 bg-slate-700/50' : 'text-slate-300'
+                    }`}
+                  >
+                    {pos.name}
                   </button>
                 ))}
               </div>
@@ -636,7 +706,8 @@ export default function CashFlowRequestsPage() {
                 <p>Current filters will be applied:</p>
                 <p className="text-slate-400">
                   Status: <span className="text-white">{statusFilter === 'all' ? 'All' : statusFilter}</span>,
-                  Type: <span className="text-white">{typeFilter === 'all' ? 'All' : typeFilter}</span>
+                  Type: <span className="text-white">{typeFilter === 'all' ? 'All' : typeFilter}</span>,
+                  Position: <span className="text-white">{positionFilter === 'all' ? 'All' : positionFilter}</span>
                 </p>
               </div>
             </div>
