@@ -190,6 +190,36 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         console.log(`Auto-created asset ${createdAsset?.id} (Serial: ${serial_number}) linked to store ${store_id}`);
       }
     }
+    // If serial number didn't change, still ensure asset exists
+    else if (serial_number) {
+      const { data: existingAsset } = await supabaseAdmin
+        .from('asset_inventory')
+        .select('id, status')
+        .ilike('serial_number', serial_number.trim())
+        .maybeSingle();
+
+      if (!existingAsset) {
+        const { error: createAssetError } = await supabaseAdmin
+          .from('asset_inventory')
+          .insert({
+            category_id,
+            brand_id,
+            model_id,
+            serial_number: serial_number.trim(),
+            under_warranty: under_warranty || false,
+            warranty_date: warranty_date || null,
+            status: 'Available',
+            store_id: store_id,
+            created_by: userId,
+          })
+          .select('id')
+          .single();
+
+        if (createAssetError) {
+          console.error('Error auto-creating asset on update:', createAssetError);
+        }
+      }
+    }
 
     // Fetch the complete record
     const { data: inventoryItem, error: fetchError } = await supabaseAdmin
