@@ -43,14 +43,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     console.log('Cash Advance Get - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
     // Get confidential position IDs to filter requests
-    // MD: sees all (HR, Accounting, Operations Manager)
-    // Operations Manager: sees HR and Accounting, but NOT other Operations Managers
+    // MD and Operations Manager: sees all (HR, Accounting, Operations Manager)
     // Others: sees none of the above
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector) {
-      const positionsToExclude = isOperationsManager
-        ? ['Operations Manager']
-        : ['HR', 'Accounting', 'Operations Manager'];
+    if (!isManagingDirector && !isOperationsManager) {
+      const positionsToExclude = ['HR', 'Accounting', 'Operations Manager'];
 
       const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin

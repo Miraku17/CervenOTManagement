@@ -90,17 +90,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
         const isOperationsManager = currentUserPosition === 'Operations Manager';
 
-        // Operations Manager cash advances: only Managing Director can approve
-        // HR and Accounting cash advances: Managing Director or Operations Manager can approve
-        const isOpsManagerRequest = requesterPositionName === 'Operations Manager';
-
-        if (isOpsManagerRequest && !isManagingDirector) {
+        // Operations Manager and Managing Director can approve all confidential cash advances
+        // Others cannot approve HR, Accounting, or Operations Manager cash advances
+        if (!isManagingDirector && !isOperationsManager) {
           return res.status(403).json({
-            error: 'Forbidden: Operations Manager cash advances can only be approved by Managing Director'
-          });
-        } else if (!isOpsManagerRequest && !isManagingDirector && !isOperationsManager) {
-          return res.status(403).json({
-            error: 'Forbidden: HR and Accounting cash advances can only be approved by Managing Director or Operations Manager'
+            error: 'Forbidden: HR, Accounting, and Operations Manager cash advances can only be approved by Managing Director or Operations Manager'
           });
         }
       }
