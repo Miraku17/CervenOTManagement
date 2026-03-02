@@ -78,54 +78,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Check if asset exists in asset_inventory, create if it doesn't
-    if (serial_number) {
-      const { data: existingAsset } = await supabaseAdmin
-        .from('asset_inventory')
-        .select('id, status')
-        .ilike('serial_number', serial_number.trim())
-        .maybeSingle();
-
-      if (existingAsset) {
-        // Asset exists - update store_id to link it to this store
-        await supabaseAdmin
-          .from('asset_inventory')
-          .update({
-            store_id: store_id,
-            status: 'Available',
-            updated_by: userId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', existingAsset.id);
-
-        console.log(`Linked asset ${existingAsset.id} (Serial: ${serial_number}) to store ${store_id} with status "Available"`);
-      } else {
-        // Asset doesn't exist - create it automatically
-        const { data: newAsset, error: createAssetError } = await supabaseAdmin
-          .from('asset_inventory')
-          .insert({
-            category_id,
-            brand_id,
-            model_id,
-            serial_number: serial_number.trim(),
-            under_warranty: under_warranty || false,
-            warranty_date: warranty_date || null,
-            status: 'Available', // Set to "Available" since it's in store inventory
-            store_id: store_id, // Link to the store
-            created_by: userId,
-          })
-          .select('id')
-          .single();
-
-        if (createAssetError) {
-          console.error('Error auto-creating asset:', createAssetError);
-          throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
-        }
-
-        console.log(`Auto-created asset ${newAsset?.id} (Serial: ${serial_number}) linked to store ${store_id} with status "Available"`);
-      }
-    }
-
     // Create the inventory item with foreign keys and audit fields
     const { data: insertedItem, error: insertError } = await supabaseAdmin
       .from('store_inventory')
