@@ -92,10 +92,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
         const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
         const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+        const isOperationsManager = currentUserPosition === 'Operations Manager';
+        const isHR = currentUserPosition === 'HR';
+        const isAccounting = currentUserPosition === 'Accounting';
 
-        if (!isManagingDirector) {
+        if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
           return res.status(403).json({
-            error: 'Forbidden: HR and Accounting liquidations can only be approved by Managing Director'
+            error: 'Forbidden: HR and Accounting liquidations can only be approved by Managing Director, Operations Manager, HR, or Accounting'
           });
         }
       }
