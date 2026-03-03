@@ -39,9 +39,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
     const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+    const isOperationsManager = currentUserPosition === 'Operations Manager';
+    const isHR = currentUserPosition === 'HR';
+    const isAccounting = currentUserPosition === 'Accounting';
 
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector) {
+    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
@@ -95,7 +98,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (!isImage) return false;
 
       const userId = (a.liquidations as any)?.user_id;
-      if (!isManagingDirector && confidentialUserIds.includes(userId)) return false;
+      if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.includes(userId)) return false;
 
       return true;
     });

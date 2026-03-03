@@ -39,14 +39,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-    // Only Managing Director can export HR and Accounting liquidations
     const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+    const isOperationsManager = currentUserPosition === 'Operations Manager';
+    const isHR = currentUserPosition === 'HR';
+    const isAccounting = currentUserPosition === 'Accounting';
 
     console.log('Liquidation Export - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
     // Get confidential position IDs to filter requests (HR and Accounting)
+    // MD, Operations Manager, HR, and Accounting can export all liquidations
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector) {
+    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
       // Get HR and Accounting position IDs
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
@@ -134,7 +137,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Filter out HR and Accounting liquidations if user is not Managing Director
-    if (!isManagingDirector && confidentialUserIds.length > 0) {
+    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.length > 0) {
       // Exclude liquidations requested by HR and Accounting
       query = query.filter('user_id', 'not.in', `(${confidentialUserIds.join(',')})`);
       console.log('Liquidation Export - Applied filter to exclude confidential requests (HR, Accounting)');
