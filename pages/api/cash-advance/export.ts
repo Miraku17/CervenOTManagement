@@ -39,14 +39,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
     const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
     const isOperationsManager = currentUserPosition === 'Operations Manager';
+    const isHR = currentUserPosition === 'HR';
+    const isAccounting = currentUserPosition === 'Accounting';
 
     console.log('Cash Advance Export - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
     // Get confidential position IDs to filter requests
-    // MD and Operations Manager: sees all (HR, Accounting, Operations Manager)
+    // MD, Operations Manager, HR, and Accounting: sees all (HR, Accounting, Operations Manager)
     // Others: sees none of the above
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector && !isOperationsManager) {
+    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
       const positionsToExclude = ['HR', 'Accounting', 'Operations Manager'];
 
       const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
@@ -123,8 +125,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
-    // Filter out HR, Accounting, and Operations Manager cash advances if user is not Managing Director
-    if (!isManagingDirector && confidentialUserIds.length > 0) {
+    // Filter out HR, Accounting, and Operations Manager cash advances if user is not Managing Director, Operations Manager, HR, or Accounting
+    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.length > 0) {
       query = query.filter('requested_by', 'not.in', `(${confidentialUserIds.join(',')})`);
       console.log('Cash Advance Export - Applied filter to exclude confidential requests (HR, Accounting, Ops Manager)');
     }
