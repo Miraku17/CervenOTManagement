@@ -77,15 +77,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 
   try {
-    // Get the current serial number before updating
-    const { data: currentItem } = await supabaseAdmin
-      .from('store_inventory')
-      .select('serial_number')
-      .eq('id', id)
-      .single();
-
-    const oldSerialNumber = currentItem?.serial_number;
-
     const updateData: any = {
       store_id,
       station_id,
@@ -110,86 +101,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .eq('id', id);
 
     if (updateError) throw updateError;
-
-    // Handle asset linking updates if serial number changed
-    if (oldSerialNumber && serial_number && oldSerialNumber.toLowerCase() !== serial_number.toLowerCase()) {
-      // Check if old serial number is still used elsewhere in store inventory
-      const { data: oldUsages } = await supabaseAdmin
-        .from('store_inventory')
-        .select('id')
-        .ilike('serial_number', oldSerialNumber.trim())
-        .is('deleted_at', null);
-
-      // If old serial number is no longer used, clear store_id from asset
-      if (!oldUsages || oldUsages.length === 0) {
-        const { data: oldAsset } = await supabaseAdmin
-          .from('asset_inventory')
-          .select('id, store_id')
-          .ilike('serial_number', oldSerialNumber.trim())
-          .maybeSingle();
-
-        if (oldAsset && oldAsset.store_id) {
-          // Clear store_id since it's no longer in any store
-          await supabaseAdmin
-            .from('asset_inventory')
-            .update({
-              store_id: null,
-              status: 'Available',
-              updated_by: userId,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', oldAsset.id);
-
-          console.log(`Cleared store link from asset ${oldAsset.id} (Serial: ${oldSerialNumber})`);
-        }
-      }
-
-      // Check if new serial number exists in asset_inventory
-      const { data: newAsset } = await supabaseAdmin
-        .from('asset_inventory')
-        .select('id, status')
-        .ilike('serial_number', serial_number.trim())
-        .maybeSingle();
-
-      if (newAsset) {
-        // Asset exists - link it to the store
-        await supabaseAdmin
-          .from('asset_inventory')
-          .update({
-            store_id: store_id,
-            status: 'Available',
-            updated_by: userId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', newAsset.id);
-
-        console.log(`Linked asset ${newAsset.id} (Serial: ${serial_number}) to store ${store_id}`);
-      } else {
-        // Asset doesn't exist - create it automatically
-        const { data: createdAsset, error: createAssetError } = await supabaseAdmin
-          .from('asset_inventory')
-          .insert({
-            category_id,
-            brand_id,
-            model_id,
-            serial_number: serial_number.trim(),
-            under_warranty: under_warranty || false,
-            warranty_date: warranty_date || null,
-            status: 'Available',
-            store_id: store_id, // Link to the store
-            created_by: userId,
-          })
-          .select('id')
-          .single();
-
-        if (createAssetError) {
-          console.error('Error auto-creating asset:', createAssetError);
-          throw new Error(`Failed to create asset in inventory: ${createAssetError.message}`);
-        }
-
-        console.log(`Auto-created asset ${createdAsset?.id} (Serial: ${serial_number}) linked to store ${store_id}`);
-      }
-    }
 
     // Fetch the complete record
     const { data: inventoryItem, error: fetchError } = await supabaseAdmin

@@ -43,14 +43,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     console.log('Cash Advance Get - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
     // Get confidential position IDs to filter requests
-    // MD: sees all (HR, Accounting, Operations Manager)
-    // Operations Manager: sees HR and Accounting, but NOT other Operations Managers
+    // MD and Operations Manager: sees all (HR, Accounting, Operations Manager)
     // Others: sees none of the above
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector) {
-      const positionsToExclude = isOperationsManager
-        ? ['Operations Manager']
-        : ['HR', 'Accounting', 'Operations Manager'];
+    if (!isManagingDirector && !isOperationsManager) {
+      const positionsToExclude = ['HR', 'Accounting', 'Operations Manager'];
 
       const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin
@@ -72,7 +69,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     // Get query parameters
-    const { status, type, page = '1', limit = '20' } = req.query;
+    const { status, type, position, page = '1', limit = '20' } = req.query;
     const pageNum = parseInt(page as string, 10);
     const limitNum = parseInt(limit as string, 10);
     const offset = (pageNum - 1) * limitNum;
@@ -119,6 +116,33 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (type && type !== 'all') {
       query = query.eq('type', type);
+    }
+
+    // Filter by position
+    if (position && position !== 'all') {
+      const { data: positionData } = await supabaseAdmin
+        .from('positions')
+        .select('id')
+        .eq('name', position)
+        .single();
+
+      if (positionData) {
+        const { data: positionUsers } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('position_id', positionData.id);
+
+        if (positionUsers && positionUsers.length > 0) {
+          const userIds = positionUsers.map(u => u.id);
+          query = query.in('requested_by', userIds);
+        } else {
+          // No users with this position - return empty
+          return res.status(200).json({
+            cashAdvances: [],
+            pagination: { total: 0, page: pageNum, limit: limitNum, totalPages: 0 },
+          });
+        }
+      }
     }
 
     // Filter out HR, Accounting, and Operations Manager cash advances if user is not Managing Director
