@@ -28,6 +28,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           status,
           under_warranty,
           warranty_date,
+          received_date,
+          dispatched_date,
           created_at,
           updated_at,
           deleted_at,

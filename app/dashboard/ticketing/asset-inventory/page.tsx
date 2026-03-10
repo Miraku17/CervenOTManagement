@@ -29,6 +29,8 @@ interface Asset {
   deleted_at?: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  received_date: string | null;
+  dispatched_date: string | null;
   store_id?: string | null;
   ticket_id?: number | null;
   categories: { id: string; name: string } | null;
@@ -328,6 +330,8 @@ export default function AssetInventoryPage() {
       'Status': asset.status || 'Available',
       'Under Warranty': asset.under_warranty ? 'Yes' : 'No',
       'Warranty Date': asset.warranty_date ? new Date(asset.warranty_date).toLocaleDateString() : 'N/A',
+      'Received Date': asset.received_date ? new Date(asset.received_date).toLocaleDateString() : 'N/A',
+      'Dispatched Date': asset.dispatched_date ? new Date(asset.dispatched_date).toLocaleDateString() : 'N/A',
       'Created At': new Date(asset.created_at).toLocaleDateString(),
     }));
 
@@ -345,6 +349,8 @@ export default function AssetInventoryPage() {
       { wch: 15 }, // Status
       { wch: 15 }, // Under Warranty
       { wch: 15 }, // Warranty Date
+      { wch: 15 }, // Received Date
+      { wch: 15 }, // Dispatched Date
       { wch: 15 }, // Created At
     ];
 
@@ -770,6 +776,8 @@ export default function AssetInventoryPage() {
                         <TableHead>Brand</TableHead>
                         <TableHead>Model</TableHead>
                         <TableHead>Serial Number</TableHead>
+                        <TableHead>Received Date</TableHead>
+                        <TableHead>Dispatched Date</TableHead>
                         <TableHead>Store</TableHead>
                         <TableHead>Ticket</TableHead>
                         <TableHead>Status</TableHead>
@@ -779,7 +787,7 @@ export default function AssetInventoryPage() {
                 <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="p-8 text-center">
+                        <TableCell colSpan={10} className="p-8 text-center">
                           <div className="flex items-center justify-center gap-2">
                             <Loader2 className="w-5 h-5 animate-spin" />
                             <span>Loading assets...</span>
@@ -788,7 +796,7 @@ export default function AssetInventoryPage() {
                       </TableRow>
                     ) : filteredAssets.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="p-8 text-center text-muted-foreground">
+                        <TableCell colSpan={10} className="p-8 text-center text-muted-foreground">
                           {searchTerm ? 'No assets found matching your search.' : 'No assets yet. Click "Add Asset" to create one.'}
                         </TableCell>
                       </TableRow>
@@ -805,6 +813,12 @@ export default function AssetInventoryPage() {
                                 {asset.models?.name || '-'}
                             </TableCell>
                             <TableCell className="font-mono text-sm">{asset.serial_number || '-'}</TableCell>
+                            <TableCell className="text-sm">
+                                {asset.received_date ? new Date(asset.received_date).toLocaleDateString() : '-'}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                                {asset.dispatched_date ? new Date(asset.dispatched_date).toLocaleDateString() : '-'}
+                            </TableCell>
                             <TableCell>
                                 {asset.store_info ? (
                                   <div className="text-sm">

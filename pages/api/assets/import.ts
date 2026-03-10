@@ -20,6 +20,8 @@ interface ImportRow {
   'Serial Number': string;
   'Under Warranty': string;
   'Warranty Date'?: string;
+  'Received Date'?: string;
+  'Dispatched Date'?: string;
 }
 
 interface ImportResult {
@@ -267,6 +269,44 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           row['Warranty Date'] = warrantyDate;
         }
 
+        // Parse Received Date (optional)
+        if (row['Received Date']) {
+          const rawReceivedDate = row['Received Date'];
+          if (typeof rawReceivedDate === 'number') {
+            const excelEpoch = new Date(1900, 0, 1);
+            const daysOffset = rawReceivedDate > 59 ? rawReceivedDate - 2 : rawReceivedDate - 1;
+            const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+            row['Received Date'] = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, '0')}-${String(jsDate.getDate()).padStart(2, '0')}`;
+          } else {
+            const dateString = rawReceivedDate.toString().trim();
+            const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+            if (!dateRegex.test(dateString)) {
+              throw new Error('Received Date must be in MM/DD/YYYY format (e.g., 01/15/2025)');
+            }
+            const [month, day, year] = dateString.split('/');
+            row['Received Date'] = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+
+        // Parse Dispatched Date (optional)
+        if (row['Dispatched Date']) {
+          const rawDispatchedDate = row['Dispatched Date'];
+          if (typeof rawDispatchedDate === 'number') {
+            const excelEpoch = new Date(1900, 0, 1);
+            const daysOffset = rawDispatchedDate > 59 ? rawDispatchedDate - 2 : rawDispatchedDate - 1;
+            const jsDate = new Date(excelEpoch.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+            row['Dispatched Date'] = `${jsDate.getFullYear()}-${String(jsDate.getMonth() + 1).padStart(2, '0')}-${String(jsDate.getDate()).padStart(2, '0')}`;
+          } else {
+            const dateString = rawDispatchedDate.toString().trim();
+            const dateRegex = /^(0?[1-9]|1[0-2])\/(0?[1-9]|[12][0-9]|3[01])\/\d{4}$/;
+            if (!dateRegex.test(dateString)) {
+              throw new Error('Dispatched Date must be in MM/DD/YYYY format (e.g., 02/01/2025)');
+            }
+            const [month, day, year] = dateString.split('/');
+            row['Dispatched Date'] = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+
         // All validations passed for this row
       } catch (error: any) {
         validationErrors.push({
@@ -342,6 +382,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       try {
         const underWarranty = row['Under Warranty'].toLowerCase() === 'yes';
         const warrantyDate = row['Warranty Date'] ? row['Warranty Date'].toString().trim() : null;
+        const receivedDate = row['Received Date'] ? row['Received Date'].toString().trim() : null;
+        const dispatchedDate = row['Dispatched Date'] ? row['Dispatched Date'].toString().trim() : null;
 
         // Get or create category, brand, model (with caching)
         const categoryKey = row['Category'].toString().trim().toUpperCase();
@@ -383,6 +425,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               model_id: modelId,
               under_warranty: underWarranty,
               warranty_date: underWarranty ? warrantyDate : null,
+              received_date: receivedDate,
+              dispatched_date: dispatchedDate,
               // Status is not updated during import - it's auto-managed
               updated_at: new Date().toISOString(),
               updated_by: userId,
@@ -402,6 +446,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               serial_number: row['Serial Number'].toString().trim(),
               under_warranty: underWarranty,
               warranty_date: underWarranty ? warrantyDate : null,
+              received_date: receivedDate,
+              dispatched_date: dispatchedDate,
               status: 'Available', // Always set to Available on import
               created_by: userId,
             });
