@@ -15,6 +15,8 @@ interface Asset {
   status: string;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  received_date: string | null;
+  dispatched_date: string | null;
   store_id?: string | null;
   ticket_id?: number | null;
   categories: { id: string; name: string } | null;
@@ -89,6 +91,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
 
   const [underWarranty, setUnderWarranty] = useState<boolean>(false);
   const [warrantyDate, setWarrantyDate] = useState('');
+  const [receivedDate, setReceivedDate] = useState('');
+  const [dispatchedDate, setDispatchedDate] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -167,6 +171,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
 
       setUnderWarranty(editItem.under_warranty || false);
       setWarrantyDate(editItem.warranty_date || '');
+      setReceivedDate(editItem.received_date || '');
+      setDispatchedDate(editItem.dispatched_date || '');
     } else if (isOpen && !editItem && !isViewingDetail) {
       // Reset form when opening for new item
       setCategory('');
@@ -183,6 +189,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setSelectedTicketId(null);
       setUnderWarranty(false);
       setWarrantyDate('');
+      setReceivedDate('');
+      setDispatchedDate('');
     }
   }, [isOpen, editItem, isViewingDetail]);
 
@@ -299,6 +307,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
           ticket_id: selectedTicketId || null,
           under_warranty: underWarranty,
           warranty_date: warrantyDate || null,
+          received_date: receivedDate || null,
+          dispatched_date: dispatchedDate || null,
         }),
       });
 
@@ -323,6 +333,8 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
       setSelectedTicketId(null);
       setUnderWarranty(false);
       setWarrantyDate('');
+      setReceivedDate('');
+      setDispatchedDate('');
 
       // Refresh autocomplete data to include newly added values
       await fetchAutocompleteData();
@@ -766,6 +778,38 @@ const AssetInventoryModal: React.FC<AssetInventoryModalProps> = ({ isOpen, onClo
               )}
             </div>
           )}
+
+          {/* Received Date */}
+          <div>
+            <label htmlFor="receivedDate" className="block text-sm font-medium text-slate-300 mb-1">Received Date</label>
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.received_date ? format(new Date(editItem.received_date), 'PPP') : 'N/A'}</p>
+            ) : (
+              <input
+                type="date"
+                id="receivedDate"
+                value={receivedDate}
+                onChange={(e) => setReceivedDate(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+              />
+            )}
+          </div>
+
+          {/* Dispatched Date */}
+          <div>
+            <label htmlFor="dispatchedDate" className="block text-sm font-medium text-slate-300 mb-1">Dispatched Date</label>
+            {isViewingDetail ? (
+              <p className="text-white bg-slate-800 p-2 rounded-md border border-slate-700">{editItem?.dispatched_date ? format(new Date(editItem.dispatched_date), 'PPP') : 'N/A'}</p>
+            ) : (
+              <input
+                type="date"
+                id="dispatchedDate"
+                value={dispatchedDate}
+                onChange={(e) => setDispatchedDate(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-md py-2 px-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 [color-scheme:dark]"
+              />
+            )}
+          </div>
 
           {/* Usage Information */}
           {isViewingDetail && (

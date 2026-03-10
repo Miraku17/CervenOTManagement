@@ -17,7 +17,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': 'OptiPlex 7090',
         'Serial Number': 'SN123456789',
         'Under Warranty': 'Yes',
-        'Warranty Date': '12/31/2025'
+        'Warranty Date': '12/31/2025',
+        'Received Date': '01/15/2025',
+        'Dispatched Date': '02/01/2025'
       },
       {
         'Category': '',
@@ -25,7 +27,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         'Model': '',
         'Serial Number': '',
         'Under Warranty': '',
-        'Warranty Date': ''
+        'Warranty Date': '',
+        'Received Date': '',
+        'Dispatched Date': ''
       }
     ];
 
@@ -40,7 +44,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { wch: 20 }, // Model
       { wch: 20 }, // Serial Number
       { wch: 15 }, // Under Warranty
-      { wch: 15 }  // Warranty Date
+      { wch: 15 }, // Warranty Date
+      { wch: 15 }, // Received Date
+      { wch: 15 }  // Dispatched Date
     ];
 
     // Add worksheet to workbook
@@ -65,6 +71,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       { 'Section': 'Warranty Date', 'Information': 'Enter warranty expiration date in MM/DD/YYYY format (e.g., 12/31/2025). Use Excel\'s default date format - NO special formatting needed!' },
       { 'Section': '  - Required when', 'Information': 'Under Warranty is "Yes"' },
       { 'Section': '  - Leave empty when', 'Information': 'Under Warranty is "No"' },
+      { 'Section': 'Received Date (Optional)', 'Information': 'Date the asset was received. Enter in MM/DD/YYYY format (e.g., 01/15/2025). Leave blank if not applicable.' },
+      { 'Section': 'Dispatched Date (Optional)', 'Information': 'Date the asset was dispatched. Enter in MM/DD/YYYY format (e.g., 02/01/2025). Leave blank if not applicable.' },
       { 'Section': '', 'Information': '' },
       { 'Section': 'STATUS (Auto-managed)', 'Information': 'Status is automatically set to "Available" when importing. It will change to "In Use" when the asset is assigned to a store.' },
       { 'Section': '', 'Information': '' },

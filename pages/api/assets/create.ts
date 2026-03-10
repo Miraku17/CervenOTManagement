@@ -8,7 +8,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status, store_id, ticket_id } = req.body;
+  const { category_id, brand_id, model_id, serial_number, under_warranty, warranty_date, status, store_id, ticket_id, received_date, dispatched_date } = req.body;
 
   // Get user ID from the authenticated request
   let userId = req.user?.id;
@@ -60,6 +60,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       serial_number: serial_number || null,
       under_warranty: under_warranty || false,
       warranty_date: warranty_date || null,
+      received_date: received_date || null,
+      dispatched_date: dispatched_date || null,
       status: assetStatus,
       store_id: store_id || null,
       ticket_id: ticket_id || null,
