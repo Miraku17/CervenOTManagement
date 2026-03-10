@@ -28,6 +28,8 @@ interface Asset {
   deleted_at?: string | null;
   under_warranty: boolean | null;
   warranty_date: string | null;
+  received_date: string | null;
+  dispatched_date: string | null;
   categories: { id: string; name: string } | null;
   brands: { id: string; name: string } | null;
   models: { id: string; name: string } | null;
