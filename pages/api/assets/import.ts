@@ -416,8 +416,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           .maybeSingle();
 
         if (existingAsset) {
-          // Update existing asset
-          await supabaseAdmin
+          // Update existing asset (also clear soft-delete if it was deleted)
+          const { error: updateError } = await supabaseAdmin
             .from('asset_inventory')
             .update({
               category_id: categoryId,
@@ -427,17 +427,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               warranty_date: underWarranty ? warrantyDate : null,
               received_date: receivedDate,
               dispatched_date: dispatchedDate,
+              deleted_at: null,
+              deleted_by: null,
               // Status is not updated during import - it's auto-managed
               updated_at: new Date().toISOString(),
               updated_by: userId,
             })
             .eq('id', existingAsset.id);
 
+          if (updateError) {
+            throw new Error(`Failed to update asset: ${updateError.message}`);
+          }
+
           result.updated++;
           console.log(`Row ${rowNumber}: Updated existing asset with serial number ${row['Serial Number']}`);
         } else {
           // Create new asset - always set status to "Available"
-          await supabaseAdmin
+          const { error: insertError } = await supabaseAdmin
             .from('asset_inventory')
             .insert({
               category_id: categoryId,
@@ -451,6 +457,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
               status: 'Available', // Always set to Available on import
               created_by: userId,
             });
+
+          if (insertError) {
+            throw new Error(`Failed to create asset: ${insertError.message}`);
+          }
 
           result.created++;
           console.log(`Row ${rowNumber}: Created new asset with serial number ${row['Serial Number']}`);
