@@ -47,6 +47,14 @@ interface OvertimeRequestsViewProps {
   canApproveLevel2: boolean;
 }
 
+const formatHoursMinutes = (totalHours: number): string => {
+  const hours = Math.floor(totalHours);
+  const minutes = Math.round((totalHours - hours) * 60);
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+};
+
 const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
   canApproveLevel1,
   canApproveLevel2
@@ -375,7 +383,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                 <div>
                   <label className="text-xs text-slate-500 uppercase font-medium">Total Hours</label>
                   <p className="text-slate-200 mt-1 font-mono text-lg font-bold">
-                    {selectedRequest.total_hours.toFixed(2)} hours
+                    {formatHoursMinutes(selectedRequest.total_hours)}
                   </p>
                 </div>
                 <div>
@@ -572,7 +580,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                               </div>
                             </td>
                             <td className="px-6 py-4 font-mono text-slate-300 font-semibold">
-                              {request.total_hours.toFixed(2)} hrs
+                              {formatHoursMinutes(request.total_hours)}
                             </td>
                             <td className="px-6 py-4">
                               {request.level1_status ? (
@@ -859,7 +867,7 @@ const OvertimeRequestsView: React.FC<OvertimeRequestsViewProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 font-mono text-slate-300 font-semibold">
-                      {request.total_hours.toFixed(2)} hrs
+                      {formatHoursMinutes(request.total_hours)}
                     </td>
                     {/* Level 1 Status */}
                     <td className="px-6 py-4">
