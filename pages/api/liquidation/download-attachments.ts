@@ -44,11 +44,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const isAccounting = currentUserPosition === 'Accounting';
 
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
+    let positionsToExclude: string[] = [];
+
+    if (isManagingDirector || isOperationsManager || isAccounting) {
+      positionsToExclude = [];
+    } else if (isHR) {
+      positionsToExclude = ['Managing Director', 'Operations Manager'];
+    } else {
+      positionsToExclude = ['HR', 'Accounting'];
+    }
+
+    if (positionsToExclude.length > 0) {
+      const orFilter = positionsToExclude.map((n) => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
-        .or('name.eq.HR,name.eq.Accounting');
+        .or(orFilter);
 
       if (confidentialPositions && confidentialPositions.length > 0) {
         const positionIds = confidentialPositions.map((p) => p.id);
@@ -98,7 +109,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (!isImage) return false;
 
       const userId = (a.liquidations as any)?.user_id;
-      if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.includes(userId)) return false;
+      if (confidentialUserIds.includes(userId)) return false;
 
       return true;
     });
