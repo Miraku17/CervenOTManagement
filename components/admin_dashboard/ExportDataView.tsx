@@ -427,6 +427,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       'OT Start Time',
       'OT End Time',
       'Total OT Hours',
+      'Total OT (H:M)',
       'Reason',
       'Level 1 Status',
       'Level 1 Reviewer',
@@ -474,6 +475,10 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       const otStartTime = formatTime(row.start_time);
       const otEndTime = formatTime(row.end_time);
       const totalOTHours = row.total_hours?.toFixed(2) || '0.00';
+      const totalHours = row.total_hours || 0;
+      const otHrs = Math.floor(totalHours);
+      const otMins = Math.round((totalHours - otHrs) * 60);
+      const totalOTHoursMinutes = otHrs === 0 ? `${otMins}m` : otMins === 0 ? `${otHrs}h` : `${otHrs}h ${otMins}m`;
       const reason = row.reason || 'N/A';
 
       const level1Status = row.level1_status || 'Pending';
@@ -507,6 +512,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
         otStartTime,
         otEndTime,
         totalOTHours,
+        totalOTHoursMinutes,
         reason,
         level1Status,
         level1Reviewer,
