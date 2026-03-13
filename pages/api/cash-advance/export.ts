@@ -45,12 +45,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     console.log('Cash Advance Export - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
     // Get confidential position IDs to filter requests
-    // MD, Operations Manager, HR, and Accounting: sees all (HR, Accounting, Operations Manager)
-    // Others: sees none of the above
+    // MD, Operations Manager, Accounting: sees all
+    // HR: sees all except Managing Director and Operations Manager
+    // Others: cannot see HR, Accounting, Operations Manager requests
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
-      const positionsToExclude = ['HR', 'Accounting', 'Operations Manager'];
+    let positionsToExclude: string[] = [];
 
+    if (isManagingDirector || isOperationsManager || isAccounting) {
+      positionsToExclude = [];
+    } else if (isHR) {
+      positionsToExclude = ['Managing Director', 'Operations Manager'];
+    } else {
+      positionsToExclude = ['HR', 'Accounting', 'Operations Manager'];
+    }
+
+    if (positionsToExclude.length > 0) {
       const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
@@ -125,10 +134,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
-    // Filter out HR, Accounting, and Operations Manager cash advances if user is not Managing Director, Operations Manager, HR, or Accounting
-    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.length > 0) {
+    // Filter out confidential cash advances based on user's position
+    if (confidentialUserIds.length > 0) {
       query = query.filter('requested_by', 'not.in', `(${confidentialUserIds.join(',')})`);
-      console.log('Cash Advance Export - Applied filter to exclude confidential requests (HR, Accounting, Ops Manager)');
+      console.log('Cash Advance Export - Applied filter to exclude confidential requests:', positionsToExclude);
     }
 
     const { data: cashAdvances, error } = await query;

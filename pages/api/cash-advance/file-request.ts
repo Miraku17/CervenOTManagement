@@ -88,10 +88,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const positionName = (userProfile?.positions as any)?.name || '';
-    const isOperationsManager = positionName === 'Operations Manager';
+    const autoApprovePositions = ['Operations Manager', 'HR', 'Accounting'];
+    const isAutoApprovePosition = autoApprovePositions.some(p => p.toLowerCase() === positionName.toLowerCase());
 
-    if (isOperationsManager) {
-      // Auto-approve for Operations Manager - no emails sent
+    if (isAutoApprovePosition) {
+      // Auto-approve for Operations Manager, HR, and Accounting - no emails sent
       const now = new Date().toISOString();
       const parsedAmount = amount ? parseFloat(amount) : 0;
       const { data: cashAdvance, error: insertError } = await supabaseAdmin
@@ -106,11 +107,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           level1_status: 'approved',
           level1_approved_by: userId,
           level1_date_approved: now,
-          level1_comment: 'Auto-approved (Operations Manager)',
+          level1_comment: `Auto-approved (${positionName})`,
           level2_status: 'approved',
           level2_approved_by: userId,
           level2_date_approved: now,
-          level2_comment: 'Auto-approved (Operations Manager)',
+          level2_comment: `Auto-approved (${positionName})`,
           approved_by: userId,
           date_approved: now,
         })
@@ -122,7 +123,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         throw insertError;
       }
 
-      console.log('Cash advance auto-approved for Operations Manager:', userId);
+      console.log(`Cash advance auto-approved for ${positionName}:`, userId);
 
       return res.status(201).json({
         message: 'Cash advance request auto-approved successfully',

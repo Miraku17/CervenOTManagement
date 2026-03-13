@@ -55,20 +55,31 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     console.log('Liquidation Get - User position:', currentUserPosition, 'Is Managing Director:', isManagingDirector);
 
-    // Get confidential position IDs to filter requests (HR and Accounting)
-    // MD, Operations Manager, HR, and Accounting can see all liquidations
+    // Get confidential position IDs to filter requests
+    // MD, Operations Manager, Accounting: sees all
+    // HR: sees all except Managing Director and Operations Manager
+    // Others: cannot see HR, Accounting liquidations
     let confidentialUserIds: string[] = [];
-    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
-      // Get HR and Accounting position IDs
+    let positionsToExclude: string[] = [];
+
+    if (isManagingDirector || isOperationsManager || isAccounting) {
+      positionsToExclude = [];
+    } else if (isHR) {
+      positionsToExclude = ['Managing Director', 'Operations Manager'];
+    } else {
+      positionsToExclude = ['HR', 'Accounting'];
+    }
+
+    if (positionsToExclude.length > 0) {
+      const orFilter = positionsToExclude.map(n => `name.eq.${n}`).join(',');
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
-        .or('name.eq.HR,name.eq.Accounting');
+        .or(orFilter);
 
       if (confidentialPositions && confidentialPositions.length > 0) {
         const positionIds = confidentialPositions.map(p => p.id);
 
-        // Get all user IDs with these positions
         const { data: confidentialUsers } = await supabaseAdmin
           .from('profiles')
           .select('id')
@@ -155,11 +166,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.eq('status', status);
     }
 
-    // Filter out HR and Accounting liquidations if user is not Managing Director
-    if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting && confidentialUserIds.length > 0) {
-      // Exclude liquidations requested by HR and Accounting
+    // Filter out confidential liquidations based on user's position
+    if (confidentialUserIds.length > 0) {
       query = query.filter('user_id', 'not.in', `(${confidentialUserIds.join(',')})`);
-      console.log('Liquidation Get - Applied filter to exclude confidential requests (HR, Accounting)');
+      console.log('Liquidation Get - Applied filter to exclude confidential requests:', positionsToExclude);
     }
 
     // Apply pagination

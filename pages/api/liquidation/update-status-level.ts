@@ -84,14 +84,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Fetch the requester's profile to check their position
     const { data: requesterProfile } = await supabaseAdmin
       .from('profiles')
-      .select('id, position_id')
+      .select('id, position_id, positions:position_id (name)')
       .eq('id', liquidation.user_id)
       .single();
 
-    // Check if this is a confidential liquidation (HR or Accounting)
+    // Check if this is a confidential liquidation
     const requesterPositionId = requesterProfile?.position_id;
+    const requesterPositionName = (requesterProfile?.positions as any)?.name || '';
     if (requesterPositionId) {
-      // Get HR and Accounting position IDs
+      // Get current user's position
+      const { data: currentUserProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('position_id, positions:position_id (name)')
+        .eq('id', userId)
+        .single();
+
+      const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
+      const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
+      const isOperationsManager = currentUserPosition === 'Operations Manager';
+      const isHR = currentUserPosition === 'HR';
+      const isAccounting = currentUserPosition === 'Accounting';
+
+      // HR cannot approve Managing Director or Operations Manager liquidations
+      if (isHR && (requesterPositionName === 'Managing Director' || requesterPositionName === 'Operations Manager')) {
+        return res.status(403).json({
+          error: 'Forbidden: Managing Director and Operations Manager liquidations cannot be approved by HR'
+        });
+      }
+
+      // Get HR and Accounting position IDs for other non-privileged users
       const { data: confidentialPositions } = await supabaseAdmin
         .from('positions')
         .select('id')
@@ -100,23 +121,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const confidentialPositionIds = (confidentialPositions || []).map(p => p.id);
 
       if (confidentialPositionIds.includes(requesterPositionId)) {
-        // This is a confidential request - only Managing Director can approve at Level 2
         if (level === 2) {
-          const { data: currentUserProfile } = await supabaseAdmin
-            .from('profiles')
-            .select('position_id, positions:position_id (name)')
-            .eq('id', userId)
-            .single();
-
-          const currentUserPosition = (currentUserProfile?.positions as any)?.name || '';
-          const isManagingDirector = currentUserPosition.toLowerCase().includes('managing director');
-          const isOperationsManager = currentUserPosition === 'Operations Manager';
-          const isHR = currentUserPosition === 'HR';
-          const isAccounting = currentUserPosition === 'Accounting';
-
           if (!isManagingDirector && !isOperationsManager && !isHR && !isAccounting) {
             return res.status(403).json({
-              error: 'Forbidden: HR and Accounting liquidations can only be approved at Level 2 by Managing Director, Operations Manager, HR, or Accounting'
+              error: 'Forbidden: HR and Accounting liquidations can only be approved at Level 2 by Managing Director, Operations Manager, or Accounting'
             });
           }
         }
