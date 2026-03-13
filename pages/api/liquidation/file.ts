@@ -138,6 +138,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       ? totalAmount - cashAdvance.amount
       : 0;
 
+    // Check if user is in an auto-approve position
+    const { data: userProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('first_name, last_name, email, position_id, positions:position_id (name)')
+      .eq('id', userId)
+      .single();
+
+    const positionName = (userProfile?.positions as any)?.name || '';
+    const autoApprovePositions = ['Operations Manager', 'HR', 'Accounting'];
+    const isAutoApprovePosition = autoApprovePositions.some(p => p.toLowerCase() === positionName.toLowerCase());
+
+    const now = new Date().toISOString();
+
     // Create liquidation
     const { data: liquidation, error: liquidationError } = await supabaseAdmin
       .from('liquidations')
@@ -151,7 +164,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         return_to_company: returnToCompany,
         reimbursement: reimbursement,
         remarks: remarks || null,
-        status: 'pending',
+        status: isAutoApprovePosition ? 'approved' : 'pending',
+        ...(isAutoApprovePosition ? {
+          level1_status: 'approved',
+          level1_approved_by: userId,
+          level1_approved_at: now,
+          level1_comment: `Auto-approved (${positionName})`,
+          level2_status: 'approved',
+          level2_approved_by: userId,
+          level2_approved_at: now,
+          level2_comment: `Auto-approved (${positionName})`,
+          approved_by: userId,
+          approved_at: now,
+        } : {}),
       })
       .select()
       .single();
@@ -179,16 +204,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Failed to create liquidation items');
     }
 
-    // Send email notification to approvers (async, non-blocking)
+    // Send email notification to approvers (async, non-blocking) - skip for auto-approved
+    if (!isAutoApprovePosition) {
     (async () => {
       try {
-        // Fetch user info
-        const { data: userProfile } = await supabaseAdmin
-          .from('profiles')
-          .select('first_name, last_name, email')
-          .eq('id', userId)
-          .single();
-
         // Collect unique ticket references from items
         const ticketIds = [...new Set(processedItems.map(i => i.ticket_id).filter(Boolean))];
         let ticketReference: string | undefined;
@@ -219,9 +238,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         console.error('Failed to send liquidation notification email:', emailError);
       }
     })();
+    }
 
     return res.status(201).json({
-      message: 'Liquidation submitted successfully',
+      message: isAutoApprovePosition ? 'Liquidation auto-approved successfully' : 'Liquidation submitted successfully',
       liquidation: {
         ...liquidation,
         items: createdItems || processedItems,
