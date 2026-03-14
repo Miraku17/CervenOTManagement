@@ -3,6 +3,45 @@ import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
 
+// Calculate night differential minutes for a session (10PM–6AM window)
+function calculateNightDiffMinutes(timeIn: Date, timeOut: Date): number {
+  let totalNightMinutes = 0;
+  const startMs = timeIn.getTime();
+  const endMs = timeOut.getTime();
+
+  const startDay = new Date(timeIn.getFullYear(), timeIn.getMonth(), timeIn.getDate());
+  const endDay = new Date(timeOut.getFullYear(), timeOut.getMonth(), timeOut.getDate());
+
+  const currentDay = new Date(startDay);
+  while (currentDay <= endDay) {
+    const y = currentDay.getFullYear();
+    const mo = currentDay.getMonth();
+    const d = currentDay.getDate();
+
+    // 00:00–06:00 window
+    const earlyStart = new Date(y, mo, d, 0, 0, 0, 0).getTime();
+    const earlyEnd = new Date(y, mo, d, 6, 0, 0, 0).getTime();
+    const overlapEarlyStart = Math.max(startMs, earlyStart);
+    const overlapEarlyEnd = Math.min(endMs, earlyEnd);
+    if (overlapEarlyEnd > overlapEarlyStart) {
+      totalNightMinutes += (overlapEarlyEnd - overlapEarlyStart) / (1000 * 60);
+    }
+
+    // 22:00–24:00 window
+    const lateStart = new Date(y, mo, d, 22, 0, 0, 0).getTime();
+    const lateEnd = new Date(y, mo, d + 1, 0, 0, 0, 0).getTime();
+    const overlapLateStart = Math.max(startMs, lateStart);
+    const overlapLateEnd = Math.min(endMs, lateEnd);
+    if (overlapLateEnd > overlapLateStart) {
+      totalNightMinutes += (overlapLateEnd - overlapLateStart) / (1000 * 60);
+    }
+
+    currentDay.setDate(currentDay.getDate() + 1);
+  }
+
+  return Math.round(totalNightMinutes);
+}
+
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (!supabase) {
     return res.status(500).json({ error: 'Server configuration error' });
@@ -218,6 +257,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       dailyOvertimeMap.set(key, Math.round(dailyOvertime * 100) / 100);
     });
 
+    // Calculate daily night differential (10PM–6AM) for each user/date
+    const dailyNightDiffMap = new Map<string, number>();
+    attendanceData?.forEach(record => {
+      if (record.time_in && record.time_out) {
+        const key = `${record.user_id}_${record.date}`;
+        const existing = dailyNightDiffMap.get(key) || 0;
+        const timeIn = new Date(record.time_in);
+        const timeOut = new Date(record.time_out);
+        dailyNightDiffMap.set(key, existing + calculateNightDiffMinutes(timeIn, timeOut));
+      }
+    });
+
     // Process attendance data with per-session calculations
     const data = attendanceData?.map(record => {
       // Check if user is a Field Engineer
@@ -265,6 +316,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const dailyKey = `${record.user_id}_${record.date}`;
       const dailyOvertime = dailyOvertimeMap.get(dailyKey) || 0;
 
+      // Get daily night differential for this record
+      const dailyNightDiffMinutes = dailyNightDiffMap.get(dailyKey) || 0;
+
       // Get overtime_v2 request for this user and date
       const overtimeV2Key = `${record.user_id}_${record.date}`;
       const overtimeRequest = overtimeV2Map.get(overtimeV2Key) || null;
@@ -278,6 +332,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         regular_hours: regularHours,
         overtime_hours: overtimeHours, // Per-session overtime (for detailed records)
         daily_overtime_hours: dailyOvertime, // Daily-based overtime (for DTR summary)
+        daily_night_diff_minutes: dailyNightDiffMinutes, // Total night diff minutes (10PM–6AM)
         overtimeRequest: overtimeRequest
       };
     });

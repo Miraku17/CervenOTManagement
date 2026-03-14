@@ -153,7 +153,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
 
     for (const employee of sortedEmployees) {
       // Add header row
-      reportData.push(['EMPLOYEE NAME', 'TIME STAMP', 'TIME IN', 'TIME OUT', 'WORK HOURS', 'SHIFT SCHEDULE', 'REMARKS', 'NO. OF LATE HH:MM', 'TOTAL LATE MINUTES', 'NO. OF DAYS', 'HOLIDAY STATUS']);
+      reportData.push(['EMPLOYEE NAME', 'TIME STAMP', 'TIME IN', 'TIME OUT', 'WORK HOURS', 'SHIFT SCHEDULE', 'REMARKS', 'NO. OF LATE HH:MM', 'TOTAL LATE MINUTES', 'NO. OF DAYS', 'HOLIDAY STATUS', 'NIGHT DIFF (HH:MM)']);
       rowStyles.push({ row: currentRow, type: 'header' });
       currentRow++;
 
@@ -163,6 +163,7 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
 
       let totalLateMinutes = 0;
       let totalLateDays = 0;
+      let totalNightDiffMinutes = 0;
 
       // Process each date in the range
       for (const date of dateRange) {
@@ -218,15 +219,19 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
               workHours = `${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}`;
             }
 
-            reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, '', '', '', holidayStatus]);
+            const restNightMins = record.daily_night_diff_minutes || 0;
+            totalNightDiffMinutes += restNightMins;
+            const restNightHHMM = restNightMins > 0 ? `${Math.floor(restNightMins / 60).toString().padStart(2, '0')}:${(restNightMins % 60).toString().padStart(2, '0')}` : '';
+
+            reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, '', '', '', holidayStatus, restNightHHMM]);
           } else {
-            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus, '']);
           }
           rowStyles.push({ row: currentRow, type: 'restday' });
           currentRow++;
         } else if (isLeave) {
           remarks = 'LEAVE';
-          reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+          reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus, '']);
           rowStyles.push({ row: currentRow, type: 'leave' });
           currentRow++;
         } else if (userAttendance.has(date)) {
@@ -275,17 +280,21 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
             }
           }
 
-          reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, lateHHMM, lateMinutes || '', lateDays || '', holidayStatus]);
+          const nightMins = record.daily_night_diff_minutes || 0;
+          totalNightDiffMinutes += nightMins;
+          const nightHHMM = nightMins > 0 ? `${Math.floor(nightMins / 60).toString().padStart(2, '0')}:${(nightMins % 60).toString().padStart(2, '0')}` : '';
+
+          reportData.push([employee.name, formattedDate, timeIn, timeOut, workHours, shiftSchedule, remarks, lateHHMM, lateMinutes || '', lateDays || '', holidayStatus, nightHHMM]);
           rowStyles.push({ row: currentRow, type: 'data' });
           currentRow++;
         } else {
           // No attendance for this date
           if (holiday) {
             remarks = `${holiday.holiday_type} - ${holiday.name}`.toUpperCase();
-            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus]);
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, remarks, '', '', '', holidayStatus, '']);
             rowStyles.push({ row: currentRow, type: 'holiday' });
           } else {
-            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, '', '', '', '', holidayStatus]);
+            reportData.push([employee.name, formattedDate, '', '', '', shiftSchedule, '', '', '', '', holidayStatus, '']);
             rowStyles.push({ row: currentRow, type: 'data' });
           }
           currentRow++;
@@ -293,7 +302,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       }
 
       // Add total row
-      reportData.push([`${employee.name} Total`, '', '', '', '', '', '', '', totalLateMinutes, totalLateDays, '']);
+      const totalNightDiffHHMM = totalNightDiffMinutes > 0 ? `${Math.floor(totalNightDiffMinutes / 60).toString().padStart(2, '0')}:${(totalNightDiffMinutes % 60).toString().padStart(2, '0')}` : '';
+      reportData.push([`${employee.name} Total`, '', '', '', '', '', '', '', totalLateMinutes, totalLateDays, '', totalNightDiffHHMM]);
       rowStyles.push({ row: currentRow, type: 'total' });
       currentRow++;
     }
@@ -314,7 +324,8 @@ const ExportDataView: React.FC<ExportDataViewProps> = ({ employees, canExport = 
       { wch: 18 },  // NO. OF LATE HH:MM
       { wch: 20 },  // TOTAL LATE MINUTES
       { wch: 15 },  // NO. OF DAYS
-      { wch: 20 }   // HOLIDAY STATUS
+      { wch: 20 },  // HOLIDAY STATUS
+      { wch: 18 }   // NIGHT DIFF (HH:MM)
     ];
 
     // Apply cell styles
