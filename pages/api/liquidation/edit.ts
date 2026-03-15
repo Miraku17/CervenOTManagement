@@ -94,8 +94,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }
 
     if (status !== undefined) {
-      if (status !== 'pending' && status !== 'approved' && status !== 'rejected') {
-        return res.status(400).json({ error: 'Invalid status. Must be "pending", "approved", or "rejected".' });
+      if (status !== 'pending' && status !== 'approved' && status !== 'rejected' && status !== 'level1_approved') {
+        return res.status(400).json({ error: 'Invalid status. Must be "pending", "level1_approved", "approved", or "rejected".' });
       }
       updatePayload.status = status;
 
