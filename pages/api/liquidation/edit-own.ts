@@ -121,11 +121,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       updatePayload.total_amount = totalAmount;
 
       // Calculate return_to_company or reimbursement
-      if (cash_advance_id) {
+      const caId = cash_advance_id || existingLiquidation.cash_advance_id;
+      if (caId) {
         const { data: cashAdvance } = await supabaseAdmin
           .from('cash_advances')
           .select('amount')
-          .eq('id', cash_advance_id)
+          .eq('id', caId)
           .single();
 
         const cashAdvanceAmount = cashAdvance?.amount || 0;
