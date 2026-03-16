@@ -2,41 +2,70 @@ import type { NextApiResponse } from 'next';
 import { supabaseAdmin as supabase } from '@/lib/supabase-server';
 import { withAuth, type AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
+import { fromZonedTime } from 'date-fns-tz';
+
+const PHILIPPINE_TZ = 'Asia/Manila';
 
 // Calculate night differential minutes for a session (10PM–6AM window)
+// Uses Philippine timezone so it works correctly on UTC production servers
 function calculateNightDiffMinutes(timeIn: Date, timeOut: Date): number {
   let totalNightMinutes = 0;
   const startMs = timeIn.getTime();
   const endMs = timeOut.getTime();
 
-  const startDay = new Date(timeIn.getFullYear(), timeIn.getMonth(), timeIn.getDate());
-  const endDay = new Date(timeOut.getFullYear(), timeOut.getMonth(), timeOut.getDate());
+  // Get the date components in Philippine timezone
+  const phFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: PHILIPPINE_TZ,
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  });
 
-  const currentDay = new Date(startDay);
-  while (currentDay <= endDay) {
-    const y = currentDay.getFullYear();
-    const mo = currentDay.getMonth();
-    const d = currentDay.getDate();
+  const startParts = phFormatter.formatToParts(timeIn);
+  const endParts = phFormatter.formatToParts(timeOut);
 
-    // 00:00–06:00 window
-    const earlyStart = new Date(y, mo, d, 0, 0, 0, 0).getTime();
-    const earlyEnd = new Date(y, mo, d, 6, 0, 0, 0).getTime();
-    const overlapEarlyStart = Math.max(startMs, earlyStart);
-    const overlapEarlyEnd = Math.min(endMs, earlyEnd);
+  const getDateFromParts = (parts: Intl.DateTimeFormatPart[]) => {
+    const year = parseInt(parts.find(p => p.type === 'year')!.value);
+    const month = parseInt(parts.find(p => p.type === 'month')!.value) - 1;
+    const day = parseInt(parts.find(p => p.type === 'day')!.value);
+    return { year, month, day };
+  };
+
+  const startDate = getDateFromParts(startParts);
+  const endDate = getDateFromParts(endParts);
+
+  // Iterate from start date to end date in Philippine timezone
+  let currentYear = startDate.year;
+  let currentMonth = startDate.month;
+  let currentDay = startDate.day;
+
+  const endTimestamp = new Date(endDate.year, endDate.month, endDate.day).getTime();
+
+  while (new Date(currentYear, currentMonth, currentDay).getTime() <= endTimestamp) {
+    // Create window boundaries in Philippine timezone using fromZonedTime
+    // fromZonedTime converts "wall clock time in PH" to the correct UTC instant
+    const earlyStartMs = fromZonedTime(new Date(currentYear, currentMonth, currentDay, 0, 0, 0, 0), PHILIPPINE_TZ).getTime();
+    const earlyEndMs = fromZonedTime(new Date(currentYear, currentMonth, currentDay, 6, 0, 0, 0), PHILIPPINE_TZ).getTime();
+
+    const overlapEarlyStart = Math.max(startMs, earlyStartMs);
+    const overlapEarlyEnd = Math.min(endMs, earlyEndMs);
     if (overlapEarlyEnd > overlapEarlyStart) {
       totalNightMinutes += (overlapEarlyEnd - overlapEarlyStart) / (1000 * 60);
     }
 
-    // 22:00–24:00 window
-    const lateStart = new Date(y, mo, d, 22, 0, 0, 0).getTime();
-    const lateEnd = new Date(y, mo, d + 1, 0, 0, 0, 0).getTime();
-    const overlapLateStart = Math.max(startMs, lateStart);
-    const overlapLateEnd = Math.min(endMs, lateEnd);
+    // 22:00–24:00 window in Philippine timezone
+    const lateStartMs = fromZonedTime(new Date(currentYear, currentMonth, currentDay, 22, 0, 0, 0), PHILIPPINE_TZ).getTime();
+    const lateEndMs = fromZonedTime(new Date(currentYear, currentMonth, currentDay + 1, 0, 0, 0, 0), PHILIPPINE_TZ).getTime();
+
+    const overlapLateStart = Math.max(startMs, lateStartMs);
+    const overlapLateEnd = Math.min(endMs, lateEndMs);
     if (overlapLateEnd > overlapLateStart) {
       totalNightMinutes += (overlapLateEnd - overlapLateStart) / (1000 * 60);
     }
 
-    currentDay.setDate(currentDay.getDate() + 1);
+    // Move to next day
+    const nextDay = new Date(currentYear, currentMonth, currentDay + 1);
+    currentYear = nextDay.getFullYear();
+    currentMonth = nextDay.getMonth();
+    currentDay = nextDay.getDate();
   }
 
   return Math.round(totalNightMinutes);
