@@ -146,7 +146,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const positionName = (userProfile?.positions as any)?.name || '';
-    const autoApprovePositions = ['Operations Manager', 'HR', 'Accounting'];
+    const autoApprovePositions = ['HR', 'Accounting'];
     const isAutoApprovePosition = autoApprovePositions.some(p => p.toLowerCase() === positionName.toLowerCase());
 
     const now = new Date().toISOString();
