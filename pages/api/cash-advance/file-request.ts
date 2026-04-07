@@ -88,11 +88,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .single();
 
     const positionName = (userProfile?.positions as any)?.name || '';
-    const autoApprovePositions = ['Operations Manager', 'HR', 'Accounting'];
+    const autoApprovePositions = ['HR', 'Accounting'];
     const isAutoApprovePosition = autoApprovePositions.some(p => p.toLowerCase() === positionName.toLowerCase());
 
     if (isAutoApprovePosition) {
-      // Auto-approve for Operations Manager, HR, and Accounting - no emails sent
+      // Auto-approve for HR and Accounting - no emails sent
       const now = new Date().toISOString();
       const parsedAmount = amount ? parseFloat(amount) : 0;
       const { data: cashAdvance, error: insertError } = await supabaseAdmin
@@ -171,7 +171,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
-    // Standard flow for non-Operations Manager, non-reimbursement users
+    // Standard flow for non-auto-approve, non-reimbursement users
     const parsedAmount = amount ? parseFloat(amount) : 0;
     const { data: cashAdvance, error: insertError } = await supabaseAdmin
       .from('cash_advances')
