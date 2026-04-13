@@ -204,6 +204,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           }
         }
 
+        // Also handle case where work end is on the same date as acknowledge
+        // but the time indicates it must be the next day (e.g., ack at 23:55, work end at 03:30)
+        if (workEndDate.getTime() < ackDate.getTime()) {
+          workEndDate.setDate(workEndDate.getDate() + 1);
+        }
+
         // Calculate difference in hours
         const diffInMs = workEndDate.getTime() - ackDate.getTime();
 
