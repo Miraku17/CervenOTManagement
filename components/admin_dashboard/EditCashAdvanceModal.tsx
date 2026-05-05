@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Wallet, Loader2, Save, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { X, Wallet, Loader2, Save } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface CashAdvance {
@@ -47,7 +47,6 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
     amount: '',
     purpose: '',
     date_requested: '',
-    status: 'pending' as 'pending' | 'approved' | 'rejected',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +59,6 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
         amount: request.amount.toString(),
         purpose: request.purpose || '',
         date_requested: format(parseISO(request.date_requested), 'yyyy-MM-dd'),
-        status: request.status,
       });
       setError(null);
     }
@@ -100,7 +98,6 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
           amount: amount,
           purpose: formData.purpose.trim() || null,
           date_requested: formData.date_requested,
-          status: formData.status,
         }),
       });
 
@@ -172,31 +169,6 @@ export const EditCashAdvanceModal: React.FC<EditCashAdvanceModalProps> = ({
                 <option value="support">Support</option>
                 <option value="reimbursement">Reimbursement</option>
               </select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Status
-              </label>
-              <div className="relative">
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50 appearance-none"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  {formData.status === 'pending' && <Clock size={18} className="text-amber-400" />}
-                  {formData.status === 'approved' && <CheckCircle size={18} className="text-emerald-400" />}
-                  {formData.status === 'rejected' && <XCircle size={18} className="text-red-400" />}
-                </div>
-              </div>
             </div>
 
             {/* Amount */}
