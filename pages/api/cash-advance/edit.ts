@@ -9,7 +9,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 
-  const { id, type, amount, purpose, date_requested, status } = req.body;
+  const { id, type, amount, purpose, date_requested } = req.body;
 
   if (!id) {
     return res.status(400).json({ error: 'Missing required field: id' });
@@ -98,26 +98,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (date_requested !== undefined) {
       updatePayload.date_requested = date_requested;
-    }
-
-    if (status !== undefined) {
-      if (status !== 'pending' && status !== 'approved' && status !== 'rejected') {
-        return res.status(400).json({ error: 'Invalid status. Must be "pending", "approved", or "rejected".' });
-      }
-      updatePayload.status = status;
-
-      // If changing to approved/rejected, set date_approved if not already set
-      if ((status === 'approved' || status === 'rejected') && !existingRequest.date_approved) {
-        updatePayload.date_approved = new Date().toISOString();
-        updatePayload.approved_by = req.user?.id;
-      }
-
-      // If changing back to pending, clear approval info
-      if (status === 'pending') {
-        updatePayload.date_approved = null;
-        updatePayload.approved_by = null;
-        updatePayload.rejection_reason = null;
-      }
     }
 
     // Check if there's anything to update
