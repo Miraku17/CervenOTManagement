@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Receipt, Loader2, Save, CheckCircle, XCircle, Clock, Search } from 'lucide-react';
+import { X, Receipt, Loader2, Save, Search } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 
 interface LiquidationItem {
@@ -81,7 +81,6 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
     ticket_id: '',
     liquidation_date: '',
     remarks: '',
-    status: 'pending' as 'pending' | 'level1_approved' | 'approved' | 'rejected',
   });
   const [stores, setStores] = useState<Store[]>([]);
   const [isLoadingStores, setIsLoadingStores] = useState(false);
@@ -127,7 +126,6 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
         ticket_id: liquidation.ticket_id?.toString() || '',
         liquidation_date: format(parseISO(liquidation.liquidation_date), 'yyyy-MM-dd'),
         remarks: liquidation.remarks || '',
-        status: liquidation.status,
       });
       setError(null);
       // Pre-load the current ticket by reference
@@ -207,7 +205,6 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
           ticket_id: formData.ticket_id ? parseInt(formData.ticket_id) : null,
           liquidation_date: formData.liquidation_date,
           remarks: formData.remarks.trim() || null,
-          status: formData.status,
         }),
       });
 
@@ -298,31 +295,6 @@ export const EditLiquidationModal: React.FC<EditLiquidationModalProps> = ({
         {/* Form */}
         <form onSubmit={handleSubmit}>
           <div className="p-6 space-y-5 max-h-[400px] overflow-y-auto">
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Status
-              </label>
-              <div className="relative">
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleInputChange}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent disabled:opacity-50 appearance-none"
-                >
-                  <option value="pending">Pending</option>
-                  <option value="approved">Approved</option>
-                  <option value="rejected">Rejected</option>
-                </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  {formData.status === 'pending' && <Clock size={18} className="text-amber-400" />}
-                  {formData.status === 'approved' && <CheckCircle size={18} className="text-emerald-400" />}
-                  {formData.status === 'rejected' && <XCircle size={18} className="text-red-400" />}
-                </div>
-              </div>
-            </div>
-
             {/* Store */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">

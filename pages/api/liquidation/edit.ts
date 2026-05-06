@@ -15,7 +15,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     ticket_id,
     liquidation_date,
     remarks,
-    status,
   } = req.body;
 
   if (!id) {
@@ -91,34 +90,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     if (remarks !== undefined) {
       updatePayload.remarks = remarks || null;
-    }
-
-    if (status !== undefined) {
-      if (status !== 'pending' && status !== 'approved' && status !== 'rejected' && status !== 'level1_approved') {
-        return res.status(400).json({ error: 'Invalid status. Must be "pending", "level1_approved", "approved", or "rejected".' });
-      }
-      updatePayload.status = status;
-
-      // If changing to approved/rejected, set approved_at if not already set
-      if ((status === 'approved' || status === 'rejected') && !existingLiquidation.approved_at) {
-        updatePayload.approved_at = new Date().toISOString();
-        updatePayload.approved_by = req.user?.id;
-      }
-
-      // If changing back to pending, clear approval info and level approvals
-      if (status === 'pending') {
-        updatePayload.approved_at = null;
-        updatePayload.approved_by = null;
-        updatePayload.reviewer_comment = null;
-        // Reset level 1 approval
-        updatePayload.level1_approved_by = null;
-        updatePayload.level1_approved_at = null;
-        updatePayload.level1_reviewer_comment = null;
-        // Reset level 2 approval
-        updatePayload.level2_approved_by = null;
-        updatePayload.level2_approved_at = null;
-        updatePayload.level2_reviewer_comment = null;
-      }
     }
 
     // Check if there's anything to update
