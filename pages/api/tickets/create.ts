@@ -47,6 +47,34 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    // Duplicate-RCC guard: warn when an active ticket already exists for this
+    // RCC so duplicates aren't created by accident. Cancelled tickets don't
+    // count, and `confirmDuplicate: true` lets the user override intentionally.
+    // Scoped to interactive creates only — bulk import is intentionally exempt.
+    if (rcc_reference_number && req.body.confirmDuplicate !== true) {
+      const { data: existingTickets, error: dupError } = await supabaseAdmin
+        .from('tickets')
+        .select('id, sev, status, date_reported')
+        .eq('rcc_reference_number', rcc_reference_number)
+        .neq('status', 'cancelled')
+        .order('id', { ascending: false })
+        .limit(1);
+
+      if (dupError) {
+        console.error('Error checking for duplicate RCC:', dupError);
+        return res.status(500).json({ error: 'Failed to verify RCC uniqueness' });
+      }
+
+      if (existingTickets && existingTickets.length > 0) {
+        const existing = existingTickets[0];
+        return res.status(409).json({
+          error: `A ticket with RCC ${rcc_reference_number} already exists (#${existing.id}, ${existing.sev}, ${existing.status}).`,
+          duplicate: true,
+          existing,
+        });
+      }
+    }
+
     const PHILIPPINE_TZ = 'Asia/Manila';
     const currentTime = formatInTimeZone(new Date(), PHILIPPINE_TZ, 'HH:mm');
 

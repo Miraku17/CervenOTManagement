@@ -118,6 +118,7 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateInfo, setDuplicateInfo] = useState<{ id: number; sev: string; status: string; date_reported?: string } | null>(null);
   const [currentUser, setCurrentUser] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string>('');
 
@@ -551,10 +552,15 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
 
   if (!isOpen) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    submitTicket(false);
+  };
+
+  const submitTicket = async (confirmDuplicate: boolean = false) => {
     setLoading(true);
     setError(null);
+    setDuplicateInfo(null);
 
     if (!selectedInventoryItem) {
         setError('Please select a device from inventory');
@@ -578,10 +584,17 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
           status: 'open',
           reported_by: currentUserId,
           serial_number: selectedInventoryItem?.serial_number || null, // Add serial number from selected device
+          confirmDuplicate,
         }),
       });
 
       const data = await response.json();
+
+      // RCC duplicate guard: surface a confirmation instead of a hard error.
+      if (response.status === 409 && data.duplicate) {
+        setDuplicateInfo(data.existing);
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to create ticket');
@@ -1356,6 +1369,48 @@ const AddTicketModal: React.FC<AddTicketModalProps> = ({ isOpen, onClose, onSucc
             <span>{loading ? 'Creating...' : 'Create Ticket'}</span>
           </button>
         </div>
+
+        {duplicateInfo && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl">
+              <div className="flex items-center gap-3 p-6 border-b border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                  <AlertCircle size={20} className="text-yellow-400" />
+                </div>
+                <h2 className="text-lg font-bold text-white">Possible duplicate ticket</h2>
+              </div>
+              <div className="p-6 text-sm text-slate-300 space-y-3">
+                <p>
+                  A ticket with RCC{' '}
+                  <span className="font-semibold text-white">{formData.rcc_reference_number}</span>{' '}
+                  already exists:
+                </p>
+                <div className="bg-slate-950/50 border border-slate-700 rounded-lg p-3 text-slate-200">
+                  #{duplicateInfo.id} · {duplicateInfo.sev?.toUpperCase()} · {duplicateInfo.status}
+                </div>
+                <p>Create this ticket anyway?</p>
+              </div>
+              <div className="p-6 border-t border-slate-800 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDuplicateInfo(null)}
+                  disabled={loading}
+                  className="px-4 py-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => submitTicket(true)}
+                  disabled={loading}
+                  className="px-6 py-2 bg-yellow-600 hover:bg-yellow-500 text-white rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Creating...' : 'Create anyway'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

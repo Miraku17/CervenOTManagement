@@ -48,6 +48,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Unlink any asset that points at this ticket. The asset_inventory.ticket_id
+    // FK would otherwise block the delete; clearing it mirrors what update.ts
+    // does, and the link is informational (not financial like liquidations).
+    const { error: assetUnlinkError } = await supabase
+      .from('asset_inventory')
+      .update({ ticket_id: null })
+      .eq('ticket_id', id);
+
+    if (assetUnlinkError) {
+      console.error('Error unlinking assets from ticket:', assetUnlinkError);
+      return res.status(500).json({ error: 'Failed to unlink assets from ticket' });
+    }
+
     // 1. Get all attachments for this ticket
     const { data: attachments, error: fetchError } = await supabase
       .from('ticket_attachments')
