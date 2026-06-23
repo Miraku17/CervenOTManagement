@@ -29,6 +29,25 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       return res.status(400).json({ error: 'Ticket ID is required' });
     }
 
+    // Block deletion if the ticket is referenced by liquidation items.
+    // The liquidation_items.ticket_id foreign key would otherwise reject the
+    // delete with an opaque 500. Surface a clear, actionable reason instead.
+    const { count: liquidationRefCount, error: liquidationCheckError } = await supabase
+      .from('liquidation_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('ticket_id', id);
+
+    if (liquidationCheckError) {
+      console.error('Error checking liquidation references:', liquidationCheckError);
+      return res.status(500).json({ error: 'Failed to verify ticket dependencies' });
+    }
+
+    if (liquidationRefCount && liquidationRefCount > 0) {
+      return res.status(409).json({
+        error: `Cannot delete ticket: it is linked to ${liquidationRefCount} liquidation item${liquidationRefCount === 1 ? '' : 's'}. Remove or reassign those liquidation entries before deleting this ticket.`,
+      });
+    }
+
     // 1. Get all attachments for this ticket
     const { data: attachments, error: fetchError } = await supabase
       .from('ticket_attachments')
