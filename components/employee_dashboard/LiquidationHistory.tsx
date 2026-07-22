@@ -25,6 +25,9 @@ interface LiquidationItem {
   toll: number;
   meals: number;
   lodging: number;
+  tools: number;
+  supplies: number;
+  mobility_transport: number;
   others: number;
   total: number;
   remarks: string;
@@ -417,6 +420,24 @@ const LiquidationHistory: React.FC = () => {
                               <div className="bg-slate-800 px-2 py-1.5 rounded">
                                 <span className="text-slate-400">Lodging:</span>{' '}
                                 <span className="text-white font-medium">{formatCurrency(item.lodging)}</span>
+                              </div>
+                            )}
+                            {item.tools > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Tools:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.tools)}</span>
+                              </div>
+                            )}
+                            {item.supplies > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Supplies:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.supplies)}</span>
+                              </div>
+                            )}
+                            {item.mobility_transport > 0 && (
+                              <div className="bg-slate-800 px-2 py-1.5 rounded">
+                                <span className="text-slate-400">Mobility/Transport:</span>{' '}
+                                <span className="text-white font-medium">{formatCurrency(item.mobility_transport)}</span>
                               </div>
                             )}
                             {item.others > 0 && (

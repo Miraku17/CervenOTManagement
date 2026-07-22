@@ -13,6 +13,9 @@ interface LiquidationItem {
   toll: string;
   meals: string;
   lodging: string;
+  tools: string;
+  supplies: string;
+  mobility_transport: string;
   others: string;
   remarks: string;
 }
@@ -113,6 +116,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           parseFloat(item.toll || '0') +
           parseFloat(item.meals || '0') +
           parseFloat(item.lodging || '0') +
+          parseFloat(item.tools || '0') +
+          parseFloat(item.supplies || '0') +
+          parseFloat(item.mobility_transport || '0') +
           parseFloat(item.others || '0');
 
         totalAmount += itemTotal;
@@ -172,6 +178,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           parseFloat(item.toll || '0') +
           parseFloat(item.meals || '0') +
           parseFloat(item.lodging || '0') +
+          parseFloat(item.tools || '0') +
+          parseFloat(item.supplies || '0') +
+          parseFloat(item.mobility_transport || '0') +
           parseFloat(item.others || '0');
 
         return {
@@ -185,6 +194,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           toll: parseFloat(item.toll || '0'),
           meals: parseFloat(item.meals || '0'),
           lodging: parseFloat(item.lodging || '0'),
+          tools: parseFloat(item.tools || '0'),
+          supplies: parseFloat(item.supplies || '0'),
+          mobility_transport: parseFloat(item.mobility_transport || '0'),
           others: parseFloat(item.others || '0'),
           total: itemTotal,
           remarks: item.remarks || '',

@@ -25,6 +25,9 @@ interface LiquidationItemData {
   toll: number;
   meals: number;
   lodging: number;
+  tools: number;
+  supplies: number;
+  mobility_transport: number;
   others: number;
   total: number;
   remarks: string;
@@ -104,6 +107,9 @@ interface LiquidationItem {
   toll: string;
   meals: string;
   lodging: string;
+  tools: string;
+  supplies: string;
+  mobility_transport: string;
   others: string;
   remarks: string;
   files?: File[];
@@ -133,6 +139,9 @@ const emptyItem = (): LiquidationItem => ({
   toll: '',
   meals: '',
   lodging: '',
+  tools: '',
+  supplies: '',
+  mobility_transport: '',
   others: '',
   remarks: '',
   files: [],
@@ -641,6 +650,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
             toll: item.toll > 0 ? String(item.toll) : '',
             meals: item.meals > 0 ? String(item.meals) : '',
             lodging: item.lodging > 0 ? String(item.lodging) : '',
+            tools: item.tools > 0 ? String(item.tools) : '',
+            supplies: item.supplies > 0 ? String(item.supplies) : '',
+            mobility_transport: item.mobility_transport > 0 ? String(item.mobility_transport) : '',
             others: item.others > 0 ? String(item.others) : '',
             remarks: item.remarks || '',
             files: [],
@@ -679,6 +691,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
         parseFloat(item.toll || '0') > 0 ||
         parseFloat(item.meals || '0') > 0 ||
         parseFloat(item.lodging || '0') > 0 ||
+        parseFloat(item.tools || '0') > 0 ||
+        parseFloat(item.supplies || '0') > 0 ||
+        parseFloat(item.mobility_transport || '0') > 0 ||
         parseFloat(item.others || '0') > 0
     );
 
@@ -944,6 +959,9 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
       parseFloat(item.toll || '0') +
       parseFloat(item.meals || '0') +
       parseFloat(item.lodging || '0') +
+      parseFloat(item.tools || '0') +
+      parseFloat(item.supplies || '0') +
+      parseFloat(item.mobility_transport || '0') +
       parseFloat(item.others || '0')
     );
   };
@@ -1132,6 +1150,15 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                     </th>
                     <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
                       Lodging
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Tools
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Supplies
+                    </th>
+                    <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
+                      Mobility/Transport
                     </th>
                     <th rowSpan={2} className="px-3 py-2 text-center border-b border-r border-slate-700 align-bottom">
                       Others
@@ -1343,6 +1370,42 @@ const FileLiquidationModal: React.FC<FileLiquidationModalProps> = ({
                           value={item.lodging}
                           onChange={(e) =>
                             updateItem(item.id, 'lodging', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.tools}
+                          onChange={(e) =>
+                            updateItem(item.id, 'tools', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.supplies}
+                          onChange={(e) =>
+                            updateItem(item.id, 'supplies', formatCurrency(e.target.value))
+                          }
+                          placeholder="0"
+                          className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"
+                        />
+                      </td>
+                      <td className="p-1 border-r border-slate-700">
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={item.mobility_transport}
+                          onChange={(e) =>
+                            updateItem(item.id, 'mobility_transport', formatCurrency(e.target.value))
                           }
                           placeholder="0"
                           className="w-full bg-slate-950 border border-slate-700 text-white px-2 py-1.5 rounded text-xs focus:ring-1 focus:ring-orange-500 outline-none text-right min-w-[60px]"

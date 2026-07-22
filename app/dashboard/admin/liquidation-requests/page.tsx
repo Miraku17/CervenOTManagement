@@ -32,6 +32,9 @@ interface LiquidationItem {
   toll: number;
   meals: number;
   lodging: number;
+  tools: number;
+  supplies: number;
+  mobility_transport: number;
   others: number;
   total: number;
   remarks: string;
@@ -274,6 +277,9 @@ export default function LiquidationRequestsPage() {
       'Toll',
       'Meals',
       'Lodging',
+      'Tools',
+      'Supplies',
+      'Mobility/Transport',
       'Others',
       'Item Total',
       'Item Remarks',
@@ -337,6 +343,9 @@ export default function LiquidationRequestsPage() {
             item.toll || 0,
             item.meals || 0,
             item.lodging || 0,
+            item.tools || 0,
+            item.supplies || 0,
+            item.mobility_transport || 0,
             item.others || 0,
             item.total || 0,
             item.remarks || '',
@@ -366,6 +375,9 @@ export default function LiquidationRequestsPage() {
           0, // toll
           0, // meals
           0, // lodging
+          0, // tools
+          0, // supplies
+          0, // mobility_transport
           0, // others
           0, // item total
           '', // item remarks
@@ -400,6 +412,9 @@ export default function LiquidationRequestsPage() {
       { wch: 10 },  // Toll
       { wch: 10 },  // Meals
       { wch: 10 },  // Lodging
+      { wch: 10 },  // Tools
+      { wch: 10 },  // Supplies
+      { wch: 16 },  // Mobility/Transport
       { wch: 10 },  // Others
       { wch: 12 },  // Item Total
       { wch: 25 },  // Item Remarks
