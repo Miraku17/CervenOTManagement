@@ -19,7 +19,8 @@ import {
   CalendarCheck,
   Wallet,
   Receipt,
-  Shield
+  Shield,
+  BarChart3
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -133,6 +134,7 @@ export default function AdminLayout({
     if (pathname.startsWith('/dashboard/admin/holidays')) return 'Holidays';
     if (pathname.startsWith('/dashboard/admin/cash-flow-requests')) return 'Cash Advance Requests';
     if (pathname.startsWith('/dashboard/admin/liquidation-requests')) return 'Liquidation Requests';
+    if (pathname.startsWith('/dashboard/admin/accounting-dashboard')) return 'Accounting Dashboard';
     if (pathname.startsWith('/dashboard/knowledge-base')) return 'Knowledge Base';
 
     return 'Dashboard';
@@ -219,7 +221,7 @@ export default function AdminLayout({
           </div>
 
           {/* Requests Section */}
-          {(hasLeaveRequestsAccess() || hasOvertimeAccess() || hasCashFlowAccess() || hasLiquidationAccess()) && (
+          {(hasLeaveRequestsAccess() || hasOvertimeAccess() || hasCashFlowAccess() || hasLiquidationAccess() || hasPermission('view_accounting_dashboard')) && (
             <div>
               <SidebarLabel isOpen={isSidebarOpen}>Requests</SidebarLabel>
               <div className="space-y-1">
@@ -256,6 +258,15 @@ export default function AdminLayout({
                     label="Liquidations"
                     isActive={isActive('/dashboard/admin/liquidation-requests')}
                     onClick={() => handleNavigate('/dashboard/admin/liquidation-requests')}
+                    isOpen={isSidebarOpen}
+                  />
+                )}
+                {hasPermission('view_accounting_dashboard') && (
+                  <SidebarItem
+                    icon={<BarChart3 size={18} />}
+                    label="Accounting Dashboard"
+                    isActive={isActive('/dashboard/admin/accounting-dashboard')}
+                    onClick={() => handleNavigate('/dashboard/admin/accounting-dashboard')}
                     isOpen={isSidebarOpen}
                   />
                 )}
@@ -452,6 +463,14 @@ export default function AdminLayout({
                 label="Liquidations"
                 isActive={isActive('/dashboard/admin/liquidation-requests')}
                 onClick={() => handleNavigate('/dashboard/admin/liquidation-requests')}
+              />
+            )}
+            {hasPermission('view_accounting_dashboard') && (
+              <SidebarItem
+                icon={<BarChart3 size={24} />}
+                label="Accounting Dashboard"
+                isActive={isActive('/dashboard/admin/accounting-dashboard')}
+                onClick={() => handleNavigate('/dashboard/admin/accounting-dashboard')}
               />
             )}
             {hasImportScheduleAccess() && (
