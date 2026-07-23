@@ -22,6 +22,9 @@ interface LiquidationItem {
   toll: number;
   meals: number;
   lodging: number;
+  tools: number;
+  supplies: number;
+  mobility_transport: number;
   others: number;
   total: number;
   remarks: string;
@@ -513,6 +516,24 @@ export const LiquidationDetailModal: React.FC<LiquidationDetailModalProps> = ({
                         <div>
                           <p className="text-xs text-slate-400 mb-1">Lodging</p>
                           <p className="text-slate-300 text-xs sm:text-sm font-mono break-all">{formatCurrency(item.lodging)}</p>
+                        </div>
+                      )}
+                      {item.tools > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Tools</p>
+                          <p className="text-slate-300 text-xs sm:text-sm font-mono break-all">{formatCurrency(item.tools)}</p>
+                        </div>
+                      )}
+                      {item.supplies > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Supplies</p>
+                          <p className="text-slate-300 text-xs sm:text-sm font-mono break-all">{formatCurrency(item.supplies)}</p>
+                        </div>
+                      )}
+                      {item.mobility_transport > 0 && (
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Mobility/Transport</p>
+                          <p className="text-slate-300 text-xs sm:text-sm font-mono break-all">{formatCurrency(item.mobility_transport)}</p>
                         </div>
                       )}
                       {item.others > 0 && (

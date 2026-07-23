@@ -2,6 +2,7 @@ import type { NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase-server';
 import { withAuth, AuthenticatedRequest } from '@/lib/apiAuth';
 import { userHasPermission } from '@/lib/permissions';
+import { parseTicketFilters, applyTicketFilters } from '@/lib/ticketFilters';
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -27,11 +28,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const from = (page - 1) * limit;
     const to = from + limit - 1;
 
-    // Get filter params
-    const statusFilter = req.query.status as string;
-    const searchTerm = req.query.search as string;
-    const startDate = req.query.startDate as string;
-    const endDate = req.query.endDate as string;
+    // Get filter params (supports comma-separated multi-value filters)
+    const filters = parseTicketFilters(req.query);
     const sortOrder = (req.query.sortOrder as string) || 'desc'; // Default to newest first
 
     // Build the base query for counting
@@ -44,25 +42,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       countQuery = countQuery.or(`serviced_by.eq.${req.user.id},serviced_by.is.null`);
     }
 
-    // Apply status filter (handle both underscore and space formats)
-    if (statusFilter && statusFilter !== 'all') {
-      // Convert filter to database format (e.g., "in progress" -> "in_progress")
-      const dbStatus = statusFilter.toLowerCase().replace(/ /g, '_');
-      countQuery = countQuery.eq('status', dbStatus);
-    }
-
-    // Apply search filter
-    if (searchTerm) {
-      countQuery = countQuery.or(`rcc_reference_number.ilike.%${searchTerm}%,request_type.ilike.%${searchTerm}%,device.ilike.%${searchTerm}%`);
-    }
-
-    // Apply date range filters
-    if (startDate) {
-      countQuery = countQuery.gte('date_reported', startDate);
-    }
-    if (endDate) {
-      countQuery = countQuery.lte('date_reported', endDate);
-    }
+    countQuery = applyTicketFilters(countQuery, filters);
 
     // Get total count
     const { count: total, error: countError } = await countQuery;
@@ -151,25 +131,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       query = query.or(`serviced_by.eq.${req.user.id},serviced_by.is.null`);
     }
 
-    // Apply status filter (handle both underscore and space formats)
-    if (statusFilter && statusFilter !== 'all') {
-      // Convert filter to database format (e.g., "in progress" -> "in_progress")
-      const dbStatus = statusFilter.toLowerCase().replace(/ /g, '_');
-      query = query.eq('status', dbStatus);
-    }
-
-    // Apply search filter
-    if (searchTerm) {
-      query = query.or(`rcc_reference_number.ilike.%${searchTerm}%,request_type.ilike.%${searchTerm}%,device.ilike.%${searchTerm}%`);
-    }
-
-    // Apply date range filters
-    if (startDate) {
-      query = query.gte('date_reported', startDate);
-    }
-    if (endDate) {
-      query = query.lte('date_reported', endDate);
-    }
+    query = applyTicketFilters(query, filters);
 
     // Apply ordering and pagination AFTER all filters
     // sortOrder: 'asc' = oldest first, 'desc' = newest first

@@ -1,7 +1,7 @@
 "use client"
 import React, { useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, Filter } from 'lucide-react';
+import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, Filter, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
 import TicketDetailModal from '@/components/ticketing/TicketDetailModal';
@@ -14,6 +14,8 @@ import { supabase } from '@/services/supabase';
 import { useRouter } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { Pagination } from "@/components/ui/pagination";
+import MultiSelectFilter from '@/components/ticketing/MultiSelectFilter';
+import { downloadTicketsExcel } from '@/lib/exports/ticketsExcel';
 import {
   Table,
   TableBody,
@@ -84,32 +86,49 @@ interface TicketsResponse {
   };
 }
 
+interface TicketListFilters {
+  status: string[];
+  severity: string[];
+  storeId: string[];
+  categoryId: string[];
+  requestTypeId: string[];
+  servicedBy: string[];
+  search: string;
+  startDate: string;
+  endDate: string;
+}
+
+interface FilterOptionsResponse {
+  stores: { id: string; store_name: string; store_code: string }[];
+  categories: { id: string; name: string }[];
+  requestTypes: { id: string; name: string }[];
+  engineers: { id: string; first_name: string; last_name: string }[];
+}
+
+// Serialize active filters as comma-separated query params (matches lib/ticketFilters.ts)
+const buildFilterParams = (filters: TicketListFilters): URLSearchParams => {
+  const params = new URLSearchParams();
+  if (filters.status.length > 0) params.append('status', filters.status.join(','));
+  if (filters.severity.length > 0) params.append('severity', filters.severity.join(','));
+  if (filters.storeId.length > 0) params.append('storeId', filters.storeId.join(','));
+  if (filters.categoryId.length > 0) params.append('categoryId', filters.categoryId.join(','));
+  if (filters.requestTypeId.length > 0) params.append('requestTypeId', filters.requestTypeId.join(','));
+  if (filters.servicedBy.length > 0) params.append('servicedBy', filters.servicedBy.join(','));
+  if (filters.search) params.append('search', filters.search);
+  if (filters.startDate) params.append('startDate', filters.startDate);
+  if (filters.endDate) params.append('endDate', filters.endDate);
+  return params;
+};
+
 const fetchTickets = async (
   page: number,
   limit: number,
-  statusFilter?: string,
-  searchTerm?: string,
-  startDate?: string,
-  endDate?: string,
+  filters: TicketListFilters,
   sortOrder?: 'asc' | 'desc'
 ): Promise<TicketsResponse> => {
-  const params = new URLSearchParams({
-    page: page.toString(),
-    limit: limit.toString(),
-  });
-
-  if (statusFilter && statusFilter !== 'all') {
-    params.append('status', statusFilter);
-  }
-  if (searchTerm) {
-    params.append('search', searchTerm);
-  }
-  if (startDate) {
-    params.append('startDate', startDate);
-  }
-  if (endDate) {
-    params.append('endDate', endDate);
-  }
+  const params = buildFilterParams(filters);
+  params.append('page', page.toString());
+  params.append('limit', limit.toString());
   if (sortOrder) {
     params.append('sortOrder', sortOrder);
   }
@@ -117,6 +136,14 @@ const fetchTickets = async (
   const response = await fetch(`/api/tickets/get?${params.toString()}`);
   if (!response.ok) {
     throw new Error('Failed to fetch tickets');
+  }
+  return response.json();
+};
+
+const fetchFilterOptions = async (): Promise<FilterOptionsResponse> => {
+  const response = await fetch('/api/tickets/filter-options');
+  if (!response.ok) {
+    throw new Error('Failed to fetch filter options');
   }
   return response.json();
 };
@@ -130,7 +157,13 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [severityFilters, setSeverityFilters] = useState<string[]>([]);
+  const [storeFilters, setStoreFilters] = useState<string[]>([]);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [requestTypeFilters, setRequestTypeFilters] = useState<string[]>([]);
+  const [servicedByFilters, setServicedByFilters] = useState<string[]>([]);
+  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -144,10 +177,11 @@ export default function TicketsPage() {
   const [importingFileName, setImportingFileName] = useState<string>('');
   const [isImportLogsModalOpen, setIsImportLogsModalOpen] = useState(false);
   const [isActionsDropdownOpen, setIsActionsDropdownOpen] = useState(false);
-  const [isStatusDropdownOpen, setIsStatusDropdownOpen] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const actionsDropdownRef = useRef<HTMLDivElement>(null);
-  const statusDropdownRef = useRef<HTMLDivElement>(null);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [showValidationModal, setShowValidationModal] = useState(false);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
@@ -156,17 +190,49 @@ export default function TicketsPage() {
   const [pageLimit, setPageLimit] = useState(100);
   const [showAll, setShowAll] = useState(false);
 
+  // Combined filter state passed to the API
+  const activeFilters: TicketListFilters = {
+    status: statusFilters,
+    severity: severityFilters,
+    storeId: storeFilters,
+    categoryId: categoryFilters,
+    requestTypeId: requestTypeFilters,
+    servicedBy: servicedByFilters,
+    search: searchTerm,
+    startDate,
+    endDate,
+  };
+
+  const activeFilterCount =
+    statusFilters.length +
+    severityFilters.length +
+    storeFilters.length +
+    categoryFilters.length +
+    requestTypeFilters.length +
+    servicedByFilters.length +
+    (startDate ? 1 : 0) +
+    (endDate ? 1 : 0);
+
+  const filterKey = buildFilterParams(activeFilters).toString();
+
   // Fetch tickets with TanStack Query
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate, sortOrder],
-    queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, statusFilter, searchTerm, startDate, endDate, sortOrder),
+    queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, filterKey, sortOrder],
+    queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, activeFilters, sortOrder),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
   });
 
+  // Fetch filter dropdown options (stores, categories, request types, engineers)
+  const { data: filterOptions } = useQuery({
+    queryKey: ['ticket-filter-options'],
+    queryFn: fetchFilterOptions,
+    enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Status options for dropdown
   const statusOptions = [
-    { value: 'all', label: 'All Statuses', color: 'text-slate-400' },
     { value: 'open', label: 'Open', color: 'text-blue-400' },
     { value: 'in_progress', label: 'In Progress', color: 'text-yellow-400' },
     { value: 'on_hold', label: 'On Hold', color: 'text-orange-400' },
@@ -180,27 +246,21 @@ export default function TicketsPage() {
     { value: 'pending', label: 'Pending', color: 'text-indigo-400' },
   ];
 
-  // Close dropdown when clicking outside
-  React.useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
-        setIsStatusDropdownOpen(false);
-      }
-    };
-
-    if (isStatusDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isStatusDropdownOpen]);
-
   // Reset to page 1 when filters change
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, searchTerm, startDate, endDate]);
+  }, [filterKey]);
+
+  const clearAllFilters = () => {
+    setStatusFilters([]);
+    setSeverityFilters([]);
+    setStoreFilters([]);
+    setCategoryFilters([]);
+    setRequestTypeFilters([]);
+    setServicedByFilters([]);
+    setStartDate('');
+    setEndDate('');
+  };
 
   // Check user role using useEffect
   React.useEffect(() => {
@@ -252,6 +312,53 @@ export default function TicketsPage() {
   const removeToast = (id: string) => {
     setToasts(prev => prev.filter(toast => toast.id !== id));
   };
+
+  // Export tickets to Excel — 'filtered' respects the current filter panel state,
+  // 'all' exports the complete visible-to-user ticket list.
+  const handleExport = async (mode: 'filtered' | 'all') => {
+    setIsExporting(true);
+    setIsExportDropdownOpen(false);
+    try {
+      const params = mode === 'filtered' ? buildFilterParams(activeFilters) : new URLSearchParams();
+      const response = await fetch(`/api/tickets/export-list?${params.toString()}`);
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch ticket data');
+      }
+
+      if (!result.tickets || result.tickets.length === 0) {
+        showToast('warning', 'No tickets to export', 'No tickets match the current filters.');
+        return;
+      }
+
+      const dateStamp = format(new Date(), 'yyyy-MM-dd');
+      const filename = mode === 'filtered' && activeFilterCount > 0
+        ? `tickets_filtered_${dateStamp}.xlsx`
+        : `tickets_all_${dateStamp}.xlsx`;
+
+      downloadTicketsExcel(result.tickets, filename);
+      showToast('success', `Exported ${result.tickets.length} tickets`, filename);
+    } catch (err) {
+      console.error('Export failed:', err);
+      showToast('error', 'Export failed', err instanceof Error ? err.message : 'Please try again.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // Close export dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false);
+      }
+    };
+    if (isExportDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isExportDropdownOpen]);
 
   // Generate import report as downloadable .txt file
   const generateImportReport = (result: any, fileName: string) => {
@@ -791,6 +898,51 @@ export default function TicketsPage() {
             </button>
           )}
 
+          {/* Export Dropdown */}
+          <div className="relative" ref={exportDropdownRef}>
+            <button
+              onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+              disabled={isExporting}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-xl transition-all shadow-lg shadow-slate-900/20 active:scale-95 whitespace-nowrap border border-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isExporting ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <Download size={16} />
+              )}
+              <span>{isExporting ? 'Exporting...' : 'Export'}</span>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {isExportDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="p-1 space-y-1">
+                  <button
+                    onClick={() => handleExport('filtered')}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <Filter size={16} />
+                    <span>
+                      Export Filtered
+                      {activeFilterCount > 0 && (
+                        <span className="ml-1.5 px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                          {activeFilterCount}
+                        </span>
+                      )}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => handleExport('all')}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  >
+                    <FileSpreadsheet size={16} />
+                    <span>Export All Tickets</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="relative" ref={actionsDropdownRef}>
             <button
               onClick={() => setIsActionsDropdownOpen(!isActionsDropdownOpen)}
@@ -883,88 +1035,146 @@ export default function TicketsPage() {
               <span className="text-sm font-medium whitespace-nowrap">{sortOrder === 'asc' ? 'Oldest First' : 'Newest First'}</span>
             </button>
 
-            {/* Status Filter Dropdown */}
-            <div className="relative flex-1 sm:flex-initial sm:min-w-[200px]" ref={statusDropdownRef}>
-              <button
-                onClick={() => setIsStatusDropdownOpen(!isStatusDropdownOpen)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-950 border border-slate-700 rounded-lg text-slate-300 hover:text-white hover:bg-slate-900 transition-colors"
-              >
-                <Filter size={16} />
-                <span className="text-sm font-medium">
-                  {statusOptions.find(opt => opt.value === statusFilter)?.label || 'Filter by Status'}
+            {/* Filters Toggle */}
+            <button
+              onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
+              className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-lg transition-colors ${
+                activeFilterCount > 0
+                  ? 'bg-blue-600/10 border-blue-500/60 text-blue-300 hover:text-blue-200'
+                  : 'bg-slate-950 border-slate-700 text-slate-300 hover:text-white hover:bg-slate-900'
+              }`}
+            >
+              <Filter size={16} />
+              <span className="text-sm font-medium whitespace-nowrap">Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="px-1.5 py-0.5 bg-blue-600 text-white text-xs rounded-full">
+                  {activeFilterCount}
                 </span>
-                <ChevronDown size={16} className={`transition-transform duration-200 ${isStatusDropdownOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {isStatusDropdownOpen && (
-                <div className="absolute left-0 right-0 sm:left-0 sm:right-auto sm:w-64 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-                  <div className="max-h-96 overflow-y-auto">
-                    {statusOptions.map((option) => (
-                      <button
-                        key={option.value}
-                        onClick={() => {
-                          setStatusFilter(option.value);
-                          setIsStatusDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-4 py-3 hover:bg-slate-800 transition-colors flex items-center justify-between border-b border-slate-800 last:border-0 ${
-                          statusFilter === option.value ? 'bg-slate-800' : ''
-                        }`}
-                      >
-                        <span className={`text-sm font-medium ${option.color}`}>
-                          {option.label}
-                        </span>
-                        {statusFilter === option.value && (
-                          <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                        )}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               )}
-            </div>
-          </div>
-        </div>
+              <ChevronDown size={16} className={`transition-transform duration-200 ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-        {/* Temporarily commented out - Date Range Filter */}
-        {/* <div className="flex flex-col md:flex-row gap-4 bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-          <div className="flex items-center gap-2 text-slate-400">
-            <Calendar size={18} className="flex-shrink-0 text-white" />
-            <span className="text-sm font-medium whitespace-nowrap">Date Range:</span>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3 flex-1">
-            <div className="flex items-center gap-2 flex-1">
-              <label htmlFor="start-date" className="text-sm text-slate-400 whitespace-nowrap">From:</label>
-              <input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
-              />
-            </div>
-            <div className="flex items-center gap-2 flex-1">
-              <label htmlFor="end-date" className="text-sm text-slate-400 whitespace-nowrap">To:</label>
-              <input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
-              />
-            </div>
-            {(startDate || endDate) && (
+            {activeFilterCount > 0 && (
               <button
-                onClick={() => {
-                  setStartDate('');
-                  setEndDate('');
-                }}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                onClick={clearAllFilters}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
               >
-                Clear Dates
+                <X size={14} />
+                Clear All
               </button>
             )}
           </div>
-        </div> */}
+
+          {/* Excel-like Filter Panel */}
+          {isFilterPanelOpen && (
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+                <MultiSelectFilter
+                  label="Status"
+                  options={statusOptions.map((opt) => ({ value: opt.value, label: opt.label }))}
+                  selected={statusFilters}
+                  onChange={setStatusFilters}
+                />
+                <MultiSelectFilter
+                  label="Severity"
+                  options={[
+                    { value: 'sev1', label: 'SEV 1' },
+                    { value: 'sev2', label: 'SEV 2' },
+                    { value: 'sev3', label: 'SEV 3' },
+                    { value: 'sev4', label: 'SEV 4' },
+                  ]}
+                  selected={severityFilters}
+                  onChange={setSeverityFilters}
+                />
+                <MultiSelectFilter
+                  label="Store"
+                  options={(filterOptions?.stores || []).map((s) => ({
+                    value: s.id,
+                    label: s.store_name,
+                    sublabel: s.store_code,
+                  }))}
+                  selected={storeFilters}
+                  onChange={setStoreFilters}
+                  searchable
+                />
+                <MultiSelectFilter
+                  label="Category"
+                  options={(filterOptions?.categories || []).map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
+                  selected={categoryFilters}
+                  onChange={setCategoryFilters}
+                  searchable
+                />
+                <MultiSelectFilter
+                  label="Request Type"
+                  options={(filterOptions?.requestTypes || []).map((rt) => ({
+                    value: rt.id,
+                    label: rt.name,
+                  }))}
+                  selected={requestTypeFilters}
+                  onChange={setRequestTypeFilters}
+                  searchable
+                />
+                <MultiSelectFilter
+                  label="Serviced By"
+                  options={[
+                    { value: 'unassigned', label: 'Unassigned' },
+                    ...(filterOptions?.engineers || []).map((e) => ({
+                      value: e.id,
+                      label: `${e.first_name} ${e.last_name}`,
+                    })),
+                  ]}
+                  selected={servicedByFilters}
+                  onChange={setServicedByFilters}
+                  searchable
+                />
+              </div>
+
+              {/* Date Range */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex items-center gap-2 text-slate-400">
+                  <Calendar size={18} className="flex-shrink-0 text-white" />
+                  <span className="text-sm font-medium whitespace-nowrap">Date Reported:</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <div className="flex items-center gap-2 flex-1">
+                    <label htmlFor="start-date" className="text-sm text-slate-400 whitespace-nowrap">From:</label>
+                    <input
+                      id="start-date"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-1">
+                    <label htmlFor="end-date" className="text-sm text-slate-400 whitespace-nowrap">To:</label>
+                    <input
+                      id="end-date"
+                      type="date"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+                    />
+                  </div>
+                  {(startDate || endDate) && (
+                    <button
+                      onClick={() => {
+                        setStartDate('');
+                        setEndDate('');
+                      }}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                    >
+                      Clear Dates
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
 
@@ -988,10 +1198,12 @@ export default function TicketsPage() {
                 <TableHead className="text-slate-400 font-semibold">Elapsed Time</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Elapsed %</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Date Reported</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Date Attended</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Request Type</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Category</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Device</TableHead>
-                <TableHead className="text-slate-400 font-semibold">Request Detail</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Store</TableHead>
+                <TableHead className="text-slate-400 font-semibold">Store Code</TableHead>
                 <TableHead className="text-slate-400 font-semibold">Serviced By</TableHead>
               </TableRow>
             </TableHeader>
@@ -1074,19 +1286,27 @@ export default function TicketsPage() {
                     </div>
                   </TableCell>
                   <TableCell className="text-slate-300">
+                    {ticket.date_attended
+                      ? format(new Date(ticket.date_attended), 'MMM d, yyyy')
+                      : <span className="text-slate-500">N/A</span>}
+                  </TableCell>
+                  <TableCell className="text-slate-300">
                     {ticket.request_types?.name || ticket.request_type}
                   </TableCell>
                   <TableCell className="text-slate-300">
-                    {ticket.device}
+                    {ticket.problem_categories?.name || ticket.problem_category || <span className="text-slate-500">N/A</span>}
                   </TableCell>
-                  <TableCell className="text-slate-400">
-                    <span className="truncate max-w-[200px] block">{ticket.request_detail}</span>
+                  <TableCell className="text-slate-300">
+                    {ticket.device}
                   </TableCell>
                   <TableCell className="text-slate-400">
                     <div className="flex items-center gap-1.5">
                       <MapPin size={14} className="text-slate-600 flex-shrink-0" />
                       <span className="truncate max-w-[150px]">{ticket.stores?.store_name}</span>
                     </div>
+                  </TableCell>
+                  <TableCell className="font-mono text-slate-300">
+                    {ticket.stores?.store_code || <span className="text-slate-500">N/A</span>}
                   </TableCell>
                   <TableCell className="text-slate-400">
                     <div className="flex items-center gap-1.5">

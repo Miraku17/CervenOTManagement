@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { Store, LayoutDashboard, LogOut, Menu, Package, Monitor, FileText, X, ArrowLeft, PieChart, History, ChevronLeft, ChevronRight, AlertTriangle, Truck } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useRouter, usePathname } from 'next/navigation';
@@ -117,6 +117,9 @@ export default function TicketingLayout({
   // Audit Logs: Permission-based access
   const hasAuditLogsAccess = hasPermission('view_audit_logs');
 
+  // Check if user has access to courier transactions
+  const hasCourierAccess = hasPermission('manage_courier_transactions');
+
   // Check if user has access to tickets
   const hasTicketsAccess = hasPermission('manage_tickets');
 
@@ -206,7 +209,7 @@ export default function TicketingLayout({
         )}
 
         {/* Inventory Section */}
-        {(hasStoresAccess || hasStoreInventoryAccess || hasAssetInventoryAccess) && (
+        {(hasStoresAccess || hasStoreInventoryAccess || hasAssetInventoryAccess || hasCourierAccess) && (
           <div>
             <SidebarLabel isOpen={isOpen}>Inventory</SidebarLabel>
             <div className="space-y-1">
@@ -274,6 +277,23 @@ export default function TicketingLayout({
                   <AlertTriangle size={18} className={pathname === '/dashboard/ticketing/defective-assets' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
                   <span className={`font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 hidden'}`}>
                     Defective Assets
+                  </span>
+                </button>
+              )}
+
+              {hasCourierAccess && (
+                <button
+                  onClick={() => handleNavigate('/dashboard/ticketing/courier-transactions')}
+                  className={`w-full flex items-center ${isOpen ? 'gap-3 px-3' : 'justify-center px-0'} py-2 rounded-lg transition-all duration-200 group ${
+                    pathname === '/dashboard/ticketing/courier-transactions'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-900/20'
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                  title={!isOpen ? "Courier Transactions" : undefined}
+                >
+                  <Truck size={18} className={pathname === '/dashboard/ticketing/courier-transactions' ? 'text-white' : 'text-slate-400 group-hover:text-white transition-colors'} />
+                  <span className={`font-medium text-sm whitespace-nowrap overflow-hidden transition-all duration-200 ${isOpen ? 'opacity-100 max-w-full' : 'opacity-0 max-w-0 hidden'}`}>
+                    Courier Transactions
                   </span>
                 </button>
               )}

@@ -24,6 +24,9 @@ interface LiquidationItem {
   toll: string;
   meals: string;
   lodging: string;
+  tools: string;
+  supplies: string;
+  mobility_transport: string;
   others: string;
   remarks: string;
 }
@@ -108,8 +111,11 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const toll = parseFloat(item.toll || '0') || 0;
       const meals = parseFloat(item.meals || '0') || 0;
       const lodging = parseFloat(item.lodging || '0') || 0;
+      const tools = parseFloat(item.tools || '0') || 0;
+      const supplies = parseFloat(item.supplies || '0') || 0;
+      const mobility_transport = parseFloat(item.mobility_transport || '0') || 0;
       const others = parseFloat(item.others || '0') || 0;
-      const itemTotal = jeep + bus + fx_van + gas + toll + meals + lodging + others;
+      const itemTotal = jeep + bus + fx_van + gas + toll + meals + lodging + tools + supplies + mobility_transport + others;
       totalAmount += itemTotal;
 
       return {
@@ -124,6 +130,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         toll,
         meals,
         lodging,
+        tools,
+        supplies,
+        mobility_transport,
         others,
         total: itemTotal,
         remarks: item.remarks || '',

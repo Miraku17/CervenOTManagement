@@ -16,14 +16,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
   try {
     // Check if user has permission to view stores
-    const [canViewStores, canManageStores, canManageTickets, canManageInventory] = await Promise.all([
+    const [canViewStores, canManageStores, canManageTickets, canManageInventory, canManageCourier] = await Promise.all([
       userHasPermission(userId, 'view_stores'),
       userHasPermission(userId, 'manage_stores'),
       userHasPermission(userId, 'manage_tickets'),
       userHasPermission(userId, 'manage_store_inventory'),
+      userHasPermission(userId, 'manage_courier_transactions'),
     ]);
 
-    if (!canViewStores && !canManageStores && !canManageTickets && !canManageInventory) {
+    if (!canViewStores && !canManageStores && !canManageTickets && !canManageInventory && !canManageCourier) {
       return res.status(403).json({ error: 'You do not have permission to view stores' });
     }
 
