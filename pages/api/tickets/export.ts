@@ -25,6 +25,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Get date range from query params
     const { startDate, endDate } = req.query;
+    // Which date column the range applies to (whitelisted).
+    const dateColumn = req.query.dateField === 'date_attended' ? 'date_attended' : 'date_reported';
 
     // Check if user has manage_tickets permission
     const hasManageTickets = await userHasPermission(req.user?.id || '', 'manage_tickets');
@@ -120,10 +122,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
       // Apply date filters if provided
       if (startDate && typeof startDate === 'string') {
-        query = query.gte('date_reported', startDate);
+        query = query.gte(dateColumn, startDate);
       }
       if (endDate && typeof endDate === 'string') {
-        query = query.lte('date_reported', endDate);
+        query = query.lte(dateColumn, endDate);
       }
 
       const { data, error } = await query;

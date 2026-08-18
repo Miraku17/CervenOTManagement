@@ -1,6 +1,6 @@
 "use client"
-import React, { useState, useRef } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useRef, useEffect } from 'react';
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { Plus, Ticket as TicketIcon, Search, ArrowUpDown, Upload, FileSpreadsheet, History, ChevronDown, Calendar, Clock, MapPin, AlertTriangle, Trash2, Loader2, X, AlertCircle, User, Filter, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import AddTicketModal from '@/components/ticketing/AddTicketModal';
@@ -96,6 +96,8 @@ interface TicketListFilters {
   search: string;
   startDate: string;
   endDate: string;
+  attendedStartDate: string;
+  attendedEndDate: string;
 }
 
 interface FilterOptionsResponse {
@@ -117,6 +119,8 @@ const buildFilterParams = (filters: TicketListFilters): URLSearchParams => {
   if (filters.search) params.append('search', filters.search);
   if (filters.startDate) params.append('startDate', filters.startDate);
   if (filters.endDate) params.append('endDate', filters.endDate);
+  if (filters.attendedStartDate) params.append('attendedStartDate', filters.attendedStartDate);
+  if (filters.attendedEndDate) params.append('attendedEndDate', filters.attendedEndDate);
   return params;
 };
 
@@ -157,6 +161,9 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  // Debounced copy of searchTerm — this is what actually drives the query, so typing
+  // stays seamless (no request/reload on every keystroke).
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [statusFilters, setStatusFilters] = useState<string[]>([]);
   const [severityFilters, setSeverityFilters] = useState<string[]>([]);
   const [storeFilters, setStoreFilters] = useState<string[]>([]);
@@ -167,6 +174,8 @@ export default function TicketsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [attendedStartDate, setAttendedStartDate] = useState('');
+  const [attendedEndDate, setAttendedEndDate] = useState('');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [ticketToDelete, setTicketToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -190,6 +199,12 @@ export default function TicketsPage() {
   const [pageLimit, setPageLimit] = useState(100);
   const [showAll, setShowAll] = useState(false);
 
+  // Debounce the search input so the query only fires once typing settles.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchTerm(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Combined filter state passed to the API
   const activeFilters: TicketListFilters = {
     status: statusFilters,
@@ -198,9 +213,11 @@ export default function TicketsPage() {
     categoryId: categoryFilters,
     requestTypeId: requestTypeFilters,
     servicedBy: servicedByFilters,
-    search: searchTerm,
+    search: debouncedSearchTerm,
     startDate,
     endDate,
+    attendedStartDate,
+    attendedEndDate,
   };
 
   const activeFilterCount =
@@ -211,16 +228,21 @@ export default function TicketsPage() {
     requestTypeFilters.length +
     servicedByFilters.length +
     (startDate ? 1 : 0) +
-    (endDate ? 1 : 0);
+    (endDate ? 1 : 0) +
+    (attendedStartDate ? 1 : 0) +
+    (attendedEndDate ? 1 : 0);
 
   const filterKey = buildFilterParams(activeFilters).toString();
 
   // Fetch tickets with TanStack Query
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: ['tickets', currentPage, showAll ? 5000 : pageLimit, filterKey, sortOrder],
     queryFn: () => fetchTickets(currentPage, showAll ? 5000 : pageLimit, activeFilters, sortOrder),
     enabled: !permissionsLoading && !checkingRole && hasPermission('manage_tickets'),
     staleTime: 30000, // 30 seconds
+    // Keep showing the previous results while the next query loads (search, filters,
+    // pagination) so the page never unmounts into a full-screen spinner mid-typing.
+    placeholderData: keepPreviousData,
   });
 
   // Fetch filter dropdown options (stores, categories, request types, engineers)
@@ -260,6 +282,8 @@ export default function TicketsPage() {
     setServicedByFilters([]);
     setStartDate('');
     setEndDate('');
+    setAttendedStartDate('');
+    setAttendedEndDate('');
   };
 
   // Check user role using useEffect
@@ -1019,8 +1043,11 @@ export default function TicketsPage() {
               placeholder="Search tickets..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-10 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
             />
+            {isFetching && (
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" size={18} />
+            )}
           </div>
 
           {/* Filter Buttons */}
@@ -1134,7 +1161,7 @@ export default function TicketsPage() {
 
               {/* Date Range */}
               <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex items-center gap-2 text-slate-400">
+                <div className="flex items-center gap-2 text-slate-400 md:w-[140px]">
                   <Calendar size={18} className="flex-shrink-0 text-white" />
                   <span className="text-sm font-medium whitespace-nowrap">Date Reported:</span>
                 </div>
@@ -1172,6 +1199,47 @@ export default function TicketsPage() {
                   )}
                 </div>
               </div>
+
+              {/* Date Attended Range */}
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex items-center gap-2 text-slate-400 md:w-[140px]">
+                  <Clock size={18} className="flex-shrink-0 text-white" />
+                  <span className="text-sm font-medium whitespace-nowrap">Date Attended:</span>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 flex-1">
+                  <div className="flex items-center gap-2 flex-1">
+                    <label htmlFor="attended-start-date" className="text-sm text-slate-400 whitespace-nowrap">From:</label>
+                    <input
+                      id="attended-start-date"
+                      type="date"
+                      value={attendedStartDate}
+                      onChange={(e) => setAttendedStartDate(e.target.value)}
+                      className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 flex-1">
+                    <label htmlFor="attended-end-date" className="text-sm text-slate-400 whitespace-nowrap">To:</label>
+                    <input
+                      id="attended-end-date"
+                      type="date"
+                      value={attendedEndDate}
+                      onChange={(e) => setAttendedEndDate(e.target.value)}
+                      className="flex-1 bg-slate-950 border border-slate-700 text-white px-3 py-2 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm [color-scheme:dark]"
+                    />
+                  </div>
+                  {(attendedStartDate || attendedEndDate) && (
+                    <button
+                      onClick={() => {
+                        setAttendedStartDate('');
+                        setAttendedEndDate('');
+                      }}
+                      className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white rounded-lg transition-colors text-sm font-medium whitespace-nowrap"
+                    >
+                      Clear Dates
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -1187,7 +1255,7 @@ export default function TicketsPage() {
             <p className="text-slate-500 mt-1">Try adjusting your filters or create a new ticket.</p>
           </div>
         ) : (
-          <Table>
+          <Table className="text-xs whitespace-nowrap [&_th]:h-9 [&_th]:px-2 [&_td]:px-2 [&_td]:py-1.5">
             <TableHeader>
               <TableRow className="border-slate-800 hover:bg-transparent">
                 <TableHead className="text-slate-400 font-semibold">Reference #</TableHead>

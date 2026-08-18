@@ -9,8 +9,10 @@ export interface TicketFilterParams {
   requestTypeId?: string[]; // request_types.id uuids
   servicedBy?: string[];    // profile uuids; special value 'unassigned'
   search?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string;           // filters date_reported (>=)
+  endDate?: string;             // filters date_reported (<=)
+  attendedStartDate?: string;   // filters date_attended (>=)
+  attendedEndDate?: string;     // filters date_attended (<=)
 }
 
 const parseList = (value: unknown): string[] | undefined => {
@@ -35,6 +37,8 @@ export function parseTicketFilters(query: Record<string, unknown>): TicketFilter
     search: typeof query.search === 'string' && query.search ? query.search : undefined,
     startDate: typeof query.startDate === 'string' && query.startDate ? query.startDate : undefined,
     endDate: typeof query.endDate === 'string' && query.endDate ? query.endDate : undefined,
+    attendedStartDate: typeof query.attendedStartDate === 'string' && query.attendedStartDate ? query.attendedStartDate : undefined,
+    attendedEndDate: typeof query.attendedEndDate === 'string' && query.attendedEndDate ? query.attendedEndDate : undefined,
   };
 }
 
@@ -87,6 +91,13 @@ export function applyTicketFilters<T extends { eq: any }>(query: T, filters: Tic
   }
   if (filters.endDate) {
     q = q.lte('date_reported', filters.endDate);
+  }
+
+  if (filters.attendedStartDate) {
+    q = q.gte('date_attended', filters.attendedStartDate);
+  }
+  if (filters.attendedEndDate) {
+    q = q.lte('date_attended', filters.attendedEndDate);
   }
 
   return q as T;

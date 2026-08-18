@@ -445,7 +445,9 @@ export default function TicketingLayout({
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative pt-16 md:pt-0">
         <div className="flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          <div className="max-w-7xl mx-auto">
+          {/* The tickets list has many columns, so let it use the full viewport width
+              to minimize horizontal scrolling; other pages stay centered/readable. */}
+          <div className={pathname === '/dashboard/ticketing/tickets' ? 'w-full' : 'max-w-7xl mx-auto'}>
             {children}
           </div>
         </div>

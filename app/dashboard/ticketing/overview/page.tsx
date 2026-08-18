@@ -29,6 +29,8 @@ export default function TicketOverviewPage() {
   const [loadingStats, setLoadingStats] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Which ticket date column the range filters against.
+  const [dateField, setDateField] = useState<'date_reported' | 'date_attended'>('date_reported');
   const [isExporting, setIsExporting] = useState(false);
 
   // Modal states
@@ -52,6 +54,7 @@ export default function TicketOverviewPage() {
         const params = new URLSearchParams();
         if (startDate) params.append('startDate', startDate);
         if (endDate) params.append('endDate', endDate);
+        params.append('dateField', dateField);
 
         const response = await fetch(`/api/tickets/stats?${params.toString()}`);
         const data = await response.json();
@@ -66,7 +69,7 @@ export default function TicketOverviewPage() {
     };
 
     fetchStats();
-  }, [user?.id, isLoading, hasPermission, startDate, endDate]);
+  }, [user?.id, isLoading, hasPermission, startDate, endDate, dateField]);
 
   const handleExportToExcel = async () => {
     setIsExporting(true);
@@ -74,6 +77,7 @@ export default function TicketOverviewPage() {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
+      params.append('dateField', dateField);
 
       const response = await fetch(`/api/tickets/export?${params.toString()}`);
       const result = await response.json();
@@ -199,6 +203,7 @@ export default function TicketOverviewPage() {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
+      params.append('dateField', dateField);
 
       const response = await fetch(`/api/tickets/export?${params.toString()}`);
       const result = await response.json();
@@ -376,9 +381,30 @@ export default function TicketOverviewPage() {
 
       {/* Date Range Filter */}
       <div className="bg-slate-900/50 p-4 rounded-xl border border-slate-800">
-        <div className="flex items-center gap-2 text-slate-400 mb-3">
-          <Calendar size={18} className="text-white" />
-          <span className="text-sm font-medium text-white">Filtered by: Date Range</span>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2 text-slate-400">
+            <Calendar size={18} className="text-white" />
+            <span className="text-sm font-medium text-white">Filtered by:</span>
+          </div>
+          {/* Choose which date column the range applies to */}
+          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-950 p-1 self-start sm:self-auto">
+            {([
+              { value: 'date_reported', label: 'Date Reported' },
+              { value: 'date_attended', label: 'Date Attended' },
+            ] as const).map((opt) => (
+              <button
+                key={opt.value}
+                onClick={() => setDateField(opt.value)}
+                className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                  dateField === opt.value
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="flex items-center gap-2 flex-1">
