@@ -153,10 +153,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         let storeId: string;
 
         if (existingStore) {
-          // Update existing store
+          // Update existing store (restores it if it was soft-deleted)
           const { data: updatedStore, error: updateError } = await supabase
             .from('stores')
-            .update(storeData)
+            .update({ ...storeData, deleted_at: null, deleted_by: null })
             .eq('store_code', storeCode)
             .select('id')
             .single();
