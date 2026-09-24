@@ -31,6 +31,28 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
+    // store_code is unique across all rows, including soft-deleted ones
+    if (store_code) {
+      const { data: conflictingStore, error: lookupError } = await supabaseAdmin
+        .from('stores')
+        .select('id, deleted_at')
+        .eq('store_code', store_code)
+        .neq('id', id)
+        .maybeSingle();
+
+      if (lookupError) {
+        throw lookupError;
+      }
+
+      if (conflictingStore) {
+        return res.status(409).json({
+          error: conflictingStore.deleted_at
+            ? `Store code "${store_code}" belongs to a deleted store. Create a new store with this code to restore it.`
+            : `A store with code "${store_code}" already exists.`,
+        });
+      }
+    }
+
     // Update the store without managers
     const { data: store, error: storeError } = await supabaseAdmin
       .from('stores')

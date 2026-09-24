@@ -31,28 +31,74 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       throw new Error('Database connection not available');
     }
 
-    // Create the store without managers
-    const { data: store, error: storeError } = await supabaseAdmin
-      .from('stores')
-      .insert([
-        {
-          store_name,
-          store_code,
-          store_type,
-          contact_no,
-          mobile_number: mobile_number || null,
-          store_address: store_address || null,
-          city,
-          location,
-          group,
-          status: status || 'active',
-        },
-      ])
-      .select()
-      .single();
+    const storeData = {
+      store_name,
+      store_code,
+      store_type,
+      contact_no,
+      mobile_number: mobile_number || null,
+      store_address: store_address || null,
+      city,
+      location,
+      group,
+      status: status || 'active',
+    };
 
-    if (storeError) {
-      throw storeError;
+    // store_code is unique across all rows, including soft-deleted ones
+    const { data: existingStore, error: lookupError } = await supabaseAdmin
+      .from('stores')
+      .select('id, deleted_at')
+      .eq('store_code', store_code)
+      .maybeSingle();
+
+    if (lookupError) {
+      throw lookupError;
+    }
+
+    if (existingStore && !existingStore.deleted_at) {
+      return res.status(409).json({ error: `A store with code "${store_code}" already exists.` });
+    }
+
+    let store;
+
+    if (existingStore) {
+      // Restore the soft-deleted store with the new details
+      const { data: restoredStore, error: restoreError } = await supabaseAdmin
+        .from('stores')
+        .update({ ...storeData, deleted_at: null, deleted_by: null })
+        .eq('id', existingStore.id)
+        .select()
+        .single();
+
+      if (restoreError) {
+        throw restoreError;
+      }
+      store = restoredStore;
+
+      // Drop the old managers so only the ones from this form remain
+      const { error: deleteManagersError } = await supabaseAdmin
+        .from('store_managers')
+        .delete()
+        .eq('store_id', store.id);
+
+      if (deleteManagersError) {
+        throw new Error(`Failed to clear old managers: ${deleteManagersError.message}`);
+      }
+    } else {
+      // Create the store without managers
+      const { data: newStore, error: storeError } = await supabaseAdmin
+        .from('stores')
+        .insert([storeData])
+        .select()
+        .single();
+
+      if (storeError) {
+        if (storeError.code === '23505') {
+          return res.status(409).json({ error: `A store with code "${store_code}" already exists.` });
+        }
+        throw storeError;
+      }
+      store = newStore;
     }
 
     // Insert managers into store_managers table if provided
