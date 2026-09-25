@@ -19,6 +19,8 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
     store_code: '',
     store_type: '',
     contact_no: '',
+    mobile_number: '',
+    store_address: '',
     city: '',
     location: '',
     group: '',
@@ -39,6 +41,8 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
         store_code: store.store_code,
         store_type: store.store_type || '',
         contact_no: store.contact_no || '',
+        mobile_number: store.mobile_number || '',
+        store_address: store.store_address || '',
         city: store.city || '',
         location: store.location || '',
         group: store.group || '',
@@ -258,6 +262,33 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                         />
                      </div>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-400 mb-1.5">Mobile Number</label>
+                     <div className="relative">
+                        <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4" />
+                        <input
+                            type="text"
+                            value={formData.mobile_number}
+                            onChange={(e) => setFormData({ ...formData, mobile_number: e.target.value })}
+                            className="w-full bg-slate-950 border border-slate-700 text-white pl-10 pr-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                            placeholder="e.g. 09987654321"
+                        />
+                     </div>
+                  </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-400 mb-1.5">Store Address</label>
+                <textarea
+                    value={formData.store_address}
+                    onChange={(e) => setFormData({ ...formData, store_address: e.target.value })}
+                    className="w-full bg-slate-950 border border-slate-700 text-white px-4 py-2.5 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+                    placeholder="e.g. 123 Main Street, Building A"
+                    rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                    <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1.5">City</label>
                     <input
@@ -268,9 +299,6 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                         placeholder="e.g. Cebu"
                     />
                   </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Location</label>
                     <input
@@ -281,6 +309,9 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                         placeholder="e.g. Downtown"
                     />
                   </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   <div>
                     <label className="block text-sm font-medium text-slate-400 mb-1.5">Group</label>
                     <input
@@ -330,12 +361,26 @@ const StoreDetailModal: React.FC<StoreDetailModalProps> = ({ isOpen, onClose, st
                                         <p className="text-slate-300">{store.contact_no || 'No contact number'}</p>
                                     </div>
                                 </div>
+                                <div className="flex items-center gap-3">
+                                    <Phone className="text-blue-500 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">Mobile Number</p>
+                                        <p className="text-slate-300">{store.mobile_number || 'No mobile number'}</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
                         <div>
                             <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Location Details</h3>
                             <div className="space-y-4">
+                                <div className="flex items-start gap-3">
+                                    <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
+                                    <div>
+                                        <p className="text-xs text-slate-500 mb-1">Address</p>
+                                        <p className="text-slate-300 break-words">{store.store_address || 'Not specified'}</p>
+                                    </div>
+                                </div>
                                 <div className="flex items-start gap-3">
                                     <MapPin className="text-blue-500 mt-1 shrink-0" size={18} />
                                     <div>
