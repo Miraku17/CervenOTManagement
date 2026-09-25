@@ -20,7 +20,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(403).json({ error: 'You do not have permission to update stores' });
   }
 
-  const { id, store_name, store_code, store_type, contact_no, city, location, group, managers, status } = req.body;
+  const { id, store_name, store_code, store_type, contact_no, mobile_number, store_address, city, location, group, managers, status } = req.body;
 
   if (!id) {
     return res.status(400).json({ error: 'Store ID is required.' });
@@ -61,6 +61,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         store_code,
         store_type,
         contact_no,
+        mobile_number,
+        store_address,
         city,
         location,
         group,
